@@ -1,4 +1,3 @@
-// add_quiz_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
@@ -8,10 +7,10 @@ import '../widgets/subject_dropdown_with_add_button.dart';
 import '../widgets/quiz_type_dropdown_with_add_button.dart';
 
 class AddQuizPage extends StatefulWidget {
-  const AddQuizPage({Key? key}) : super(key: key);
+  const AddQuizPage({super.key});
 
   @override
-  _AddQuizPageState createState() => _AddQuizPageState();
+  State<AddQuizPage> createState() => _AddQuizPageState();
 }
 
 class _AddQuizPageState extends State<AddQuizPage> {
@@ -26,6 +25,9 @@ class _AddQuizPageState extends State<AddQuizPage> {
       List.generate(5, (_) => TextEditingController());
   int _correctOptionIndex = 0;
   final TextEditingController _explanationController = TextEditingController();
+  final List<TextEditingController> _keywordControllers = [
+    TextEditingController()
+  ];
 
   @override
   void initState() {
@@ -42,6 +44,9 @@ class _AddQuizPageState extends State<AddQuizPage> {
       controller.dispose();
     }
     _explanationController.dispose();
+    for (var controller in _keywordControllers) {
+      controller.dispose();
+    }
     _logger.i('AddQuizPage disposed');
     super.dispose();
   }
@@ -89,6 +94,8 @@ class _AddQuizPageState extends State<AddQuizPage> {
                   onAddPressed: () => _showAddDialog(isSubject: false),
                 ),
               const SizedBox(height: 16),
+              _buildKeywordFields(),
+              const SizedBox(height: 16),
               _buildQuestionField(),
               const SizedBox(height: 16),
               ..._buildOptionFields(),
@@ -111,7 +118,7 @@ class _AddQuizPageState extends State<AddQuizPage> {
 
     return showDialog<void>(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: Text('Add $itemType'),
           content: TextField(
@@ -123,7 +130,7 @@ class _AddQuizPageState extends State<AddQuizPage> {
               child: const Text('Cancel'),
               onPressed: () {
                 _logger.i('Add $itemType dialog cancelled');
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
               },
             ),
             TextButton(
@@ -144,7 +151,8 @@ class _AddQuizPageState extends State<AddQuizPage> {
                           'Attempted to add quiz type without selecting subject');
                     }
                   }
-                  Navigator.of(context).pop();
+                  if (!mounted) return;
+                  Navigator.of(dialogContext).pop();
                   setState(() {}); // Refresh the dropdowns
                 } else {
                   _logger.w('Attempted to add $itemType with empty name');
@@ -155,6 +163,57 @@ class _AddQuizPageState extends State<AddQuizPage> {
         );
       },
     );
+  }
+
+  Widget _buildKeywordFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Keywords (Optional)',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        ..._keywordControllers.map((controller) => Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: controller,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter a keyword',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: () => _removeKeywordField(controller),
+                  ),
+                ],
+              ),
+            )),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.add),
+          label: const Text('Add Keyword'),
+          onPressed: _addKeywordField,
+        ),
+      ],
+    );
+  }
+
+  void _removeKeywordField(TextEditingController controller) {
+    setState(() {
+      _keywordControllers.remove(controller);
+      controller.dispose();
+    });
+    _logger.i('Removed keyword field');
+  }
+
+  void _addKeywordField() {
+    setState(() {
+      _keywordControllers.add(TextEditingController());
+    });
+    _logger.i('Added new keyword field');
   }
 
   Widget _buildQuestionField() {
@@ -235,15 +294,22 @@ class _AddQuizPageState extends State<AddQuizPage> {
           correctOptionIndex: _correctOptionIndex,
           explanation: _explanationController.text,
           typeId: _selectedTypeId!,
+          keywords: _keywordControllers
+              .map((c) => c.text.trim())
+              .where((keyword) => keyword.isNotEmpty)
+              .toList(),
         );
-        await _quizService.addQuiz(newQuiz);
+        await _quizService.addQuiz(
+            _selectedSubjectId!, _selectedTypeId!, newQuiz);
         _logger.i('New quiz added successfully');
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Quiz added successfully')),
         );
         _resetForm();
       } catch (e) {
         _logger.e('Error adding quiz: $e');
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Failed to add quiz. Please try again.')),
@@ -262,6 +328,11 @@ class _AddQuizPageState extends State<AddQuizPage> {
       controller.clear();
     }
     _explanationController.clear();
+    for (var controller in _keywordControllers) {
+      controller.dispose();
+    }
+    _keywordControllers.clear();
+    _keywordControllers.add(TextEditingController());
     setState(() {
       _selectedSubjectId = null;
       _selectedTypeId = null;

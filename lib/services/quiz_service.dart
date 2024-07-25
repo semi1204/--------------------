@@ -1,4 +1,3 @@
-// quiz_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/subject.dart';
 import '../models/quiz_type.dart';
@@ -21,8 +20,9 @@ class QuizService {
   Stream<List<QuizType>> getQuizTypes(String subjectId) {
     _logger.i('Fetching quiz types for subject: $subjectId');
     return _firestore
+        .collection('subjects')
+        .doc(subjectId)
         .collection('quizTypes')
-        .where('subjectId', isEqualTo: subjectId)
         .snapshots()
         .map((snapshot) {
       _logger.i('Quiz types fetched. Count: ${snapshot.docs.length}');
@@ -33,12 +33,13 @@ class QuizService {
   Future<void> addQuizTypeToSubject(String subjectId, String typeName) async {
     _logger.i('Adding new quiz type: $typeName to subject: $subjectId');
     try {
-      final subjectRef = _firestore.collection('subjects').doc(subjectId);
-      await subjectRef.update({
-        'quizTypes': FieldValue.arrayUnion([
-          {'name': typeName, 'id': Uuid().v4()}
-        ])
-      });
+      final quizTypeId = Uuid().v4();
+      await _firestore
+          .collection('subjects')
+          .doc(subjectId)
+          .collection('quizTypes')
+          .doc(quizTypeId)
+          .set({'name': typeName, 'id': quizTypeId});
       _logger.i('Quiz type added successfully to subject');
     } catch (e) {
       _logger.e('Error adding quiz type to subject: $e');
@@ -50,11 +51,10 @@ class QuizService {
     return _firestore
         .collection('subjects')
         .doc(subjectId)
+        .collection('quizTypes')
         .snapshots()
-        .map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      final quizTypes = data['quizTypes'] as List<dynamic>? ?? [];
-      return quizTypes.map((type) => QuizType.fromMap(type)).toList();
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => QuizType.fromFirestore(doc)).toList();
     });
   }
 
@@ -69,25 +69,15 @@ class QuizService {
     }
   }
 
-  Future<void> addQuizType(String name, String subjectId) async {
-    _logger.i('Adding new quiz type: $name for subject: $subjectId');
-    try {
-      await _firestore.collection('quizTypes').add({
-        'name': name,
-        'subjectId': subjectId,
-      });
-      _logger.i('Quiz type added successfully');
-    } catch (e) {
-      _logger.e('Error adding quiz type: $e');
-      rethrow;
-    }
-  }
-
-  Stream<List<Quiz>> getQuizzes(String typeId) {
-    _logger.i('Fetching quizzes for type: $typeId');
+  Stream<List<Quiz>> getQuizzes(String subjectId, String quizTypeId) {
+    _logger
+        .i('Fetching quizzes for subject: $subjectId, quizType: $quizTypeId');
     return _firestore
+        .collection('subjects')
+        .doc(subjectId)
+        .collection('quizTypes')
+        .doc(quizTypeId)
         .collection('quizzes')
-        .where('typeId', isEqualTo: typeId)
         .snapshots()
         .map((snapshot) {
       _logger.i('Quizzes fetched. Count: ${snapshot.docs.length}');
@@ -95,10 +85,16 @@ class QuizService {
     });
   }
 
-  Future<void> addQuiz(Quiz quiz) async {
-    _logger.i('Adding new quiz');
+  Future<void> addQuiz(String subjectId, String quizTypeId, Quiz quiz) async {
+    _logger.i('Adding new quiz to subject: $subjectId, quizType: $quizTypeId');
     try {
-      await _firestore.collection('quizzes').add(quiz.toFirestore());
+      await _firestore
+          .collection('subjects')
+          .doc(subjectId)
+          .collection('quizTypes')
+          .doc(quizTypeId)
+          .collection('quizzes')
+          .add(quiz.toFirestore());
       _logger.i('Quiz added successfully');
     } catch (e) {
       _logger.e('Error adding quiz: $e');

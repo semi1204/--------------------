@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "560724875652",
+    "project_id": "nursingquizapp6",
+    "storage_bucket": "nursingquizapp6.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:560724875652:android:649bc7c6ab417b1a82a5d1",
+        "android_client_info": {
+          "package_name": "com.example.nursing_quiz_app_6"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "560724875652-2par7rtptb70geo2juq1kdcehhlpdfsr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nursing_quiz_app_6",
+            "certificate_hash": "5373297f6952e071cb0172021f06c0ea814c5852"
+          }
+        },
+        {
+          "client_id": "560724875652-q2483it62tg1odrgfkhv8s7joqf2ghkf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAy0lxwbp2Ed7T0RMavuOBF6ve6tTV33cQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "560724875652-q2483it62tg1odrgfkhv8s7joqf2ghkf.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "560724875652-b9vdp3k62anr5c6hs1hdr3begsbv5nrk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.nursingQuizApp6"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

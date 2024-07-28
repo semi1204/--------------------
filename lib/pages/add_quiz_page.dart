@@ -7,6 +7,10 @@ import 'package:logger/logger.dart';
 import '../widgets/subject_dropdown_with_add_button.dart';
 import '../widgets/quiz_type_dropdown_with_add_button.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class AddQuizPage extends StatefulWidget {
   const AddQuizPage({super.key});
@@ -19,6 +23,8 @@ class _AddQuizPageState extends State<AddQuizPage> {
   final _formKey = GlobalKey<FormState>();
   late final Logger _logger;
   late final QuizService _quizService;
+  File? _image;
+  String? _imageUrl; // 이 부분을 다시 추가했습니다.
 
   String? _selectedSubjectId;
   String? _selectedTypeId;
@@ -39,6 +45,7 @@ class _AddQuizPageState extends State<AddQuizPage> {
     _logger = Provider.of<Logger>(context, listen: false);
     _quizService = Provider.of<QuizService>(context, listen: false);
     _logger.i('AddQuizPage initialized');
+    _requestPermissions();
   }
 
   @override
@@ -93,6 +100,14 @@ class _AddQuizPageState extends State<AddQuizPage> {
                 },
                 onAddPressed: () => _showAddDialog(isSubject: true),
               ),
+              ElevatedButton(
+                onPressed: _pickImage,
+                child: const Text('Pick Image'),
+              ),
+              if (_image != null)
+                Image.file(_image!, height: 200)
+              else if (_imageUrl != null)
+                Image.network(_imageUrl!, height: 200),
               const SizedBox(height: 16),
               if (_selectedSubjectId != null)
                 QuizTypeDropdownWithAddButton(
@@ -135,6 +150,29 @@ class _AddQuizPageState extends State<AddQuizPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickImage() async {
+    _logger.i('Picking image for quiz');
+
+    // 권한 체크 추가
+    PermissionStatus photoStatus = await Permission.photos.status;
+    if (!photoStatus.isGranted) {
+      _logger.w('Photo permission not granted');
+      return;
+    }
+
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _image = File(pickedFile.path);
+      });
+      _logger.i('Image picked: ${pickedFile.path}');
+    } else {
+      _logger.w('No image selected');
+    }
   }
 
   // Markdown 필드 빌드
@@ -243,6 +281,15 @@ class _AddQuizPageState extends State<AddQuizPage> {
     );
   }
 
+  Future<void> _requestPermissions() async {
+    _logger.i('Requesting permissions');
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.photos,
+      Permission.camera,
+    ].request();
+    _logger.i('Permission statuses: $statuses');
+  }
+
   Widget _buildKeywordFields() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,18 +341,6 @@ class _AddQuizPageState extends State<AddQuizPage> {
     _logger.i('Added new keyword field');
   }
 
-  Widget _buildQuestionField() {
-    return TextFormField(
-      controller: _questionController,
-      decoration: const InputDecoration(
-        labelText: 'Question',
-        border: OutlineInputBorder(),
-      ),
-      maxLines: 3,
-      validator: (value) => value!.isEmpty ? 'Please enter a question' : null,
-    );
-  }
-
   List<Widget> _buildOptionFields() {
     _logger.i('Building option fields');
     return List.generate(5, (index) {
@@ -341,19 +376,6 @@ class _AddQuizPageState extends State<AddQuizPage> {
     });
   }
 
-  Widget _buildExplanationField() {
-    return TextFormField(
-      controller: _explanationController,
-      decoration: const InputDecoration(
-        labelText: 'Explanation',
-        border: OutlineInputBorder(),
-      ),
-      maxLines: 3,
-      validator: (value) =>
-          value!.isEmpty ? 'Please enter an explanation' : null,
-    );
-  }
-
   Widget _buildSubmitButton() {
     return ElevatedButton(
       onPressed: _submitQuiz,
@@ -362,9 +384,14 @@ class _AddQuizPageState extends State<AddQuizPage> {
   }
 
   Future<void> _submitQuiz() async {
-    _logger.i('Attempting to submit quiz');
+    _logger.i('Attempting to submit quiz with image');
     if (_formKey.currentState!.validate()) {
       try {
+        String? imageUrl;
+        if (_image != null) {
+          imageUrl = await _uploadImage(_image!);
+        }
+
         final newQuiz = Quiz(
           id: '',
           question: _questionController.text,
@@ -376,26 +403,42 @@ class _AddQuizPageState extends State<AddQuizPage> {
               .map((c) => c.text.trim())
               .where((keyword) => keyword.isNotEmpty)
               .toList(),
+          imageUrl: imageUrl,
         );
         await _quizService.addQuiz(
             _selectedSubjectId!, _selectedTypeId!, newQuiz);
-        _logger.i('New quiz added successfully');
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Quiz added successfully')),
-        );
-        _resetForm();
+        _logger.i('New quiz added successfully with image: $imageUrl');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Quiz added successfully')),
+          );
+          _resetForm();
+        }
       } catch (e) {
-        _logger.e('Error adding quiz: $e');
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Failed to add quiz. Please try again.')),
-        );
+        _logger.e('Error adding quiz with image: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Failed to add quiz. Please try again.')),
+          );
+        }
       }
     } else {
       _logger.w('Form validation failed');
     }
+  }
+
+  Future<String> _uploadImage(File image) async {
+    _logger.i('Uploading image to Firebase Storage');
+    final storageRef = FirebaseStorage.instance
+        .ref()
+        .child('quiz_images')
+        .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
+    final uploadTask = storageRef.putFile(image);
+    final snapshot = await uploadTask.whenComplete(() {});
+    final downloadUrl = await snapshot.ref.getDownloadURL();
+    _logger.i('Image uploaded successfully: $downloadUrl');
+    return downloadUrl;
   }
 
   void _resetForm() {
@@ -415,6 +458,8 @@ class _AddQuizPageState extends State<AddQuizPage> {
       _selectedSubjectId = null;
       _selectedTypeId = null;
       _correctOptionIndex = 0;
+      _image = null;
+      _imageUrl = null;
     });
   }
 }

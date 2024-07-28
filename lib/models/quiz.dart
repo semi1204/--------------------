@@ -9,6 +9,7 @@ class Quiz {
   final String explanation; // Now contains Markdown
   final String typeId;
   final List<String> keywords;
+  final String? imageUrl;
 
   final Logger _logger = Logger();
 
@@ -20,6 +21,7 @@ class Quiz {
     required this.explanation,
     required this.typeId,
     this.keywords = const [],
+    this.imageUrl,
   }) {
     _logger.d('Quiz object created with Markdown support');
   }
@@ -36,6 +38,7 @@ class Quiz {
       explanation: data['explanation'] ?? '',
       typeId: data['typeId'] ?? '',
       keywords: List<String>.from(data['keywords'] ?? []),
+      imageUrl: data['imageUrl'],
     );
   }
 
@@ -48,6 +51,7 @@ class Quiz {
       'explanation': explanation,
       'typeId': typeId,
       'keywords': keywords,
+      'imageUrl': imageUrl,
     };
   }
 }

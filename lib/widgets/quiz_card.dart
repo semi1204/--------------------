@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
 import '../models/quiz.dart';
 
 class QuizCard extends StatefulWidget {
@@ -37,40 +39,51 @@ class _QuizCardState extends State<QuizCard> {
           children: [
             if (widget.quiz.keywords.isNotEmpty) ...[
               Wrap(
-                spacing: 4.0, // 버튼 사이의 가로 간격 줄임
-                runSpacing: 2.0, // 버튼 사이의 세로 간격 줄임
+                spacing: 4.0,
+                runSpacing: 2.0,
                 children: widget.quiz.keywords
                     .map((keyword) => SizedBox(
-                          height: 24, // 버튼의 높이 고정
+                          height: 24,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue.shade100,
                               foregroundColor: Colors.black,
                               elevation: 1,
                               shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(12.0), // 모서리 반경 줄임
+                                borderRadius: BorderRadius.circular(12.0),
                               ),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 4, vertical: 2), // 패딩 더 줄임
+                                  horizontal: 4, vertical: 2),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              minimumSize: Size.zero, // 최소 크기 제한 제거
+                              minimumSize: Size.zero,
                             ),
-                            onPressed: () {},
+                            onPressed: () {
+                              _logger.i('Keyword tapped: $keyword');
+                            },
                             child: Text(
                               keyword,
-                              style:
-                                  const TextStyle(fontSize: 10), // 폰트 크기 더 줄임
+                              style: const TextStyle(fontSize: 10),
                             ),
                           ),
                         ))
                     .toList(),
               ),
-              const SizedBox(height: 12), // 키워드와 질문 사이 간격 줄임
+              const SizedBox(height: 12),
             ],
-            Text(
-              widget.quiz.question,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            // 수정: 볼드 스타일 제거 및 마크다운 완전 지원
+            MarkdownBody(
+              data: widget.quiz.question,
+              selectable: true,
+              extensionSet: md.ExtensionSet([
+                md.TableSyntax(),
+              ], md.ExtensionSet.gitHubFlavored.inlineSyntaxes),
+              styleSheet: MarkdownStyleSheet(
+                p: const TextStyle(fontSize: 16),
+                tableBody: const TextStyle(fontSize: 14),
+                tableBorder: TableBorder.all(color: Colors.grey),
+                tableColumnWidth: const FixedColumnWidth(120),
+                tableCellsPadding: const EdgeInsets.all(4),
+              ),
             ),
             const SizedBox(height: 16),
             ...widget.quiz.options.asMap().entries.map((entry) {
@@ -123,23 +136,35 @@ class _QuizCardState extends State<QuizCard> {
                         ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          option,
-                          style: TextStyle(
-                            color:
-                                _hasAnswered && isCorrect ? Colors.green : null,
-                            fontWeight:
-                                isSelected || (_hasAnswered && isCorrect)
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                            decoration: _hasAnswered && isSelected && !isCorrect
-                                ? TextDecoration.lineThrough
-                                : null,
-                            decorationColor:
-                                _hasAnswered && isSelected && !isCorrect
-                                    ? Colors.red
-                                    : null,
-                            decorationThickness: 2.0, // 취소선 두께 증가
+                        child: MarkdownBody(
+                          data: option,
+                          selectable: true,
+                          extensionSet: md.ExtensionSet([
+                            md.TableSyntax(),
+                          ], md.ExtensionSet.gitHubFlavored.inlineSyntaxes),
+                          styleSheet: MarkdownStyleSheet(
+                            p: TextStyle(
+                              color: _hasAnswered && isCorrect
+                                  ? Colors.green
+                                  : null,
+                              fontWeight:
+                                  isSelected || (_hasAnswered && isCorrect)
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                              decoration:
+                                  _hasAnswered && isSelected && !isCorrect
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                              decorationColor:
+                                  _hasAnswered && isSelected && !isCorrect
+                                      ? Colors.red
+                                      : null,
+                              decorationThickness: 2.0,
+                            ),
+                            tableBody: const TextStyle(fontSize: 14),
+                            tableBorder: TableBorder.all(color: Colors.grey),
+                            tableColumnWidth: const FixedColumnWidth(120),
+                            tableCellsPadding: const EdgeInsets.all(4),
                           ),
                         ),
                       ),
@@ -150,9 +175,42 @@ class _QuizCardState extends State<QuizCard> {
             }),
             if (_hasAnswered) ...[
               const SizedBox(height: 16),
-              Text(
-                'Explanation: ${widget.quiz.explanation}',
-                style: const TextStyle(fontStyle: FontStyle.italic),
+              // 수정: Explanation 위젯 추가
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Text(
+                      'Explanation',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              // 수정: 설명 부분을 마크다운으로 렌더링
+              MarkdownBody(
+                data: widget.quiz.explanation,
+                selectable: true,
+                extensionSet: md.ExtensionSet([
+                  md.TableSyntax(),
+                ], md.ExtensionSet.gitHubFlavored.inlineSyntaxes),
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(fontSize: 14),
+                  tableBody: const TextStyle(fontSize: 14),
+                  tableBorder: TableBorder.all(color: Colors.grey),
+                  tableColumnWidth: const FixedColumnWidth(120),
+                  tableCellsPadding: const EdgeInsets.all(4),
+                ),
               ),
             ],
           ],
@@ -197,5 +255,7 @@ class _QuizCardState extends State<QuizCard> {
     );
 
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
+    _logger.i(
+        'Snackbar shown for quiz answer: ${isCorrect ? 'Correct' : 'Incorrect'}');
   }
 }

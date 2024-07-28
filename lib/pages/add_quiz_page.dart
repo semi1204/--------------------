@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
 import '../models/quiz.dart';
 import 'package:logger/logger.dart';
 import '../widgets/subject_dropdown_with_add_button.dart';
 import '../widgets/quiz_type_dropdown_with_add_button.dart';
+import 'package:markdown/markdown.dart' as md;
 
 class AddQuizPage extends StatefulWidget {
   const AddQuizPage({super.key});
@@ -28,6 +30,8 @@ class _AddQuizPageState extends State<AddQuizPage> {
   final List<TextEditingController> _keywordControllers = [
     TextEditingController()
   ];
+
+  bool _isPreviewMode = false;
 
   @override
   void initState() {
@@ -53,10 +57,21 @@ class _AddQuizPageState extends State<AddQuizPage> {
 
   @override
   Widget build(BuildContext context) {
-    _logger.i('Building AddQuizPage');
+    _logger.i('Building AddQuizPage with Markdown support');
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Quiz'),
+        actions: [
+          Switch(
+            value: _isPreviewMode,
+            onChanged: (value) {
+              setState(() {
+                _isPreviewMode = value;
+              });
+              _logger.i('Preview mode changed to: $_isPreviewMode');
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -96,17 +111,80 @@ class _AddQuizPageState extends State<AddQuizPage> {
               const SizedBox(height: 16),
               _buildKeywordFields(),
               const SizedBox(height: 16),
-              _buildQuestionField(),
+              // 수정된 부분: Markdown 위젯 사용
+              _buildMarkdownField(
+                controller: _questionController,
+                labelText: 'Question',
+                validator: (value) =>
+                    value!.isEmpty ? 'Please enter a question' : null,
+              ),
               const SizedBox(height: 16),
               ..._buildOptionFields(),
               const SizedBox(height: 16),
-              _buildExplanationField(),
+              // 수정된 부분: Markdown 위젯 사용
+              _buildMarkdownField(
+                controller: _explanationController,
+                labelText: 'Explanation',
+                validator: (value) =>
+                    value!.isEmpty ? 'Please enter an explanation' : null,
+              ),
               const SizedBox(height: 20),
               _buildSubmitButton(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  // Markdown 필드 빌드
+  Widget _buildMarkdownField({
+    required TextEditingController controller,
+    required String labelText,
+    required String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(labelText, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (_isPreviewMode)
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Markdown(
+              data: controller.text,
+              selectable: true,
+              extensionSet: md.ExtensionSet([
+                md.TableSyntax(),
+              ], md.ExtensionSet.gitHubFlavored.inlineSyntaxes),
+              styleSheet: MarkdownStyleSheet(
+                p: const TextStyle(fontSize: 16),
+                tableBody: const TextStyle(fontSize: 14),
+                tableBorder: TableBorder.all(color: Colors.grey),
+                tableColumnWidth: const FixedColumnWidth(120),
+                tableCellsPadding: const EdgeInsets.all(4),
+              ),
+            ),
+          )
+        else
+          TextFormField(
+            controller: controller,
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              hintText: 'Enter ${labelText.toLowerCase()}',
+            ),
+            maxLines: 10,
+            validator: validator,
+            onChanged: (value) {
+              setState(() {});
+              _logger.i('Text changed in $labelText field');
+            },
+          ),
+      ],
     );
   }
 

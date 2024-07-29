@@ -14,7 +14,16 @@ class Subject {
     );
   }
 
+  // Add this method for caching
+  factory Subject.fromMap(Map<String, dynamic> map) {
+    return Subject(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+    );
+  }
+
   Map<String, dynamic> toFirestore() => {
+        'id': id,
         'name': name,
       };
 }

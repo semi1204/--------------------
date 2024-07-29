@@ -16,6 +16,7 @@ class QuizType {
     );
   }
 
+  // Add this method for caching
   factory QuizType.fromMap(Map<String, dynamic> map) {
     return QuizType(
       id: map['id'] ?? '',
@@ -25,6 +26,7 @@ class QuizType {
   }
 
   Map<String, dynamic> toFirestore() => {
+        'id': id,
         'name': name,
         'subjectId': subjectId,
       };

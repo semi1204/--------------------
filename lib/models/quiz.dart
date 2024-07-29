@@ -3,10 +3,10 @@ import 'package:logger/logger.dart';
 
 class Quiz {
   final String id;
-  final String question; // Now contains Markdown
+  final String question;
   final List<String> options;
   final int correctOptionIndex;
-  final String explanation; // Now contains Markdown
+  final String explanation;
   final String typeId;
   final List<String> keywords;
   final String? imageUrl;
@@ -42,9 +42,24 @@ class Quiz {
     );
   }
 
+  // Add this method for caching
+  factory Quiz.fromMap(Map<String, dynamic> map) {
+    return Quiz(
+      id: map['id'] ?? '',
+      question: map['question'] ?? '',
+      options: List<String>.from(map['options'] ?? []),
+      correctOptionIndex: map['correctOptionIndex'] ?? 0,
+      explanation: map['explanation'] ?? '',
+      typeId: map['typeId'] ?? '',
+      keywords: List<String>.from(map['keywords'] ?? []),
+      imageUrl: map['imageUrl'],
+    );
+  }
+
   Map<String, dynamic> toFirestore() {
     _logger.d('Converting Quiz to Firestore data with Markdown support');
     return {
+      'id': id,
       'question': question,
       'options': options,
       'correctOptionIndex': correctOptionIndex,

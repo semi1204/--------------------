@@ -4,30 +4,84 @@ import '../models/quiz_type.dart';
 import '../models/quiz.dart';
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class QuizService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Logger _logger = Logger();
 
-  Stream<List<Subject>> getSubjects() {
+  static const String _subjectsKey = 'subjects';
+  static const String _quizTypesKey = 'quizTypes';
+  static const String _quizzesKey = 'quizzes';
+
+  // Stream<List<Subject>> getSubjects() {
+  //   _logger.i('Fetching subjects');
+  //   return _firestore.collection('subjects').snapshots().map((snapshot) {
+  //     _logger.i('Subjects fetched. Count: ${snapshot.docs.length}');
+  //     return snapshot.docs.map((doc) => Subject.fromFirestore(doc)).toList();
+  //   });
+  // }
+
+  Stream<List<Subject>> getSubjects() async* {
     _logger.i('Fetching subjects');
-    return _firestore.collection('subjects').snapshots().map((snapshot) {
-      _logger.i('Subjects fetched. Count: ${snapshot.docs.length}');
-      return snapshot.docs.map((doc) => Subject.fromFirestore(doc)).toList();
-    });
+
+    // Try to get subjects from cache
+    final prefs = await SharedPreferences.getInstance();
+    final cachedSubjects = prefs.getString(_subjectsKey);
+
+    if (cachedSubjects != null) {
+      _logger.i('Subjects fetched from cache');
+      yield (json.decode(cachedSubjects) as List)
+          .map((item) => Subject.fromMap(item))
+          .toList();
+    }
+
+    // Fetch from Firestore and update cache
+    await for (var snapshot in _firestore.collection('subjects').snapshots()) {
+      final subjects =
+          snapshot.docs.map((doc) => Subject.fromFirestore(doc)).toList();
+      _logger.i('Subjects fetched from Firestore. Count: ${subjects.length}');
+
+      // Update cache
+      await prefs.setString(_subjectsKey,
+          json.encode(subjects.map((s) => s.toFirestore()).toList()));
+
+      yield subjects;
+    }
   }
 
-  Stream<List<QuizType>> getQuizTypes(String subjectId) {
+  Stream<List<QuizType>> getQuizTypes(String subjectId) async* {
     _logger.i('Fetching quiz types for subject: $subjectId');
-    return _firestore
+
+    // Try to get quiz types from cache
+    final prefs = await SharedPreferences.getInstance();
+    final cachedQuizTypes = prefs.getString('${_quizTypesKey}_$subjectId');
+
+    if (cachedQuizTypes != null) {
+      _logger.i('Quiz types fetched from cache');
+      yield (json.decode(cachedQuizTypes) as List)
+          .map((item) => QuizType.fromMap(item))
+          .toList();
+    }
+
+    // Fetch from Firestore and update cache
+    await for (var snapshot in _firestore
         .collection('subjects')
         .doc(subjectId)
         .collection('quizTypes')
-        .snapshots()
-        .map((snapshot) {
-      _logger.i('Quiz types fetched. Count: ${snapshot.docs.length}');
-      return snapshot.docs.map((doc) => QuizType.fromFirestore(doc)).toList();
-    });
+        .snapshots()) {
+      final quizTypes =
+          snapshot.docs.map((doc) => QuizType.fromFirestore(doc)).toList();
+      _logger
+          .i('Quiz types fetched from Firestore. Count: ${quizTypes.length}');
+
+      // Update cache
+      await prefs.setString('${_quizTypesKey}_$subjectId',
+          json.encode(quizTypes.map((qt) => qt.toFirestore()).toList()));
+
+      yield quizTypes;
+    }
   }
 
   Future<void> addQuizTypeToSubject(String subjectId, String typeName) async {
@@ -69,20 +123,40 @@ class QuizService {
     }
   }
 
-  Stream<List<Quiz>> getQuizzes(String subjectId, String quizTypeId) {
+  Stream<List<Quiz>> getQuizzes(String subjectId, String quizTypeId) async* {
     _logger
         .i('Fetching quizzes for subject: $subjectId, quizType: $quizTypeId');
-    return _firestore
+
+    // Try to get quizzes from cache
+    final prefs = await SharedPreferences.getInstance();
+    final cachedQuizzes =
+        prefs.getString('${_quizzesKey}_${subjectId}_$quizTypeId');
+
+    if (cachedQuizzes != null) {
+      _logger.i('Quizzes fetched from cache');
+      yield (json.decode(cachedQuizzes) as List)
+          .map((item) => Quiz.fromMap(item))
+          .toList();
+    }
+
+    // Fetch from Firestore and update cache
+    await for (var snapshot in _firestore
         .collection('subjects')
         .doc(subjectId)
         .collection('quizTypes')
         .doc(quizTypeId)
         .collection('quizzes')
-        .snapshots()
-        .map((snapshot) {
-      _logger.i('Quizzes fetched. Count: ${snapshot.docs.length}');
-      return snapshot.docs.map((doc) => Quiz.fromFirestore(doc)).toList();
-    });
+        .snapshots()) {
+      final quizzes =
+          snapshot.docs.map((doc) => Quiz.fromFirestore(doc)).toList();
+      _logger.i('Quizzes fetched from Firestore. Count: ${quizzes.length}');
+
+      // Update cache
+      await prefs.setString('${_quizzesKey}_${subjectId}_$quizTypeId',
+          json.encode(quizzes.map((q) => q.toFirestore()).toList()));
+
+      yield quizzes;
+    }
   }
 
   Future<void> addQuiz(String subjectId, String quizTypeId, Quiz quiz) async {
@@ -96,6 +170,17 @@ class QuizService {
           .collection('quizzes')
           .add(quiz.toFirestore());
       _logger.i('Quiz added successfully');
+
+      // Update cache
+      final prefs = await SharedPreferences.getInstance();
+      final cachedQuizzes =
+          prefs.getString('${_quizzesKey}_${subjectId}_$quizTypeId');
+      if (cachedQuizzes != null) {
+        final List<dynamic> quizzes = json.decode(cachedQuizzes);
+        quizzes.add(quiz.toFirestore());
+        await prefs.setString(
+            '${_quizzesKey}_${subjectId}_$quizTypeId', json.encode(quizzes));
+      }
     } catch (e) {
       _logger.e('Error adding quiz: $e');
       rethrow;
@@ -115,6 +200,20 @@ class QuizService {
           .doc(quiz.id)
           .update(quiz.toFirestore());
       _logger.i('Quiz updated successfully');
+
+      // Update cache
+      final prefs = await SharedPreferences.getInstance();
+      final cachedQuizzes =
+          prefs.getString('${_quizzesKey}_${subjectId}_$quizTypeId');
+      if (cachedQuizzes != null) {
+        final List<dynamic> quizzes = json.decode(cachedQuizzes);
+        final index = quizzes.indexWhere((q) => q['id'] == quiz.id);
+        if (index != -1) {
+          quizzes[index] = quiz.toFirestore();
+          await prefs.setString(
+              '${_quizzesKey}_${subjectId}_$quizTypeId', json.encode(quizzes));
+        }
+      }
     } catch (e) {
       _logger.e('Error updating quiz: $e');
       rethrow;
@@ -134,6 +233,17 @@ class QuizService {
           .doc(quizId)
           .delete();
       _logger.i('Quiz deleted successfully');
+
+      // Update cache
+      final prefs = await SharedPreferences.getInstance();
+      final cachedQuizzes =
+          prefs.getString('${_quizzesKey}_${subjectId}_$quizTypeId');
+      if (cachedQuizzes != null) {
+        final List<dynamic> quizzes = json.decode(cachedQuizzes);
+        quizzes.removeWhere((q) => q['id'] == quizId);
+        await prefs.setString(
+            '${_quizzesKey}_${subjectId}_$quizTypeId', json.encode(quizzes));
+      }
     } catch (e) {
       _logger.e('Error deleting quiz: $e');
       rethrow;

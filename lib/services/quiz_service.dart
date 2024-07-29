@@ -101,4 +101,42 @@ class QuizService {
       rethrow;
     }
   }
+
+  Future<void> updateQuiz(
+      String subjectId, String quizTypeId, Quiz quiz) async {
+    _logger.i('Updating quiz: ${quiz.id}');
+    try {
+      await _firestore
+          .collection('subjects')
+          .doc(subjectId)
+          .collection('quizTypes')
+          .doc(quizTypeId)
+          .collection('quizzes')
+          .doc(quiz.id)
+          .update(quiz.toFirestore());
+      _logger.i('Quiz updated successfully');
+    } catch (e) {
+      _logger.e('Error updating quiz: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteQuiz(
+      String subjectId, String quizTypeId, String quizId) async {
+    _logger.i('Deleting quiz: $quizId');
+    try {
+      await _firestore
+          .collection('subjects')
+          .doc(subjectId)
+          .collection('quizTypes')
+          .doc(quizTypeId)
+          .collection('quizzes')
+          .doc(quizId)
+          .delete();
+      _logger.i('Quiz deleted successfully');
+    } catch (e) {
+      _logger.e('Error deleting quiz: $e');
+      rethrow;
+    }
+  }
 }

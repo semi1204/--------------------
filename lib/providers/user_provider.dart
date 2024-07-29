@@ -8,7 +8,17 @@ class UserProvider with ChangeNotifier {
   final Logger _logger = Logger();
 
   User? get user => _user;
-  bool get isAdmin => _user?.email == ADMIN_EMAIL;
+
+  // Updated isAdmin getter
+  bool get isAdmin {
+    if (_user == null) {
+      _logger.i('User is null, not admin');
+      return false;
+    }
+    bool adminStatus = _user!.email == ADMIN_EMAIL;
+    _logger.i('Checking admin status for ${_user!.email}: $adminStatus');
+    return adminStatus;
+  }
 
   void setUser(User? user) {
     if (_user?.uid != user?.uid) {

@@ -7,8 +7,17 @@ import '../models/quiz.dart';
 
 class QuizCard extends StatefulWidget {
   final Quiz quiz;
+  final bool isAdmin;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
-  const QuizCard({super.key, required this.quiz});
+  const QuizCard({
+    super.key,
+    required this.quiz,
+    this.isAdmin = false,
+    this.onEdit,
+    this.onDelete,
+  });
 
   @override
   State<QuizCard> createState() => _QuizCardState();
@@ -37,6 +46,28 @@ class _QuizCardState extends State<QuizCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.isAdmin)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: () {
+                      _logger
+                          .i('Edit button pressed for quiz: ${widget.quiz.id}');
+                      widget.onEdit?.call();
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () {
+                      _logger.i(
+                          'Delete button pressed for quiz: ${widget.quiz.id}');
+                      widget.onDelete?.call();
+                    },
+                  ),
+                ],
+              ),
             if (widget.quiz.keywords.isNotEmpty) ...[
               Wrap(
                 spacing: 4.0,

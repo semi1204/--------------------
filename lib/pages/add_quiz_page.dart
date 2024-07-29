@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
 import '../models/quiz.dart';
 import 'package:logger/logger.dart';
 import '../widgets/subject_dropdown_with_add_button.dart';
 import '../widgets/quiz_type_dropdown_with_add_button.dart';
-import 'package:markdown/markdown.dart' as md;
+import '../widgets/markdown_field.dart';
+import '../widgets/keyword_fields.dart';
+import '../widgets/option_fields.dart';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class AddQuizPage extends StatefulWidget {
   const AddQuizPage({super.key});
@@ -24,7 +24,7 @@ class _AddQuizPageState extends State<AddQuizPage> {
   late final Logger _logger;
   late final QuizService _quizService;
   File? _image;
-  String? _imageUrl; // 이 부분을 다시 추가했습니다.
+  String? _imageUrl;
 
   String? _selectedSubjectId;
   String? _selectedTypeId;
@@ -45,7 +45,6 @@ class _AddQuizPageState extends State<AddQuizPage> {
     _logger = Provider.of<Logger>(context, listen: false);
     _quizService = Provider.of<QuizService>(context, listen: false);
     _logger.i('AddQuizPage initialized');
-    _requestPermissions();
   }
 
   @override
@@ -100,14 +99,6 @@ class _AddQuizPageState extends State<AddQuizPage> {
                 },
                 onAddPressed: () => _showAddDialog(isSubject: true),
               ),
-              ElevatedButton(
-                onPressed: _pickImage,
-                child: const Text('Pick Image'),
-              ),
-              if (_image != null)
-                Image.file(_image!, height: 200)
-              else if (_imageUrl != null)
-                Image.network(_imageUrl!, height: 200),
               const SizedBox(height: 16),
               if (_selectedSubjectId != null)
                 QuizTypeDropdownWithAddButton(
@@ -124,27 +115,63 @@ class _AddQuizPageState extends State<AddQuizPage> {
                   onAddPressed: () => _showAddDialog(isSubject: false),
                 ),
               const SizedBox(height: 16),
-              _buildKeywordFields(),
+              KeywordFields(
+                controllers: _keywordControllers,
+                logger: _logger,
+              ),
               const SizedBox(height: 16),
-              // 수정된 부분: Markdown 위젯 사용
-              _buildMarkdownField(
+              MarkdownField(
                 controller: _questionController,
                 labelText: 'Question',
                 validator: (value) =>
                     value!.isEmpty ? 'Please enter a question' : null,
+                isPreviewMode: _isPreviewMode,
+                logger: _logger,
               ),
               const SizedBox(height: 16),
-              ..._buildOptionFields(),
+              if (_image == null)
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.image),
+                  label: const Text('Pick Image'),
+                  onPressed: _pickImage,
+                )
+              else
+                Column(
+                  children: [
+                    Image.file(_image!),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Change Image'),
+                      onPressed: _pickImage,
+                    ),
+                  ],
+                ),
               const SizedBox(height: 16),
-              // 수정된 부분: Markdown 위젯 사용
-              _buildMarkdownField(
+              OptionFields(
+                controllers: _optionControllers,
+                correctOptionIndex: _correctOptionIndex,
+                onOptionChanged: (value) {
+                  setState(() {
+                    _correctOptionIndex = value!;
+                  });
+                },
+                logger: _logger,
+              ),
+              const SizedBox(height: 16),
+              MarkdownField(
                 controller: _explanationController,
                 labelText: 'Explanation',
                 validator: (value) =>
                     value!.isEmpty ? 'Please enter an explanation' : null,
+                isPreviewMode: _isPreviewMode,
+                logger: _logger,
               ),
               const SizedBox(height: 20),
-              _buildSubmitButton(),
+              ElevatedButton(
+                onPressed: _submitQuiz,
+                child: const Text('Add Quiz'),
+              ),
             ],
           ),
         ),
@@ -153,77 +180,29 @@ class _AddQuizPageState extends State<AddQuizPage> {
   }
 
   Future<void> _pickImage() async {
-    _logger.i('Picking image for quiz');
+    _logger.i('Attempting to pick image for quiz');
 
-    // 권한 체크 추가
-    PermissionStatus photoStatus = await Permission.photos.status;
-    if (!photoStatus.isGranted) {
-      _logger.w('Photo permission not granted');
-      return;
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+      if (pickedFile != null) {
+        setState(() {
+          _image = File(pickedFile.path);
+        });
+        _logger.i('Image picked: ${pickedFile.path}');
+      } else {
+        _logger.w('No image selected');
+      }
+    } catch (e) {
+      _logger.e('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Failed to pick image. Please try again.')),
+        );
+      }
     }
-
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      setState(() {
-        _image = File(pickedFile.path);
-      });
-      _logger.i('Image picked: ${pickedFile.path}');
-    } else {
-      _logger.w('No image selected');
-    }
-  }
-
-  // Markdown 필드 빌드
-  Widget _buildMarkdownField({
-    required TextEditingController controller,
-    required String labelText,
-    required String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(labelText, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        if (_isPreviewMode)
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Markdown(
-              data: controller.text,
-              selectable: true,
-              extensionSet: md.ExtensionSet([
-                md.TableSyntax(),
-              ], md.ExtensionSet.gitHubFlavored.inlineSyntaxes),
-              styleSheet: MarkdownStyleSheet(
-                p: const TextStyle(fontSize: 16),
-                tableBody: const TextStyle(fontSize: 14),
-                tableBorder: TableBorder.all(color: Colors.grey),
-                tableColumnWidth: const FixedColumnWidth(120),
-                tableCellsPadding: const EdgeInsets.all(4),
-              ),
-            ),
-          )
-        else
-          TextFormField(
-            controller: controller,
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              hintText: 'Enter ${labelText.toLowerCase()}',
-            ),
-            maxLines: 10,
-            validator: validator,
-            onChanged: (value) {
-              setState(() {});
-              _logger.i('Text changed in $labelText field');
-            },
-          ),
-      ],
-    );
   }
 
   Future<void> _showAddDialog({required bool isSubject}) async {
@@ -278,108 +257,6 @@ class _AddQuizPageState extends State<AddQuizPage> {
           ],
         );
       },
-    );
-  }
-
-  Future<void> _requestPermissions() async {
-    _logger.i('Requesting permissions');
-    Map<Permission, PermissionStatus> statuses = await [
-      Permission.photos,
-      Permission.camera,
-    ].request();
-    _logger.i('Permission statuses: $statuses');
-  }
-
-  Widget _buildKeywordFields() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Keywords (Optional)',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        ..._keywordControllers.map((controller) => Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: controller,
-                      decoration: const InputDecoration(
-                        hintText: 'Enter a keyword',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: () => _removeKeywordField(controller),
-                  ),
-                ],
-              ),
-            )),
-        ElevatedButton.icon(
-          icon: const Icon(Icons.add),
-          label: const Text('Add Keyword'),
-          onPressed: _addKeywordField,
-        ),
-      ],
-    );
-  }
-
-  void _removeKeywordField(TextEditingController controller) {
-    setState(() {
-      _keywordControllers.remove(controller);
-      controller.dispose();
-    });
-    _logger.i('Removed keyword field');
-  }
-
-  void _addKeywordField() {
-    setState(() {
-      _keywordControllers.add(TextEditingController());
-    });
-    _logger.i('Added new keyword field');
-  }
-
-  List<Widget> _buildOptionFields() {
-    _logger.i('Building option fields');
-    return List.generate(5, (index) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: RadioListTile<int>(
-          title: TextFormField(
-            controller: _optionControllers[index],
-            decoration: InputDecoration(
-              labelText: 'Option ${index + 1}',
-              border: const OutlineInputBorder(),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                _logger.w('Option ${index + 1} is empty');
-                return 'Please enter an option';
-              }
-              return null;
-            },
-          ),
-          value: index,
-          groupValue: _correctOptionIndex,
-          onChanged: (int? value) {
-            if (value != null && value != _correctOptionIndex) {
-              setState(() {
-                _correctOptionIndex = value;
-              });
-              _logger.i('Correct option changed to: ${value + 1}');
-            }
-          },
-        ),
-      );
-    });
-  }
-
-  Widget _buildSubmitButton() {
-    return ElevatedButton(
-      onPressed: _submitQuiz,
-      child: const Text('Add Quiz'),
     );
   }
 
@@ -461,5 +338,6 @@ class _AddQuizPageState extends State<AddQuizPage> {
       _image = null;
       _imageUrl = null;
     });
+    _logger.i('Form reset completed');
   }
 }

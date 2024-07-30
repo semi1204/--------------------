@@ -5,6 +5,7 @@ import '../models/quiz.dart';
 import '../providers/user_provider.dart';
 import '../services/quiz_service.dart';
 import 'accuracy_display.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 
 class QuizCard extends StatefulWidget {
   final Quiz quiz;
@@ -31,6 +32,8 @@ class _QuizCardState extends State<QuizCard> {
   late final QuizService _quizService;
   late final UserProvider _userProvider;
 
+  Map<String, dynamic>? _cachedQuizData;
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +41,17 @@ class _QuizCardState extends State<QuizCard> {
     _quizService = Provider.of<QuizService>(context, listen: false);
     _userProvider = Provider.of<UserProvider>(context, listen: false);
     _logger.i('QuizCard initialized for quiz: ${widget.quiz.question}');
+
+    // 추가: 초기화 시 퀴즈 데이터 로드
+    _loadQuizData();
+  }
+
+  Future<void> _loadQuizData() async {
+    if (_userProvider.user != null) {
+      _cachedQuizData =
+          await _quizService.getUserQuizData(_userProvider.user!.uid);
+      if (mounted) setState(() {});
+    }
   }
 
   @override
@@ -102,29 +116,15 @@ class _QuizCardState extends State<QuizCard> {
   }
 
   Widget _buildAccuracyDisplay() {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _userProvider.user != null
-          ? _quizService.getUserQuizData(_userProvider.user!.uid)
-          : Future.value({}),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const CircularProgressIndicator();
-        }
-        if (snapshot.hasError) {
-          _logger.e('Error fetching user quiz data: ${snapshot.error}');
-          return const Text('Error loading accuracy');
-        }
-        if (snapshot.hasData && snapshot.data != null) {
-          final quizData = snapshot.data![widget.quiz.id];
-          if (quizData != null) {
-            // 수정: 정확도 계산 방식 변경
-            final accuracy = quizData['accuracy'] ?? 0.0;
-            return AccuracyDisplay(accuracy: accuracy);
-          }
-        }
-        return const SizedBox.shrink();
-      },
-    );
+    // 수정: 캐시된 데이터 사용
+    if (_cachedQuizData != null) {
+      final quizData = _cachedQuizData![widget.quiz.id];
+      if (quizData != null) {
+        final accuracy = quizData['accuracy'] ?? 0.0;
+        return AccuracyDisplay(accuracy: accuracy);
+      }
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildKeywords() {
@@ -312,8 +312,9 @@ class _QuizCardState extends State<QuizCard> {
     final isCorrect = index == widget.quiz.correctOptionIndex;
 
     if (_userProvider.user != null) {
-      // 수정: updateQuizData 메서드 호출 방식 변경
       _userProvider.updateQuizData(widget.quiz.id, isCorrect);
+      // 추가: 캐시 업데이트
+      _loadQuizData();
     } else {
       _logger.w('User is not logged in. Quiz data not updated.');
     }
@@ -322,20 +323,41 @@ class _QuizCardState extends State<QuizCard> {
   }
 
   void _showAnswerSnackBar(bool isCorrect) {
+    final reviewTimeString = kDebugMode
+        ? _userProvider.getDebugNextReviewTimeString(widget.quiz.id)
+        : _userProvider.getNextReviewTimeString(widget.quiz.id);
+
+    _logger.i(
+        'Showing answer snackbar. IsCorrect: $isCorrect, Next review: $reviewTimeString');
+
     final snackBar = SnackBar(
-      content: Row(
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            isCorrect ? Icons.check_circle : Icons.cancel,
-            color: Colors.white,
+          Row(
+            children: [
+              Icon(
+                isCorrect ? Icons.check_circle : Icons.cancel,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isCorrect ? '정답입니다! 🎉' : '오답입니다. 다시 도전해보세요! 💪',
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
+          const SizedBox(height: 4),
           Text(
-            isCorrect ? '정답입니다! 🎉' : '오답입니다. 다시 도전해보세요! 💪',
+            '다음 복습은 $reviewTimeString 후입니다.', // 수정: 더 자연스러운 문구로 변경
             style: const TextStyle(
-              color: Colors.black,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+              fontSize: 14,
             ),
           ),
         ],
@@ -343,13 +365,11 @@ class _QuizCardState extends State<QuizCard> {
       backgroundColor: isCorrect
           ? const Color.fromARGB(255, 144, 223, 146)
           : const Color.fromARGB(255, 218, 141, 135),
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
     );
 
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
-    _logger.i(
-        'Snackbar shown for quiz answer: ${isCorrect ? 'Correct' : 'Incorrect'}');
   }
 }

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/subject.dart';
 import '../models/quiz_type.dart';
 import '../models/quiz.dart';
@@ -16,23 +17,12 @@ class QuizService {
   static const String _quizzesKey = 'quizzes';
   static const String _userQuizDataKey = 'userQuizData';
 
-  // Stream<List<Subject>> getSubjects() {
-  //   _logger.i('Fetching subjects');
-  //   return _firestore.collection('subjects').snapshots().map((snapshot) {
-  //     _logger.i('Subjects fetched. Count: ${snapshot.docs.length}');
-  //     return snapshot.docs.map((doc) => Subject.fromFirestore(doc)).toList();
-  //   });
-  // }
+  // 수정: 초기 간격을 4320분(3일)로 설정
+  static const int _initialInterval = 4320;
 
-  Future<Map<String, dynamic>> getUserQuizData(String userId) async {
-    _logger.i('Fetching user quiz data for user: $userId');
-    final prefs = await SharedPreferences.getInstance();
-    final userData = prefs.getString('${_userQuizDataKey}_$userId');
-    if (userData != null) {
-      return json.decode(userData);
-    }
-    return {};
-  }
+  // 추가: 개발 환경을 위한 짧은 시간 옵션
+  static const bool _useShortIntervals = kDebugMode;
+  static const int _debugInitialInterval = 60; // 1분
 
   Future<void> updateUserQuizData(
       String userId, String quizId, bool isCorrect) async {
@@ -44,43 +34,72 @@ class QuizService {
       userData[quizId] = {
         'correct': 0,
         'total': 0,
-        'nextReviewDate':
-            DateTime.now().add(const Duration(days: 3)).toIso8601String(),
+        'nextReviewDate': DateTime.now()
+            .add(Duration(
+                minutes: _useShortIntervals
+                    ? _debugInitialInterval
+                    : _initialInterval))
+            .toIso8601String(),
         'accuracy': 0.0,
+        'interval':
+            _useShortIntervals ? _debugInitialInterval : _initialInterval,
+        'consecutiveCorrect': 0,
       };
     }
 
     userData[quizId]['total']++;
     if (isCorrect) {
       userData[quizId]['correct']++;
+      userData[quizId]['consecutiveCorrect']++;
+    } else {
+      userData[quizId]['consecutiveCorrect'] = 0;
     }
 
-    // 수정: 정확도 계산 로직 개선
     userData[quizId]['accuracy'] =
         (userData[quizId]['correct'] / userData[quizId]['total']).toDouble();
 
-    // 수정: 복습 날짜 계산 로직 개선
-    final currentReviewDate =
-        DateTime.parse(userData[quizId]['nextReviewDate']);
+    final now = DateTime.now();
     if (isCorrect) {
+      // 수정: 정답 시 간격 증가 로직
+      double multiplier =
+          2.0 + (userData[quizId]['consecutiveCorrect'] - 1) * 0.5;
+      multiplier = multiplier.clamp(2.0, 3.5); // 최대 3.5배로 제한
+      int newInterval =
+          (userData[quizId]['interval'] as int) * multiplier.round();
+      userData[quizId]['interval'] = newInterval;
       userData[quizId]['nextReviewDate'] =
-          currentReviewDate.add(const Duration(days: 1)).toIso8601String();
+          now.add(Duration(minutes: newInterval)).toIso8601String();
     } else {
-      userData[quizId]['nextReviewDate'] = currentReviewDate
-          .subtract(const Duration(hours: 12))
-          .toIso8601String();
+      // 수정: 오답 시 간격 감소 로직
+      int newInterval = (userData[quizId]['interval'] as int) ~/ 2;
+      userData[quizId]['interval'] = newInterval;
+      userData[quizId]['nextReviewDate'] =
+          now.add(Duration(minutes: newInterval)).toIso8601String();
     }
+
+    _logger.i(
+        'Next review interval set to ${userData[quizId]['interval']} minutes');
 
     await prefs.setString('${_userQuizDataKey}_$userId', json.encode(userData));
 
-    // Firestore 업데이트
+    // Firestore update
     await _firestore
         .collection('users')
         .doc(userId)
         .set({'quizData': userData}, SetOptions(merge: true));
 
     _logger.i(
-        'User quiz data updated successfully. New accuracy: ${userData[quizId]['accuracy']}');
+        'User quiz data updated successfully. New accuracy: ${userData[quizId]['accuracy']}, Next review: ${userData[quizId]['nextReviewDate']}');
+  }
+
+  Future<Map<String, dynamic>> getUserQuizData(String userId) async {
+    _logger.i('Fetching user quiz data for user: $userId');
+    final prefs = await SharedPreferences.getInstance();
+    final userData = prefs.getString('${_userQuizDataKey}_$userId');
+    if (userData != null) {
+      return json.decode(userData);
+    }
+    return {};
   }
 
   Stream<List<Quiz>> getIncorrectQuizzes(

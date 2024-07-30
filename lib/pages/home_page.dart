@@ -1,5 +1,7 @@
 // home_page.dart
+
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/pages/incorrect_answer_page.dart';
 import 'package:nursing_quiz_app_6/pages/subject_page.dart';
 import 'package:nursing_quiz_app_6/pages/add_quiz_page.dart';
 import 'package:nursing_quiz_app_6/widgets/drawer/app_drawer.dart';
@@ -35,6 +37,7 @@ class _HomePageState extends State<HomePage> {
     final List<Widget> _pages = [
       const SubjectPage(),
       const SubjectPage(), // Quiz page is now SubjectPage
+      const IncorrectAnswersPage(), // Add new page for incorrect answers
       if (userProvider.isAdmin) const AddQuizPage(),
     ];
 
@@ -63,6 +66,10 @@ class _HomePageState extends State<HomePage> {
           const NavigationDestination(
             icon: Icon(Icons.quiz),
             label: 'Quiz',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.error_outline),
+            label: 'Incorrect',
           ),
           if (userProvider.isAdmin)
             const NavigationDestination(

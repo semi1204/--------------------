@@ -14,6 +14,7 @@ class QuizService {
   static const String _subjectsKey = 'subjects';
   static const String _quizTypesKey = 'quizTypes';
   static const String _quizzesKey = 'quizzes';
+  static const String _userQuizDataKey = 'userQuizData';
 
   // Stream<List<Subject>> getSubjects() {
   //   _logger.i('Fetching subjects');
@@ -22,6 +23,100 @@ class QuizService {
   //     return snapshot.docs.map((doc) => Subject.fromFirestore(doc)).toList();
   //   });
   // }
+
+  Future<Map<String, dynamic>> getUserQuizData(String userId) async {
+    _logger.i('Fetching user quiz data for user: $userId');
+    final prefs = await SharedPreferences.getInstance();
+    final userData = prefs.getString('${_userQuizDataKey}_$userId');
+    if (userData != null) {
+      return json.decode(userData);
+    }
+    return {};
+  }
+
+  Future<void> updateUserQuizData(
+      String userId, String quizId, bool isCorrect) async {
+    _logger.i('Updating user quiz data for user: $userId, quiz: $quizId');
+    final prefs = await SharedPreferences.getInstance();
+    final userData = await getUserQuizData(userId);
+
+    if (!userData.containsKey(quizId)) {
+      userData[quizId] = {
+        'correct': 0,
+        'total': 0,
+        'nextReviewDate':
+            DateTime.now().add(const Duration(days: 3)).toIso8601String(),
+        'accuracy': 0.0,
+      };
+    }
+
+    userData[quizId]['total']++;
+    if (isCorrect) {
+      userData[quizId]['correct']++;
+    }
+
+    // 수정: 정확도 계산 로직 개선
+    userData[quizId]['accuracy'] =
+        (userData[quizId]['correct'] / userData[quizId]['total']).toDouble();
+
+    // 수정: 복습 날짜 계산 로직 개선
+    final currentReviewDate =
+        DateTime.parse(userData[quizId]['nextReviewDate']);
+    if (isCorrect) {
+      userData[quizId]['nextReviewDate'] =
+          currentReviewDate.add(const Duration(days: 1)).toIso8601String();
+    } else {
+      userData[quizId]['nextReviewDate'] = currentReviewDate
+          .subtract(const Duration(hours: 12))
+          .toIso8601String();
+    }
+
+    await prefs.setString('${_userQuizDataKey}_$userId', json.encode(userData));
+
+    // Firestore 업데이트
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .set({'quizData': userData}, SetOptions(merge: true));
+
+    _logger.i(
+        'User quiz data updated successfully. New accuracy: ${userData[quizId]['accuracy']}');
+  }
+
+  Stream<List<Quiz>> getIncorrectQuizzes(
+      String userId, String subjectId) async* {
+    _logger
+        .i('Fetching incorrect quizzes for user: $userId, subject: $subjectId');
+    final userData = await getUserQuizData(userId);
+    final now = DateTime.now();
+
+    await for (var snapshot in _firestore
+        .collection('subjects')
+        .doc(subjectId)
+        .collection('quizTypes')
+        .snapshots()) {
+      List<Quiz> incorrectQuizzes = [];
+      for (var quizTypeDoc in snapshot.docs) {
+        var quizSnapshot =
+            await quizTypeDoc.reference.collection('quizzes').get();
+        for (var quizDoc in quizSnapshot.docs) {
+          final quiz = Quiz.fromFirestore(quizDoc);
+          final quizData = userData[quiz.id];
+          if (quizData != null) {
+            final accuracy = quizData['accuracy'] ?? 0.0;
+            final nextReviewDate = DateTime.parse(quizData['nextReviewDate']);
+            if (accuracy < 1.0 && now.isAfter(nextReviewDate)) {
+              incorrectQuizzes.add(quiz);
+              _logger.d('Added incorrect quiz: ${quiz.id} to review list');
+            }
+          }
+        }
+      }
+      _logger.i(
+          'Yielding ${incorrectQuizzes.length} incorrect quizzes for review');
+      yield incorrectQuizzes;
+    }
+  }
 
   Stream<List<Subject>> getSubjects() async* {
     _logger.i('Fetching subjects');

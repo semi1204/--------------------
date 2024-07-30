@@ -1,20 +1,18 @@
+// accuracy_display.dart
+
 import 'package:flutter/material.dart';
 
 class AccuracyDisplay extends StatelessWidget {
-  final int correctAttempts;
-  final int totalAttempts;
+  final double accuracy;
 
   const AccuracyDisplay({
     Key? key,
-    required this.correctAttempts,
-    required this.totalAttempts,
+    required this.accuracy,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final accuracy = totalAttempts > 0
-        ? (correctAttempts / totalAttempts * 100).toStringAsFixed(1)
-        : '0.0';
+    final accuracyPercentage = (accuracy * 100).toStringAsFixed(1);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -28,7 +26,7 @@ class AccuracyDisplay extends StatelessWidget {
           const Icon(Icons.bar_chart, size: 16, color: Colors.blue),
           const SizedBox(width: 4),
           Text(
-            '$accuracy%',
+            '$accuracyPercentage%',
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,

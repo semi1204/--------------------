@@ -29,7 +29,7 @@ class Quiz {
   factory Quiz.fromFirestore(DocumentSnapshot doc) {
     final logger = Logger();
     Map data = doc.data() as Map<String, dynamic>;
-    logger.d('Creating Quiz from Firestore data with Markdown support: $data');
+    logger.d('Creating Quiz from Firestore data with image support: $data');
     return Quiz(
       id: doc.id,
       question: data['question'] ?? '',
@@ -38,7 +38,7 @@ class Quiz {
       explanation: data['explanation'] ?? '',
       typeId: data['typeId'] ?? '',
       keywords: List<String>.from(data['keywords'] ?? []),
-      imageUrl: data['imageUrl'],
+      imageUrl: data['imageUrl'], // This should now be properly parsed
     );
   }
 
@@ -52,7 +52,7 @@ class Quiz {
       explanation: map['explanation'] ?? '',
       typeId: map['typeId'] ?? '',
       keywords: List<String>.from(map['keywords'] ?? []),
-      imageUrl: map['imageUrl'],
+      imageUrl: map['imageUrl'], // Ensure this is included in the map parsing
     );
   }
 

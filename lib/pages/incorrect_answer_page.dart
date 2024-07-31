@@ -104,7 +104,10 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
         return Column(
           children: [
             Expanded(
-              child: QuizCard(quiz: snapshot.data![_currentQuizIndex]),
+              child: QuizCard(
+                quiz: snapshot.data![_currentQuizIndex],
+                questionNumber: _currentQuizIndex + 1, // questionNumber 추가
+              ),
             ),
             _buildNavigationButtons(snapshot.data!.length),
           ],

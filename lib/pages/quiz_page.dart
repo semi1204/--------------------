@@ -11,8 +11,11 @@ class QuizPage extends StatelessWidget {
   final String subjectId;
   final String quizTypeId;
 
-  const QuizPage({Key? key, required this.subjectId, required this.quizTypeId})
-      : super(key: key);
+  const QuizPage({
+    super.key, // Use super.key here
+    required this.subjectId,
+    required this.quizTypeId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -45,11 +48,13 @@ class QuizPage extends StatelessWidget {
             itemCount: snapshot.data!.length,
             itemBuilder: (context, index) {
               final quiz = snapshot.data![index];
+              logger.d('Creating QuizCard for quiz ${index + 1}: ${quiz.id}');
               return QuizCard(
                 quiz: quiz,
                 isAdmin: userProvider.isAdmin,
                 onEdit: () => _editQuiz(context, quiz),
                 onDelete: () => _deleteQuiz(context, quiz),
+                questionNumber: index + 1,
               );
             },
           );

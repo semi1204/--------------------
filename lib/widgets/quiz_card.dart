@@ -12,6 +12,7 @@ class QuizCard extends StatefulWidget {
   final bool isAdmin;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final int questionNumber;
 
   const QuizCard({
     Key? key,
@@ -19,6 +20,7 @@ class QuizCard extends StatefulWidget {
     this.isAdmin = false,
     this.onEdit,
     this.onDelete,
+    required this.questionNumber,
   }) : super(key: key);
 
   @override
@@ -31,6 +33,7 @@ class _QuizCardState extends State<QuizCard> {
   late final Logger _logger;
   late final QuizService _quizService;
   late final UserProvider _userProvider;
+  DateTime? _startTime;
 
   Map<String, dynamic>? _cachedQuizData;
 
@@ -41,6 +44,7 @@ class _QuizCardState extends State<QuizCard> {
     _quizService = Provider.of<QuizService>(context, listen: false);
     _userProvider = Provider.of<UserProvider>(context, listen: false);
     _logger.i('QuizCard initialized for quiz: ${widget.quiz.question}');
+    _startTime = DateTime.now();
 
     // 추가: 초기화 시 퀴즈 데이터 로드
     _loadQuizData();
@@ -78,6 +82,7 @@ class _QuizCardState extends State<QuizCard> {
               const SizedBox(height: 16),
               _buildExplanation(),
             ],
+            if (widget.isAdmin) _buildAdminActions(),
           ],
         ),
       ),
@@ -88,7 +93,13 @@ class _QuizCardState extends State<QuizCard> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        if (widget.isAdmin) _buildAdminActions(),
+        Text(
+          'Question ${widget.questionNumber}', // widget.questionNumber 사용
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         _buildAccuracyDisplay(),
       ],
     );
@@ -96,6 +107,7 @@ class _QuizCardState extends State<QuizCard> {
 
   Widget _buildAdminActions() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
         IconButton(
           icon: const Icon(Icons.edit),
@@ -302,24 +314,29 @@ class _QuizCardState extends State<QuizCard> {
   }
 
   void _selectOption(int index) {
+    final endTime = DateTime.now(); // 수정: 변수명 수정
+    final answerTime = endTime.difference(_startTime!);
+
     setState(() {
       _selectedOptionIndex = index;
       _hasAnswered = true;
     });
     _logger.i(
-        'Option selected for quiz: ${widget.quiz.question}, selected option index: $index');
+        'Option selected for quiz: ${widget.quiz.question}, selected option index: $index, answer time: $answerTime');
 
     final isCorrect = index == widget.quiz.correctOptionIndex;
 
     if (_userProvider.user != null) {
-      _userProvider.updateQuizData(widget.quiz.id, isCorrect);
-      // 추가: 캐시 업데이트
-      _loadQuizData();
+      _userProvider.updateUserQuizData(widget.quiz.id, isCorrect,
+          answerTime: answerTime);
     } else {
       _logger.w('User is not logged in. Quiz data not updated.');
     }
 
     _showAnswerSnackBar(isCorrect);
+
+    // 답변 후 타이머 리셋
+    _startTime = DateTime.now();
   }
 
   void _showAnswerSnackBar(bool isCorrect) {
@@ -354,7 +371,7 @@ class _QuizCardState extends State<QuizCard> {
           ),
           const SizedBox(height: 4),
           Text(
-            '다음 복습은 $reviewTimeString 후입니다.', // 수정: 더 자연스러운 문구로 변경
+            '다음 복습은 $reviewTimeString 후입니다.',
             style: const TextStyle(
               color: Colors.black87,
               fontSize: 14,

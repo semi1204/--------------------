@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import '../models/subject.dart';
 import '../models/quiz_type.dart';
 import '../models/quiz.dart';
@@ -7,6 +6,7 @@ import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../utils/anki_algorithm.dart';
 
 class QuizService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -16,81 +16,6 @@ class QuizService {
   static const String _quizTypesKey = 'quizTypes';
   static const String _quizzesKey = 'quizzes';
   static const String _userQuizDataKey = 'userQuizData';
-
-  // 수정: 초기 간격을 4320분(3일)로 설정
-  static const int _initialInterval = 4320;
-
-  // 추가: 개발 환경을 위한 짧은 시간 옵션
-  static const bool _useShortIntervals = kDebugMode;
-  static const int _debugInitialInterval = 60; // 1분
-
-  Future<void> updateUserQuizData(
-      String userId, String quizId, bool isCorrect) async {
-    _logger.i('Updating user quiz data for user: $userId, quiz: $quizId');
-    final prefs = await SharedPreferences.getInstance();
-    final userData = await getUserQuizData(userId);
-
-    if (!userData.containsKey(quizId)) {
-      userData[quizId] = {
-        'correct': 0,
-        'total': 0,
-        'nextReviewDate': DateTime.now()
-            .add(Duration(
-                minutes: _useShortIntervals
-                    ? _debugInitialInterval
-                    : _initialInterval))
-            .toIso8601String(),
-        'accuracy': 0.0,
-        'interval':
-            _useShortIntervals ? _debugInitialInterval : _initialInterval,
-        'consecutiveCorrect': 0,
-      };
-    }
-
-    userData[quizId]['total']++;
-    if (isCorrect) {
-      userData[quizId]['correct']++;
-      userData[quizId]['consecutiveCorrect']++;
-    } else {
-      userData[quizId]['consecutiveCorrect'] = 0;
-    }
-
-    userData[quizId]['accuracy'] =
-        (userData[quizId]['correct'] / userData[quizId]['total']).toDouble();
-
-    final now = DateTime.now();
-    if (isCorrect) {
-      // 수정: 정답 시 간격 증가 로직
-      double multiplier =
-          2.0 + (userData[quizId]['consecutiveCorrect'] - 1) * 0.5;
-      multiplier = multiplier.clamp(2.0, 3.5); // 최대 3.5배로 제한
-      int newInterval =
-          (userData[quizId]['interval'] as int) * multiplier.round();
-      userData[quizId]['interval'] = newInterval;
-      userData[quizId]['nextReviewDate'] =
-          now.add(Duration(minutes: newInterval)).toIso8601String();
-    } else {
-      // 수정: 오답 시 간격 감소 로직
-      int newInterval = (userData[quizId]['interval'] as int) ~/ 2;
-      userData[quizId]['interval'] = newInterval;
-      userData[quizId]['nextReviewDate'] =
-          now.add(Duration(minutes: newInterval)).toIso8601String();
-    }
-
-    _logger.i(
-        'Next review interval set to ${userData[quizId]['interval']} minutes');
-
-    await prefs.setString('${_userQuizDataKey}_$userId', json.encode(userData));
-
-    // Firestore update
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .set({'quizData': userData}, SetOptions(merge: true));
-
-    _logger.i(
-        'User quiz data updated successfully. New accuracy: ${userData[quizId]['accuracy']}, Next review: ${userData[quizId]['nextReviewDate']}');
-  }
 
   Future<Map<String, dynamic>> getUserQuizData(String userId) async {
     _logger.i('Fetching user quiz data for user: $userId');
@@ -276,14 +201,20 @@ class QuizService {
   Future<void> addQuiz(String subjectId, String quizTypeId, Quiz quiz) async {
     _logger.i('Adding new quiz to subject: $subjectId, quizType: $quizTypeId');
     try {
+      final quizData = quiz.toFirestore();
+      // Ensure the imageUrl is included in the quiz data
+      if (quiz.imageUrl != null) {
+        quizData['imageUrl'] = quiz.imageUrl;
+      }
+
       await _firestore
           .collection('subjects')
           .doc(subjectId)
           .collection('quizTypes')
           .doc(quizTypeId)
           .collection('quizzes')
-          .add(quiz.toFirestore());
-      _logger.i('Quiz added successfully');
+          .add(quizData);
+      _logger.i('Quiz added successfully with image: ${quiz.imageUrl}');
 
       // Update cache
       final prefs = await SharedPreferences.getInstance();
@@ -291,7 +222,7 @@ class QuizService {
           prefs.getString('${_quizzesKey}_${subjectId}_$quizTypeId');
       if (cachedQuizzes != null) {
         final List<dynamic> quizzes = json.decode(cachedQuizzes);
-        quizzes.add(quiz.toFirestore());
+        quizzes.add(quizData);
         await prefs.setString(
             '${_quizzesKey}_${subjectId}_$quizTypeId', json.encode(quizzes));
       }
@@ -305,6 +236,12 @@ class QuizService {
       String subjectId, String quizTypeId, Quiz quiz) async {
     _logger.i('Updating quiz: ${quiz.id}');
     try {
+      final quizData = quiz.toFirestore();
+      // Ensure the imageUrl is included in the quiz data
+      if (quiz.imageUrl != null) {
+        quizData['imageUrl'] = quiz.imageUrl;
+      }
+
       await _firestore
           .collection('subjects')
           .doc(subjectId)
@@ -312,8 +249,8 @@ class QuizService {
           .doc(quizTypeId)
           .collection('quizzes')
           .doc(quiz.id)
-          .update(quiz.toFirestore());
-      _logger.i('Quiz updated successfully');
+          .update(quizData);
+      _logger.i('Quiz updated successfully with image: ${quiz.imageUrl}');
 
       // Update cache
       final prefs = await SharedPreferences.getInstance();
@@ -323,7 +260,7 @@ class QuizService {
         final List<dynamic> quizzes = json.decode(cachedQuizzes);
         final index = quizzes.indexWhere((q) => q['id'] == quiz.id);
         if (index != -1) {
-          quizzes[index] = quiz.toFirestore();
+          quizzes[index] = quizData;
           await prefs.setString(
               '${_quizzesKey}_${subjectId}_$quizTypeId', json.encode(quizzes));
         }

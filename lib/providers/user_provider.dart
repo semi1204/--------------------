@@ -3,6 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
 import 'package:nursing_quiz_app_6/constants.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
 
 class UserProvider with ChangeNotifier {
   User? _user;
@@ -49,21 +53,72 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateQuizData(String quizId, bool isCorrect) async {
-    if (_user != null) {
-      try {
-        await _quizService.updateUserQuizData(_user!.uid, quizId, isCorrect);
-        await _loadUserQuizData(); // Reload data after update
-        _logger.i(
-            'Updated user quiz data for quiz: $quizId, isCorrect: $isCorrect');
-
-        notifyListeners();
-      } catch (e) {
-        _logger.e('Error updating user quiz data: $e');
-      }
-    } else {
+  Future<void> updateUserQuizData(String quizId, bool isCorrect,
+      {Duration? answerTime}) async {
+    if (_user == null) {
       _logger.w('Attempted to update quiz data for null user');
+      return;
     }
+
+    _logger.i('Updating user quiz data for user: ${_user!.uid}, quiz: $quizId');
+    final userData = _quizData;
+
+    if (!userData.containsKey(quizId)) {
+      userData[quizId] = {
+        'correct': 0,
+        'total': 0,
+        'nextReviewDate': DateTime.now().toIso8601String(),
+        'accuracy': 0.0,
+        'interval': 1,
+        'easeFactor': 2.5,
+        'consecutiveCorrect': 0,
+      };
+    }
+
+    userData[quizId]['total']++;
+    if (isCorrect) {
+      userData[quizId]['correct']++;
+    }
+
+    userData[quizId]['accuracy'] =
+        (userData[quizId]['correct'] / userData[quizId]['total']).toDouble();
+
+    // 수정: Anki 알고리즘 적용
+    int? qualityOfRecall;
+    if (answerTime != null) {
+      qualityOfRecall =
+          AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect);
+    }
+
+    final ankiResult = AnkiAlgorithm.calculateNextReview(
+      interval: userData[quizId]['interval'],
+      easeFactor: userData[quizId]['easeFactor'],
+      consecutiveCorrect: userData[quizId]['consecutiveCorrect'],
+      isCorrect: isCorrect,
+      qualityOfRecall: qualityOfRecall,
+    );
+
+    userData[quizId]['interval'] = ankiResult['interval'];
+    userData[quizId]['easeFactor'] = ankiResult['easeFactor'];
+    userData[quizId]['consecutiveCorrect'] = ankiResult['consecutiveCorrect'];
+
+    final now = DateTime.now();
+    userData[quizId]['nextReviewDate'] =
+        now.add(Duration(days: ankiResult['interval'])).toIso8601String();
+
+    _logger.i('Next review interval set to ${ankiResult['interval']} days');
+
+    // Firestore update
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_user!.uid)
+        .set({'quizData': userData}, SetOptions(merge: true));
+
+    _quizData = userData;
+    notifyListeners();
+
+    _logger.i(
+        'User quiz data updated successfully. New accuracy: ${userData[quizId]['accuracy']}, Next review: ${userData[quizId]['nextReviewDate']}');
   }
 
   DateTime getNextReviewDate(String quizId) {
@@ -71,7 +126,7 @@ class UserProvider with ChangeNotifier {
       return DateTime.parse(_quizData[quizId]['nextReviewDate']);
     }
     return DateTime.now()
-        .add(const Duration(minutes: 4320)); // 초기값을 3일(4320분)로 설정
+        .add(const Duration(days: 1)); // Default to 1 day if not found
   }
 
   String getNextReviewTimeString(String quizId) {

@@ -24,7 +24,6 @@ class _AddQuizPageState extends State<AddQuizPage> {
   late final Logger _logger;
   late final QuizService _quizService;
   File? _image;
-  String? _imageUrl;
 
   String? _selectedSubjectId;
   String? _selectedTypeId;
@@ -336,7 +335,6 @@ class _AddQuizPageState extends State<AddQuizPage> {
       _selectedTypeId = null;
       _correctOptionIndex = 0;
       _image = null;
-      _imageUrl = null;
     });
     _logger.i('Form reset completed');
   }

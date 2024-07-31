@@ -13,6 +13,7 @@ class UserProvider with ChangeNotifier {
   final Logger _logger = Logger();
   final QuizService _quizService = QuizService();
   Map<String, dynamic> _quizData = {};
+  Map<String, Map<String, Map<String, int>>> _userAnswers = {};
 
   User? get user => _user;
   Map<String, dynamic> get quizData => _quizData;
@@ -36,6 +37,29 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+  Future<void> deleteUserQuizData(String userId, String quizId) async {
+    _logger.i('Deleting user quiz data for user: $userId, quiz: $quizId');
+    try {
+      // Firestore에서 데이터 삭제
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'quizData.$quizId': FieldValue.delete(),
+      });
+
+      // 로컬 상태 업데이트
+      _quizData.remove(quizId);
+
+      // SharedPreferences 업데이트
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_quiz_data_$userId', json.encode(_quizData));
+
+      notifyListeners();
+      _logger.i('User quiz data deleted successfully');
+    } catch (e) {
+      _logger.e('Error deleting user quiz data: $e');
+      rethrow;
+    }
+  }
+
   Future<void> _loadUserQuizData() async {
     if (_user != null) {
       try {
@@ -50,6 +74,72 @@ class UserProvider with ChangeNotifier {
       _logger.w('Attempted to load quiz data for null user');
       _quizData = {};
       notifyListeners();
+    }
+  }
+
+  Future<void> saveUserAnswer(String subjectId, String quizTypeId,
+      String quizId, int answerIndex) async {
+    _userAnswers[subjectId] ??= {};
+    _userAnswers[subjectId]![quizTypeId] ??= {};
+    _userAnswers[subjectId]![quizTypeId]![quizId] = answerIndex;
+    await _saveUserAnswers();
+    _logger.i('Saved user answer for quiz: $quizId, answer: $answerIndex');
+  }
+
+  Map<String, int> getUserAnswers(String subjectId, String quizTypeId) {
+    return _userAnswers[subjectId]?[quizTypeId] ?? {};
+  }
+
+  Future<void> _saveUserAnswers() async {
+    if (_user != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          'user_answers_${_user!.uid}', json.encode(_userAnswers));
+      _logger.i('Saved user answers successfully');
+    } else {
+      _logger.w('Attempted to save user answers for null user');
+    }
+  }
+
+  Future<void> resetUserAnswers(String subjectId, String quizTypeId) async {
+    _userAnswers[subjectId]?[quizTypeId]?.clear();
+    await _saveUserAnswers();
+    _logger
+        .i('Reset user answers for subject: $subjectId, quizType: $quizTypeId');
+    notifyListeners();
+  }
+
+  Future<void> resetUserAnswer(
+      String subjectId, String quizTypeId, String quizId) async {
+    _userAnswers[subjectId]?[quizTypeId]?.remove(quizId);
+    await _saveUserAnswers();
+    _logger.i('Reset user answer for quiz: $quizId');
+    notifyListeners();
+  }
+
+  Future<void> _loadUserAnswers() async {
+    if (_user != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final userAnswersJson = prefs.getString('user_answers_${_user!.uid}');
+      if (userAnswersJson != null) {
+        _userAnswers = Map<String, Map<String, Map<String, int>>>.from(
+          json.decode(userAnswersJson).map((key, value) => MapEntry(
+                key,
+                Map<String, Map<String, int>>.from(
+                  value.map((k, v) => MapEntry(
+                        k,
+                        Map<String, int>.from(v),
+                      )),
+                ),
+              )),
+        );
+        _logger.i('Loaded user answers successfully');
+      } else {
+        _userAnswers = {};
+      }
+    } else {
+      _logger.w('Attempted to load user answers for null user');
+      _userAnswers = {};
     }
   }
 

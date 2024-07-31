@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz.dart';
 import '../providers/user_provider.dart';
 import '../services/quiz_service.dart';
 import 'accuracy_display.dart';
+import 'package:logger/logger.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'common_widgets.dart';
+import 'markdown_widgets.dart';
 
 class QuizCard extends StatefulWidget {
   final Quiz quiz;
@@ -13,22 +15,33 @@ class QuizCard extends StatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final int questionNumber;
+  final int? selectedOptionIndex;
+  final Function(int)? onAnswerSelected;
+  final bool isIncorrectAnswersMode;
+  final bool isScrollable;
+  final VoidCallback? onResetQuiz;
+  final VoidCallback? onDeleteReview;
 
   const QuizCard({
-    Key? key,
+    super.key,
     required this.quiz,
     this.isAdmin = false,
     this.onEdit,
     this.onDelete,
     required this.questionNumber,
-  }) : super(key: key);
+    this.selectedOptionIndex,
+    this.onAnswerSelected,
+    this.isIncorrectAnswersMode = false,
+    this.isScrollable = false,
+    this.onResetQuiz,
+    this.onDeleteReview,
+  });
 
   @override
   State<QuizCard> createState() => _QuizCardState();
 }
 
 class _QuizCardState extends State<QuizCard> {
-  int? _selectedOptionIndex;
   bool _hasAnswered = false;
   late final Logger _logger;
   late final QuizService _quizService;
@@ -46,8 +59,9 @@ class _QuizCardState extends State<QuizCard> {
     _logger.i('QuizCard initialized for quiz: ${widget.quiz.question}');
     _startTime = DateTime.now();
 
-    // 추가: 초기화 시 퀴즈 데이터 로드
     _loadQuizData();
+    // Set _hasAnswered based on whether there's a selected option
+    _hasAnswered = widget.selectedOptionIndex != null;
   }
 
   Future<void> _loadQuizData() async {
@@ -62,7 +76,7 @@ class _QuizCardState extends State<QuizCard> {
   Widget build(BuildContext context) {
     _logger.i('Building QuizCard for quiz: ${widget.quiz.question}');
 
-    return Card(
+    Widget content = Card(
       margin: const EdgeInsets.all(8.0),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -83,10 +97,16 @@ class _QuizCardState extends State<QuizCard> {
               _buildExplanation(),
             ],
             if (widget.isAdmin) _buildAdminActions(),
+            if (widget.isIncorrectAnswersMode) _buildDeleteReviewButton(),
           ],
         ),
       ),
     );
+
+    // 수정: isScrollable이 true일 경우 SingleChildScrollView로 감싸기
+    return widget.isScrollable
+        ? SingleChildScrollView(child: content)
+        : content;
   }
 
   Widget _buildHeader() {
@@ -94,13 +114,26 @@ class _QuizCardState extends State<QuizCard> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          'Question ${widget.questionNumber}', // widget.questionNumber 사용
+          'Question ${widget.questionNumber}',
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
-        _buildAccuracyDisplay(),
+        Row(
+          children: [
+            _buildAccuracyDisplay(),
+            // 추가: 초기화 버튼
+            if (widget.onResetQuiz != null)
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  _logger.i('Reset button pressed for quiz: ${widget.quiz.id}');
+                  widget.onResetQuiz?.call();
+                },
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -128,7 +161,6 @@ class _QuizCardState extends State<QuizCard> {
   }
 
   Widget _buildAccuracyDisplay() {
-    // 수정: 캐시된 데이터 사용
     if (_cachedQuizData != null) {
       final quizData = _cachedQuizData![widget.quiz.id];
       if (quizData != null) {
@@ -175,10 +207,42 @@ class _QuizCardState extends State<QuizCard> {
     );
   }
 
+  // 수정: 마크다운 및 수식 지원 추가
   Widget _buildQuestion() {
-    return Text(
-      widget.quiz.question,
-      style: const TextStyle(fontSize: 16),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.quiz.imageUrl != null && widget.quiz.imageUrl!.isNotEmpty)
+          NetworkImageWithLoader(
+            imageUrl: widget.quiz.imageUrl!,
+            width: double.infinity,
+            height: 200,
+          ),
+        const SizedBox(height: 8),
+        MarkdownRenderer(
+          data: widget.quiz.question,
+          logger: _logger,
+        ),
+      ],
+    );
+  }
+
+  // 추가: 복습 카드 삭제 버튼
+  Widget _buildDeleteReviewButton() {
+    return ElevatedButton.icon(
+      icon: const Icon(Icons.delete),
+      label: const Text('Delete Review'),
+      onPressed: () {
+        _logger.i('Delete review button pressed for quiz: ${widget.quiz.id}');
+        showDialog(
+          context: context,
+          builder: (context) => ConfirmationDialog(
+            title: 'Delete Review',
+            content: 'Are you sure you want to delete this review?',
+            onConfirm: widget.onDeleteReview ?? () {},
+          ),
+        );
+      },
     );
   }
 
@@ -186,11 +250,13 @@ class _QuizCardState extends State<QuizCard> {
     return widget.quiz.options.asMap().entries.map((entry) {
       final index = entry.key;
       final option = entry.value;
-      final isSelected = _selectedOptionIndex == index;
+      final isSelected = widget.selectedOptionIndex == index;
       final isCorrect = index == widget.quiz.correctOptionIndex;
 
       return InkWell(
-        onTap: !_hasAnswered ? () => _selectOption(index) : null,
+        onTap: widget.selectedOptionIndex == null
+            ? () => _selectOption(index)
+            : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: Row(
@@ -198,16 +264,9 @@ class _QuizCardState extends State<QuizCard> {
               _buildOptionIcon(isSelected, isCorrect),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  option,
-                  style: TextStyle(
-                    color: _getOptionTextColor(isSelected, isCorrect),
-                    fontWeight: _getOptionFontWeight(isSelected, isCorrect),
-                    decoration: _getOptionDecoration(isSelected, isCorrect),
-                    decorationColor:
-                        _getOptionDecorationColor(isSelected, isCorrect),
-                    decorationThickness: 2.0,
-                  ),
+                child: MarkdownRenderer(
+                  data: option,
+                  logger: _logger,
                 ),
               ),
             ],
@@ -305,38 +364,44 @@ class _QuizCardState extends State<QuizCard> {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          widget.quiz.explanation,
-          style: const TextStyle(fontSize: 14),
+        MarkdownRenderer(
+          data: widget.quiz.explanation,
+          logger: _logger,
         ),
       ],
     );
   }
 
   void _selectOption(int index) {
-    final endTime = DateTime.now(); // 수정: 변수명 수정
+    if (_hasAnswered && !widget.isIncorrectAnswersMode) {
+      return; // Prevent re-selection if already answered in normal quiz mode
+    }
+
+    final endTime = DateTime.now();
     final answerTime = endTime.difference(_startTime!);
 
-    setState(() {
-      _selectedOptionIndex = index;
-      _hasAnswered = true;
-    });
     _logger.i(
         'Option selected for quiz: ${widget.quiz.question}, selected option index: $index, answer time: $answerTime');
 
     final isCorrect = index == widget.quiz.correctOptionIndex;
 
-    if (_userProvider.user != null) {
+    setState(() {
+      _hasAnswered = true;
+    });
+
+    widget.onAnswerSelected?.call(index);
+
+    if (_userProvider.user != null && !widget.isIncorrectAnswersMode) {
       _userProvider.updateUserQuizData(widget.quiz.id, isCorrect,
           answerTime: answerTime);
     } else {
-      _logger.w('User is not logged in. Quiz data not updated.');
+      _logger.w(
+          'User is not logged in or in Incorrect Answers mode. Quiz data not updated.');
     }
 
-    _showAnswerSnackBar(isCorrect);
-
-    // 답변 후 타이머 리셋
-    _startTime = DateTime.now();
+    if (!widget.isIncorrectAnswersMode) {
+      _showAnswerSnackBar(isCorrect);
+    }
   }
 
   void _showAnswerSnackBar(bool isCorrect) {

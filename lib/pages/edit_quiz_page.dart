@@ -5,7 +5,7 @@ import '../models/quiz.dart';
 import 'package:logger/logger.dart';
 import '../widgets/quiz_card/markdown_field.dart';
 import '../widgets/quiz_card/keyword_fields.dart';
-import '../widgets/option_fields.dart';
+import '../widgets/quiz_card/option_fields.dart';
 
 class EditQuizPage extends StatefulWidget {
   final Quiz quiz;

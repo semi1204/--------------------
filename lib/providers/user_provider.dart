@@ -351,7 +351,9 @@ class UserProvider with ChangeNotifier {
   // 유저의 모든 데이터에 대한 UI는 바로바로 갱신되어야 함.
   Future<void> updateUserQuizData(
       String subjectId, String quizTypeId, String quizId, bool isCorrect,
-      {Duration? answerTime, int? selectedOptionIndex}) async {
+      {Duration? answerTime,
+      int? selectedOptionIndex,
+      int mistakeCount = 0}) async {
     if (_user == null) {
       _logger.w('Attempted to update quiz data for null user');
       return;
@@ -374,22 +376,24 @@ class UserProvider with ChangeNotifier {
                   'easeFactor': 2.5,
                   'consecutiveCorrect': 0,
                   'selectedOptionIndex': null, // 선택한 옵션 인덱스 저장
-                });
+                  'mistakeCount': 0,
+                }); // 퀴즈 데이터 초기화
 
-    quizData['total'] = (quizData['total'] as int? ?? 0) + 1;
+    quizData['total'] = (quizData['total'] as int? ?? 0) + 1; // 총 퀴즈 수 증가
     if (isCorrect) {
-      quizData['correct'] = (quizData['correct'] as int? ?? 0) + 1;
+      quizData['correct'] = (quizData['correct'] as int? ?? 0) + 1; // 정답 수 증가
     }
 
     quizData['accuracy'] =
-        (quizData['correct'] as int) / (quizData['total'] as int);
+        (quizData['correct'] as int) / (quizData['total'] as int); // 정확도 계산
     quizData['selectedOptionIndex'] =
         selectedOptionIndex; // 추가: 선택한 옵션 인덱스 업데이트
+    quizData['mistakeCount'] = mistakeCount; // 실수 횟수 업데이트
 
     int? qualityOfRecall;
     if (answerTime != null) {
-      qualityOfRecall =
-          AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect);
+      qualityOfRecall = AnkiAlgorithm.evaluateRecallQuality(
+          answerTime, isCorrect); // 기억의 질 평가
     }
 
     final ankiResult = AnkiAlgorithm.calculateNextReview(
@@ -398,22 +402,31 @@ class UserProvider with ChangeNotifier {
       consecutiveCorrect: quizData['consecutiveCorrect'] as int? ?? 0,
       isCorrect: isCorrect,
       qualityOfRecall: qualityOfRecall,
-    );
+      mistakeCount: mistakeCount,
+    ); // anki 알고리즘 결과 계산
 
-    quizData['interval'] = ankiResult['interval'];
-    quizData['easeFactor'] = ankiResult['easeFactor'];
-    quizData['consecutiveCorrect'] = ankiResult['consecutiveCorrect'];
+    quizData['interval'] = (ankiResult['interval'] as num).toInt(); // 간격 업데이트
+    quizData['easeFactor'] = ankiResult['easeFactor'] as double; // 용이성 계수 업데이트
+    quizData['consecutiveCorrect'] =
+        (ankiResult['consecutiveCorrect'] as num).toInt(); // 연속 정답 횟수 업데이트
 
     final now = DateTime.now();
     quizData['nextReviewDate'] = now
         .add(Duration(days: ankiResult['interval'] as int))
-        .toIso8601String();
+        .toIso8601String(); // 다음 복습 날짜 설정
 
     _logger.i(
         'User quiz data updated. New accuracy: ${quizData['accuracy']}, Next review: ${quizData['nextReviewDate']}');
 
-    await _saveQuizData();
-    notifyListeners();
+    await _saveQuizData(); // 퀴즈 데이터 저장
+    notifyListeners(); // 리스너들에게 알림
+  }
+
+  // 특정 퀴즈의 실수 횟수를 가져오는 메소드
+  int getQuizMistakeCount(String subjectId, String quizTypeId, String quizId) {
+    return _quizData[subjectId]?[quizTypeId]?[quizId]?['mistakeCount']
+            as int? ??
+        0;
   }
 
   // 주의 사항:
@@ -453,6 +466,37 @@ class UserProvider with ChangeNotifier {
       return '${difference.inMinutes}분';
     } else {
       return '1분'; // 1분 미만일 경우 1분으로 표시
+    }
+  }
+
+  // Add this method for offline support
+  Future<void> syncOfflineData() async {
+    _logger.i('Syncing offline data');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final offlineData = prefs.getString('offline_quiz_data');
+      if (offlineData != null) {
+        final decodedData = json.decode(offlineData) as Map<String, dynamic>;
+        for (final subjectId in decodedData.keys) {
+          for (final quizTypeId in decodedData[subjectId].keys) {
+            for (final quizId in decodedData[subjectId][quizTypeId].keys) {
+              final quizData = decodedData[subjectId][quizTypeId][quizId];
+              await updateUserQuizData(
+                subjectId,
+                quizTypeId,
+                quizId,
+                quizData['isCorrect'],
+                selectedOptionIndex: quizData['selectedOptionIndex'],
+                mistakeCount: quizData['mistakeCount'],
+              );
+            }
+          }
+        }
+        await prefs.remove('offline_quiz_data');
+        _logger.i('Offline data synced successfully');
+      }
+    } catch (e) {
+      _logger.e('Error syncing offline data: $e');
     }
   }
 

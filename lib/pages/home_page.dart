@@ -8,7 +8,7 @@ import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({Key? key});
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -36,8 +36,8 @@ class _HomePageState extends State<HomePage> {
             'Building HomePage. User logged in: ${userProvider.user != null}. Is admin: ${userProvider.isAdmin}');
 
         final List<Widget> _pages = [
-          SubjectPage(key: PageStorageKey('subject')),
-          SubjectPage(key: PageStorageKey('quiz')),
+          SubjectPage(key: const PageStorageKey('subject')),
+          SubjectPage(key: const PageStorageKey('quiz')),
           const IncorrectAnswersPage(key: PageStorageKey('incorrect')),
           if (userProvider.isAdmin)
             const AddQuizPage(key: PageStorageKey('add_quiz')),

@@ -23,14 +23,15 @@ class AccuracyDisplay extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.bar_chart, size: 16, color: Colors.blue),
+          const Icon(Icons.bar_chart,
+              size: 16, color: Color.fromARGB(255, 127, 190, 241)),
           const SizedBox(width: 4),
           Text(
             '$accuracyPercentage%',
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: Colors.blue,
+              color: Color.fromARGB(255, 22, 125, 209),
             ),
           ),
         ],

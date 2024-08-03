@@ -6,6 +6,8 @@ import '../providers/user_provider.dart';
 import '../widgets/quiz_card.dart';
 import 'package:logger/logger.dart';
 import '../models/subject.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:math' show min;
 
 class IncorrectAnswersPage extends StatefulWidget {
   const IncorrectAnswersPage({super.key});
@@ -20,6 +22,9 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
   late final Logger _logger;
   String? _selectedSubjectId;
   List<Quiz> _incorrectQuizzes = [];
+  bool _isOffline = false;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -28,25 +33,56 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
     _userProvider = Provider.of<UserProvider>(context, listen: false);
     _logger = Provider.of<Logger>(context, listen: false);
     _logger.i('IncorrectAnswersPage initialized');
+    _checkConnectivity();
+  }
+
+  Future<void> _checkConnectivity() async {
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    setState(() {
+      _isOffline = connectivityResult == ConnectivityResult.none;
+    });
+    _logger.i('Connectivity status: ${_isOffline ? 'Offline' : 'Online'}');
   }
 
   Future<void> _loadIncorrectQuizzes() async {
-    if (_selectedSubjectId == null) return;
+    if (_selectedSubjectId == null) {
+      _logger.w('No subject selected, cannot load incorrect quizzes');
+      return;
+    }
+
     _logger.i('Loading incorrect quizzes for subject: $_selectedSubjectId');
+    setState(() => _isLoading = true);
+
     try {
-      // 수정: getIncorrectQuizzes 메서드 호출 방식 변경
       final quizzes = await _quizService.getIncorrectQuizzes(
         _userProvider.user!.uid,
         _selectedSubjectId!,
       );
+
+      _logger.d('Received ${quizzes.length} incorrect quizzes from service');
+
       if (mounted) {
         setState(() {
           _incorrectQuizzes = quizzes;
+          _isLoading = false;
         });
       }
+
       _logger.i('Loaded ${_incorrectQuizzes.length} incorrect quizzes');
+
+      // Log details of each quiz for debugging
+      _incorrectQuizzes.forEach((quiz) {
+        _logger.d(
+            'Quiz ID: ${quiz.id}, Question: ${quiz.question.substring(0, min(20, quiz.question.length))}...');
+      });
     } catch (e) {
       _logger.e('Error loading incorrect quizzes: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _incorrectQuizzes = [];
+        });
+      }
     }
   }
 
@@ -54,7 +90,7 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Review Cards!'),
+        title: const Text('Review Cards'),
       ),
       body: Column(
         children: [
@@ -62,11 +98,19 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
           Expanded(
             child: _selectedSubjectId == null
                 ? const Center(child: Text('Please select a subject'))
-                : _buildQuizList(),
+                : RefreshIndicator(
+                    onRefresh: _refreshQuizzes,
+                    child: _buildQuizList(),
+                  ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _refreshQuizzes() async {
+    _logger.i('Manually refreshing quiz list');
+    await _loadIncorrectQuizzes();
   }
 
   Widget _buildSubjectDropdown() {
@@ -83,6 +127,7 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
           value: _selectedSubjectId,
           hint: const Text('Select a subject'),
           onChanged: (String? newValue) {
+            _logger.i('Subject selected: $newValue');
             setState(() {
               _selectedSubjectId = newValue;
               _incorrectQuizzes = [];
@@ -102,6 +147,9 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
   }
 
   Widget _buildQuizList() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     if (_incorrectQuizzes.isEmpty) {
       return const Center(child: Text('No incorrect quizzes available'));
     }
@@ -115,7 +163,9 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
           questionNumber: index + 1,
           isIncorrectAnswersMode: true,
           onAnswerSelected: (answerIndex) {
-            setState(() {}); // 답변 선택 시 UI 갱신
+            _logger.i(
+                'Answer selected for quiz: ${quiz.id}, answer: $answerIndex');
+            setState(() {}); // Refresh UI when answer is selected
           },
           onDeleteReview: () => _deleteReview(quiz),
           subjectId: _selectedSubjectId!,
@@ -133,7 +183,6 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
   Future<void> _deleteReview(Quiz quiz) async {
     _logger.i('Deleting review for quiz: ${quiz.id}');
     try {
-      // 수정: deleteUserQuizData 메서드 호출 수정
       await _userProvider.deleteUserQuizData(
         _userProvider.user!.uid,
         _selectedSubjectId!,
@@ -145,16 +194,19 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
       });
       _logger.i('Review deleted successfully');
 
-      // 수정: 사용자에게 피드백 제공
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Review deleted successfully')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Review deleted successfully')),
+        );
+      }
     } catch (e) {
       _logger.e('Error deleting review: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Failed to delete review. Please try again.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Failed to delete review. Please try again.')),
+        );
+      }
     }
   }
 }

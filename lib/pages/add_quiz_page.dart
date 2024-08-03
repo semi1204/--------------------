@@ -11,7 +11,7 @@ import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
 import '../models/quiz.dart';
 import 'package:logger/logger.dart';
-import '../widgets/option_fields.dart';
+import '../widgets/quiz_card/option_fields.dart';
 
 class AddQuizPage extends StatefulWidget {
   const AddQuizPage({super.key});

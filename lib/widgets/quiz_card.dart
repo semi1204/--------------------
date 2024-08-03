@@ -70,6 +70,7 @@ class _QuizCardState extends State<QuizCard> {
   DateTime? _startTime;
   int? _selectedOptionIndex;
   bool _hasAnswered = false;
+  int _mistakeCount = 0;
 
   @override
   void initState() {
@@ -79,9 +80,17 @@ class _QuizCardState extends State<QuizCard> {
     _logger.i('QuizCard initialized for quiz: ${widget.quiz.question}');
     _startTime = DateTime.now();
     _loadUserAnswer();
+    _loadMistakeCount();
   }
 
-  // 새로운 메서드: 사용자의 답변 로드
+  // 사용자의 실수 횟수 로드 메소드
+  void _loadMistakeCount() {
+    _mistakeCount = _userProvider.getQuizMistakeCount(
+        widget.subjectId, widget.quizTypeId, widget.quiz.id);
+    _logger.i('Loaded mistake count: $_mistakeCount');
+  }
+
+  // 사용자의 답변 로드 메소드
   void _loadUserAnswer() {
     _selectedOptionIndex = _userProvider.getUserAnswer(
         widget.subjectId, widget.quizTypeId, widget.quiz.id);
@@ -143,6 +152,7 @@ class _QuizCardState extends State<QuizCard> {
       _selectedOptionIndex = null;
       _hasAnswered = false;
       _startTime = DateTime.now();
+      _mistakeCount = 0;
     });
     _userProvider.resetUserAnswers(widget.subjectId, widget.quizTypeId,
         quizId: widget.quiz.id);
@@ -160,20 +170,28 @@ class _QuizCardState extends State<QuizCard> {
     final answerTime = endTime.difference(_startTime!);
     final isCorrect = index == widget.quiz.correctOptionIndex;
 
-    Provider.of<UserProvider>(context, listen: false).updateUserQuizData(
+    if (!isCorrect) {
+      setState(() {
+        _mistakeCount++;
+      });
+    }
+
+    _userProvider.updateUserQuizData(
       widget.subjectId,
       widget.quizTypeId,
       widget.quiz.id,
       isCorrect,
       answerTime: answerTime,
       selectedOptionIndex: index,
+      mistakeCount: _mistakeCount,
     );
 
     widget.onAnswerSelected?.call(index);
 
     _showAnswerSnackBar(isCorrect);
 
-    _logger.i('User selected option $index. Correct: $isCorrect');
+    _logger.i(
+        'User selected option $index. Correct: $isCorrect. Mistake count: $_mistakeCount');
   }
 
   void _showAnswerSnackBar(bool isCorrect) {

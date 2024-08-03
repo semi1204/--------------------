@@ -5,9 +5,14 @@ import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nursing_quiz_app_6/pages/home_page.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final bool isFromDrawer;
+  // Drawer에서 로그인 => 로그인 후 Drawer 닫기
+  // auth_wrapper 에서 로그인 => 로그인 후 HomePage로 이동
+  // 이 두 경우를 구분하기 위한 isFromDrawer 변수 추가
+  const LoginPage({super.key, this.isFromDrawer = false});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -24,6 +29,20 @@ class _LoginPageState extends State<LoginPage> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _navigateAfterLogin() {
+    final logger = Provider.of<Logger>(context, listen: false);
+    if (widget.isFromDrawer) {
+      logger.i('Login successful from Drawer, popping context');
+      Navigator.of(context).pop(); // Close the login page (and drawer)
+    } else {
+      logger.i('Login successful, navigating to HomePage');
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomePage()),
+        (Route<dynamic> route) => false,
+      );
+    }
   }
 
   Future<void> _handleEmailSignIn() async {
@@ -46,7 +65,7 @@ class _LoginPageState extends State<LoginPage> {
         if (user != null) {
           Provider.of<UserProvider>(context, listen: false).setUser(user);
           logger.i('User ${user.email} signed in with email');
-          Navigator.pop(context);
+          _navigateAfterLogin();
         }
       } on FirebaseAuthException catch (e) {
         final logger = Provider.of<Logger>(context, listen: false);
@@ -104,7 +123,7 @@ class _LoginPageState extends State<LoginPage> {
       if (user != null) {
         Provider.of<UserProvider>(context, listen: false).setUser(user);
         logger.i('User ${user.email} signed in with Google');
-        Navigator.pop(context);
+        _navigateAfterLogin(); // 수정: Navigator.pop(context) 대신 _navigateAfterLogin() 호출
       }
     } catch (e) {
       final logger = Provider.of<Logger>(context, listen: false);

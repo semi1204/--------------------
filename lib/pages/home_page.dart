@@ -1,5 +1,3 @@
-// home_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/pages/incorrect_answer_page.dart';
 import 'package:nursing_quiz_app_6/pages/subject_page.dart';
@@ -25,59 +23,63 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _logger = Provider.of<Logger>(context, listen: false);
     _logger.i('HomePage initialized');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _logger.i('HomePage built');
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = context.watch<UserProvider>();
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        _logger.i(
+            'Building HomePage. User logged in: ${userProvider.user != null}. Is admin: ${userProvider.isAdmin}');
 
-    _logger.i(
-        'Building HomePage. User logged in: ${userProvider.user != null}. Is admin: ${userProvider.isAdmin}');
-
-    final List<Widget> _pages = [
-      const SubjectPage(),
-      const SubjectPage(), // Quiz page is now SubjectPage
-      const IncorrectAnswersPage(), // Add new page for incorrect answers
-      if (userProvider.isAdmin) const AddQuizPage(),
-    ];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nursing Quiz App'),
-      ),
-      drawer: const AppDrawer(),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (int index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-          _logger.i('User navigated to page index: $index');
-        },
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.quiz),
-            label: 'Quiz',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.error_outline),
-            label: 'Incorrect',
-          ),
+        final List<Widget> _pages = [
+          SubjectPage(key: PageStorageKey('subject')),
+          SubjectPage(key: PageStorageKey('quiz')),
+          const IncorrectAnswersPage(key: PageStorageKey('incorrect')),
           if (userProvider.isAdmin)
-            const NavigationDestination(
-              icon: Icon(Icons.add),
-              label: 'Add Quiz',
-            ),
-        ],
-      ),
+            const AddQuizPage(key: PageStorageKey('add_quiz')),
+        ];
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Nursing Quiz App'),
+          ),
+          drawer: const AppDrawer(),
+          body: IndexedStack(
+            index: _selectedIndex,
+            children: _pages,
+          ),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (int index) {
+              setState(() {
+                _selectedIndex = index;
+              });
+              _logger.i('User navigated to page index: $index');
+            },
+            destinations: [
+              const NavigationDestination(
+                  icon: Icon(Icons.home), label: 'Home'),
+              const NavigationDestination(
+                  icon: Icon(Icons.quiz), label: 'Quiz'),
+              const NavigationDestination(
+                  icon: Icon(Icons.error_outline), label: 'Incorrect'),
+              if (userProvider.isAdmin)
+                const NavigationDestination(
+                    icon: Icon(Icons.add), label: 'Add Quiz'),
+            ],
+          ),
+        );
+      },
     );
+  }
+
+  @override
+  void dispose() {
+    _logger.i('HomePage disposed');
+    super.dispose();
   }
 }

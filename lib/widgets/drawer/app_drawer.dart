@@ -20,17 +20,18 @@ class AppDrawer extends StatelessWidget {
         padding: EdgeInsets.zero,
         children: <Widget>[
           const AppDrawerHeader(),
-          // 수정: 사용자 로그인 상태에 따라 동적으로 버튼 표시
           if (userProvider.user == null)
             ListTile(
               leading: const Icon(Icons.login),
               title: const Text('Login'),
               onTap: () {
-                logger.i('Login button tapped');
-                Navigator.pop(context);
+                logger.i('Login button tapped from Drawer');
+                Navigator.pop(context); // Close the drawer
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  MaterialPageRoute(
+                      builder: (context) => const LoginPage(
+                          isFromDrawer: true)), // Add isFromDrawer parameter
                 );
               },
             )
@@ -43,13 +44,11 @@ class AppDrawer extends StatelessWidget {
                 await authService.signOut();
                 userProvider.setUser(null);
                 Navigator.pop(context);
-                // 추가: 로그아웃 후 스낵바 표시
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Successfully logged out')),
                 );
               },
             ),
-          // 추가: 기타 드로어 메뉴 항목들
           ListTile(
             leading: const Icon(Icons.home),
             title: const Text('Home'),

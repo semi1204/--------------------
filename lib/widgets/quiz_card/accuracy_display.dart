@@ -6,9 +6,9 @@ class AccuracyDisplay extends StatelessWidget {
   final double accuracy;
 
   const AccuracyDisplay({
-    Key? key,
+    super.key,
     required this.accuracy,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

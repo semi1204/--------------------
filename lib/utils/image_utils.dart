@@ -1,14 +1,11 @@
-// lib/utils/image_utils.dart
-
 import 'package:flutter/services.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:logger/logger.dart';
 
-final logger = Logger();
-
 class ImageUtils {
   static const platform =
       MethodChannel('com.example.nursing_quiz_app_6/clipboard');
+  static final Logger logger = Logger();
 
   static Future<Uint8List?> getClipboardImage() async {
     logger.d('Attempting to get clipboard image');
@@ -32,7 +29,7 @@ class ImageUtils {
     logger.i('Uploading image to Firebase Storage: $imageName');
     try {
       FirebaseStorage storage = FirebaseStorage.instance;
-      Reference ref = storage.ref().child('images/$imageName');
+      Reference ref = storage.ref().child('quiz_images/$imageName');
 
       final metadata = SettableMetadata(
         contentType: 'image/png',
@@ -43,11 +40,11 @@ class ImageUtils {
       TaskSnapshot snapshot = await uploadTask;
       String downloadUrl = await snapshot.ref.getDownloadURL();
 
-      logger.i('Image uploaded successfully: $downloadUrl');
-      return downloadUrl;
+      logger.i('Image uploaded successfully. Download URL: $downloadUrl');
+      return 'quiz_images/$imageName';
     } catch (e) {
       logger.e('Error uploading image: $e');
-      rethrow;
+      throw Exception('Failed to upload image: $e');
     }
   }
 }

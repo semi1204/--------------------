@@ -1,58 +1,56 @@
 import 'package:flutter/material.dart';
-import '../services/quiz_service.dart';
+import '../../services/quiz_service.dart';
 import 'package:logger/logger.dart';
-import '../models/quiz_type.dart';
+import '../../models/subject.dart';
 
-class QuizTypeDropdownWithAddButton extends StatelessWidget {
+class SubjectDropdownWithAddButton extends StatelessWidget {
   final QuizService quizService;
   final Logger logger;
-  final String selectedSubjectId;
-  final String? selectedTypeId;
+  final String? selectedSubjectId;
   final Function(String?) onChanged;
   final VoidCallback onAddPressed;
 
-  const QuizTypeDropdownWithAddButton({
-    Key? key,
+  const SubjectDropdownWithAddButton({
+    super.key,
     required this.quizService,
     required this.logger,
     required this.selectedSubjectId,
-    required this.selectedTypeId,
     required this.onChanged,
     required this.onAddPressed,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Expanded(
-          child: StreamBuilder<List<QuizType>>(
-            stream: quizService.getQuizTypesForSubject(selectedSubjectId),
+          child: FutureBuilder<List<Subject>>(
+            future: quizService.getSubjects(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                logger.i('Waiting for quiz types data');
+                logger.i('Waiting for subjects data');
                 return const CircularProgressIndicator();
               }
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                logger.w('No quiz types available for selected subject');
-                return const Text('No quiz types available');
+                logger.w('No subjects available');
+                return const Text('No subjects available');
               }
-              logger.i('Quiz types loaded. Count: ${snapshot.data!.length}');
+              logger.i('Subjects loaded. Count: ${snapshot.data!.length}');
               return DropdownButtonFormField<String>(
-                value: selectedTypeId,
+                value: selectedSubjectId,
                 decoration: const InputDecoration(
-                  labelText: 'Select Quiz Type',
+                  labelText: 'Select Subject',
                   border: OutlineInputBorder(),
                 ),
-                items: snapshot.data!.map((QuizType type) {
+                items: snapshot.data!.map((Subject subject) {
                   return DropdownMenuItem<String>(
-                    value: type.id,
-                    child: Text(type.name),
+                    value: subject.id,
+                    child: Text(subject.name),
                   );
                 }).toList(),
                 onChanged: onChanged,
                 validator: (value) =>
-                    value == null ? 'Please select a quiz type' : null,
+                    value == null ? 'Please select a subject' : null,
               );
             },
           ),

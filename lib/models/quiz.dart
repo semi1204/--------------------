@@ -26,10 +26,21 @@ class Quiz {
     _logger.d('Quiz object created with Markdown support');
   }
 
+  Map<String, dynamic> toJson() => toFirestore();
+
   factory Quiz.fromFirestore(DocumentSnapshot doc) {
     final logger = Logger();
     Map data = doc.data() as Map<String, dynamic>;
     logger.d('Creating Quiz from Firestore data with image support: $data');
+
+    // imageUrl 처리 로직 개선
+    String? imageUrl = data['imageUrl'];
+    if (imageUrl != null && !imageUrl.startsWith('http')) {
+      imageUrl =
+          'https://firebasestorage.googleapis.com/v0/b/nursingquizapp6.appspot.com/o/$imageUrl?alt=media';
+    }
+    logger.d('Processed imageUrl: $imageUrl');
+
     return Quiz(
       id: doc.id,
       question: data['question'] ?? '',
@@ -38,7 +49,20 @@ class Quiz {
       explanation: data['explanation'] ?? '',
       typeId: data['typeId'] ?? '',
       keywords: List<String>.from(data['keywords'] ?? []),
-      imageUrl: data['imageUrl'], // This should now be properly parsed
+      imageUrl: imageUrl,
+    );
+  }
+
+  factory Quiz.fromJson(Map<String, dynamic> json) {
+    return Quiz(
+      id: json['id'] ?? '',
+      question: json['question'] ?? '',
+      options: List<String>.from(json['options'] ?? []),
+      correctOptionIndex: json['correctOptionIndex'] ?? 0,
+      explanation: json['explanation'] ?? '',
+      typeId: json['typeId'] ?? '',
+      keywords: List<String>.from(json['keywords'] ?? []),
+      imageUrl: json['imageUrl'],
     );
   }
 

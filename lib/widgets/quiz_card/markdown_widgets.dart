@@ -4,21 +4,37 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:logger/logger.dart';
-import 'common_widgets.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:nursing_quiz_app_6/widgets/quiz_card/network_image_with_loader.dart'; // 새로 추가
 
 class MarkdownRenderer extends StatelessWidget {
   final String data;
   final Logger logger;
+  final MarkdownStyleSheet? styleSheet;
 
-  const MarkdownRenderer({Key? key, required this.data, required this.logger})
-      : super(key: key);
+  const MarkdownRenderer({
+    super.key,
+    required this.data,
+    required this.logger,
+    this.styleSheet,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final defaultStyle = DefaultTextStyle.of(context).style;
+    final mergedStyleSheet = styleSheet?.copyWith(
+          p: styleSheet?.p?.merge(defaultStyle) ?? defaultStyle,
+          // Merge other styles as needed
+        ) ??
+        MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+          p: defaultStyle,
+          // Set other styles as needed
+        );
+
     return MarkdownBody(
       data: data,
       selectable: true,
+      styleSheet: mergedStyleSheet,
       builders: {
         'math': MathBuilder(logger: logger),
         'img': ImageBuilder(logger: logger),
@@ -28,7 +44,6 @@ class MarkdownRenderer extends StatelessWidget {
       ], [
         ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
         InlineMathSyntax(),
-        // BlockMathSyntax는 여기서 제거합니다.
       ]),
     );
   }
@@ -64,7 +79,17 @@ class ImageBuilder extends MarkdownElementBuilder {
       final src = element.attributes['src'];
       if (src != null) {
         logger.d('Rendering image: $src');
-        return NetworkImageWithLoader(imageUrl: src);
+        return ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 300,
+            maxHeight: 200,
+          ),
+          child: NetworkImageWithLoader(
+            imageUrl: src,
+            fit: BoxFit.contain,
+            logger: logger,
+          ),
+        );
       }
     }
     return null;

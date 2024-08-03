@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:nursing_quiz_app_6/utils/auth_wrapper.dart';
 import 'package:provider/provider.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
 import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
-import 'package:nursing_quiz_app_6/pages/home_page.dart';
 import 'package:logger/logger.dart';
 import 'firebase_options.dart';
 
@@ -28,7 +28,7 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -36,10 +36,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Nursing Quiz App',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme:
+            ColorScheme.fromSeed(seedColor: Color.fromARGB(255, 84, 119, 148)),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: const AuthWrapper(),
     );
   }
 }

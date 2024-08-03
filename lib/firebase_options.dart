@@ -85,5 +85,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'nursingquizapp6.appspot.com',
     measurementId: 'G-8RNE9V7ZR0',
   );
-
 }

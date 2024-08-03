@@ -23,8 +23,8 @@ class QuizTypePage extends StatelessWidget {
       appBar: AppBar(
         title: Text(subject.name),
       ),
-      body: StreamBuilder<List<QuizType>>(
-        stream: quizService.getQuizTypes(subject.id),
+      body: FutureBuilder<List<QuizType>>(
+        future: quizService.getQuizTypes(subject.id),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             logger.i('Waiting for quiz types data');

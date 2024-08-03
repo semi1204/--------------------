@@ -14,7 +14,21 @@ class Subject {
     );
   }
 
-  // Add this method for caching
+  // 수정: JSON 직렬화를 위한 메서드 추가
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+      };
+
+  // 수정: fromJson 메서드 추가
+  factory Subject.fromJson(Map<String, dynamic> json) {
+    return Subject(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+    );
+  }
+
+  // 기존 메서드는 그대로 유지
   factory Subject.fromMap(Map<String, dynamic> map) {
     return Subject(
       id: map['id'] ?? '',

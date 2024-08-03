@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:markdown/markdown.dart' as md;
 import 'package:logger/logger.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import '../utils/image_utils.dart';
+import '../../utils/image_utils.dart';
 import 'markdown_widgets.dart';
 
 class MarkdownField extends StatefulWidget {
@@ -50,9 +48,11 @@ class _MarkdownFieldState extends State<MarkdownField> {
         border: Border.all(color: Colors.grey),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: MarkdownRenderer(
-        data: widget.controller.text,
-        logger: widget.logger,
+      child: SingleChildScrollView(
+        child: MarkdownRenderer(
+          data: widget.controller.text,
+          logger: widget.logger,
+        ),
       ),
     );
   }

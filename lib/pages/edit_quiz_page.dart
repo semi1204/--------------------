@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
 import '../models/quiz.dart';
 import 'package:logger/logger.dart';
-import '../widgets/markdown_field.dart';
-import '../widgets/keyword_fields.dart';
+import '../widgets/quiz_card/markdown_field.dart';
+import '../widgets/quiz_card/keyword_fields.dart';
 import '../widgets/option_fields.dart';
 
 class EditQuizPage extends StatefulWidget {

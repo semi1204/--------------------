@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:nursing_quiz_app_6/widgets/quiz_card.dart';
 import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
 import '../models/quiz.dart';
 import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
+import '../widgets/quiz_card.dart';
 import 'edit_quiz_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 
 class QuizPage extends StatefulWidget {
   final String subjectId;
@@ -17,20 +15,17 @@ class QuizPage extends StatefulWidget {
     super.key,
     required this.subjectId,
     required this.quizTypeId,
-  });
+  }); // super.key 사용
 
   @override
-  _QuizPageState createState() => _QuizPageState();
+  State<QuizPage> createState() => _QuizPageState();
 }
 
 class _QuizPageState extends State<QuizPage> {
   late final QuizService _quizService;
   late final UserProvider _userProvider;
   late final Logger _logger;
-  List<Quiz> _quizzes = [];
-  int _currentPage = 0;
-  static const int _quizzesPerPage = 10;
-  Map<String, int?> _userAnswers = {};
+  List<Quiz> _quizzes = []; // admin만 접근이 가능한, 원래의 퀴즈 목록
 
   @override
   void initState() {
@@ -39,152 +34,102 @@ class _QuizPageState extends State<QuizPage> {
     _userProvider = Provider.of<UserProvider>(context, listen: false);
     _logger = Provider.of<Logger>(context, listen: false);
     _loadQuizzes();
-    _loadUserAnswers();
   }
 
   Future<void> _loadQuizzes() async {
     _logger.i(
         'Loading quizzes for subject: ${widget.subjectId}, quizType: ${widget.quizTypeId}');
-    final quizzes = await _quizService
-        .getQuizzes(widget.subjectId, widget.quizTypeId)
-        .first;
-    setState(() {
-      _quizzes = quizzes;
-    });
-  }
-
-  Future<void> _loadUserAnswers() async {
-    if (_userProvider.user != null) {
-      final prefs = await SharedPreferences.getInstance();
-      final userAnswersJson =
-          prefs.getString('user_answers_${_userProvider.user!.uid}');
-      if (userAnswersJson != null) {
-        final userAnswers = json.decode(userAnswersJson);
+    try {
+      // 수정: await 사용
+      final quizzes =
+          await _quizService.getQuizzes(widget.subjectId, widget.quizTypeId);
+      if (mounted) {
+        // 추가: mounted 체크
         setState(() {
-          _userAnswers = Map<String, int?>.from(userAnswers);
+          _quizzes = quizzes;
         });
       }
-    }
-  }
-
-  Future<void> _saveUserAnswer(String quizId, int answerIndex) async {
-    _logger.i('Saving user answer for quiz: $quizId, answer: $answerIndex');
-    setState(() {
-      _userAnswers[quizId] = answerIndex;
-    });
-    if (_userProvider.user != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          'user_answers_${_userProvider.user!.uid}', json.encode(_userAnswers));
-    }
-  }
-
-  Future<void> _resetUserAnswers() async {
-    _logger.i('Resetting all user answers');
-    setState(() {
-      _userAnswers.clear();
-    });
-    if (_userProvider.user != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('user_answers_${_userProvider.user!.uid}');
+      _logger.i('Loaded ${_quizzes.length} quizzes');
+    } catch (e) {
+      _logger.e('Error loading quizzes: $e');
     }
   }
 
   Future<void> _resetQuiz(String quizId) async {
     _logger.i('Resetting quiz: $quizId');
-    setState(() {
-      _userAnswers.remove(quizId);
-    });
-    if (_userProvider.user != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          'user_answers_${_userProvider.user!.uid}', json.encode(_userAnswers));
-    }
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Reset Quiz'),
+          content: const Text(
+              'Are you sure you want to reset this quiz? This will clear your answer and reset the accuracy.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Reset'),
+              onPressed: () async {
+                // quizId를 named parameter로 전달
+                await _userProvider.resetUserAnswers(
+                    widget.subjectId, widget.quizTypeId,
+                    quizId: quizId);
+                if (mounted) {
+                  // mounted 체크 추가
+                  setState(() {});
+                  Navigator.of(context).pop();
+                }
+                _logger.i('Quiz reset completed');
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
+// 수정 시 주의 사항
+// 1. QuizCard 위젯에서 User의 기존 선택지는 항상 표시되어있어야함.
+// 2. User는 초기화 버튼으로만 선택지를 초기화할 수 있어야함.
+// 3. User가 선택지를 변경하면, QuizCard 위젯은 즉시 변경된 선택지를 표시해야함.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quiz'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _resetUserAnswers,
-          ),
-        ],
       ),
-      body: _quizzes.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: _getPageItemCount(),
-              itemBuilder: (context, index) {
-                final quizIndex = _currentPage * _quizzesPerPage + index;
-                final quiz = _quizzes[quizIndex];
-                return QuizCard(
-                  key: ValueKey(quiz.id),
-                  quiz: quiz,
-                  questionNumber: quizIndex + 1,
-                  isAdmin: _userProvider.isAdmin,
-                  onEdit: () => _editQuiz(quiz),
-                  onDelete: () => _deleteQuiz(quiz),
-                  selectedOptionIndex: _userAnswers[quiz.id],
-                  onAnswerSelected: (answerIndex) =>
-                      _saveUserAnswer(quiz.id, answerIndex),
-                  onResetQuiz: () => _resetQuiz(quiz.id),
+      body: Consumer<UserProvider>(
+        builder: (context, userProvider, child) {
+          _logger.i('Rebuilding QuizPage');
+          return _quizzes.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  itemCount: _quizzes.length,
+                  itemBuilder: (context, index) {
+                    final quiz = _quizzes[index];
+                    return QuizCard(
+                      key: ValueKey(quiz.id),
+                      quiz: quiz,
+                      questionNumber: index + 1,
+                      isAdmin: userProvider.isAdmin,
+                      onEdit: () => _editQuiz(quiz),
+                      onDelete: () => _deleteQuiz(quiz),
+                      onAnswerSelected: (answerIndex) {
+                        _logger.i('Answer selected for quiz: ${quiz.id}');
+                      },
+                      onResetQuiz: () => _resetQuiz(quiz.id),
+                      subjectId: widget.subjectId,
+                      quizTypeId: widget.quizTypeId,
+                    );
+                  },
                 );
-              },
-            ),
-      bottomNavigationBar: _buildPaginationControls(),
-    );
-  }
-
-  Widget _buildPaginationControls() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _currentPage > 0 ? _previousPage : null,
-          ),
-          Text(
-              '${_currentPage + 1} / ${(_quizzes.length / _quizzesPerPage).ceil()}'),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward),
-            onPressed: _hasNextPage() ? _nextPage : null,
-          ),
-        ],
+        },
       ),
     );
-  }
-
-  int _getPageItemCount() {
-    final remainingItems = _quizzes.length - (_currentPage * _quizzesPerPage);
-    return remainingItems < _quizzesPerPage ? remainingItems : _quizzesPerPage;
-  }
-
-  bool _hasNextPage() {
-    return (_currentPage + 1) * _quizzesPerPage < _quizzes.length;
-  }
-
-  void _previousPage() {
-    if (_currentPage > 0) {
-      setState(() {
-        _currentPage--;
-      });
-      _logger.i('Navigated to previous page: $_currentPage');
-    }
-  }
-
-  void _nextPage() {
-    if (_hasNextPage()) {
-      setState(() {
-        _currentPage++;
-      });
-      _logger.i('Navigated to next page: $_currentPage');
-    }
   }
 
   void _editQuiz(Quiz quiz) {
@@ -218,8 +163,8 @@ class _QuizPageState extends State<QuizPage> {
             ),
             TextButton(
               child: const Text('Delete'),
-              onPressed: () {
-                _quizService.deleteQuiz(
+              onPressed: () async {
+                await _quizService.deleteQuiz(
                     widget.subjectId, widget.quizTypeId, quiz.id);
                 setState(() {
                   _quizzes.removeWhere((q) => q.id == quiz.id);

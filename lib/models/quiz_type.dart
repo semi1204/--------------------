@@ -16,7 +16,16 @@ class QuizType {
     );
   }
 
-  // Add this method for caching
+  //fromJson 메서드
+  factory QuizType.fromJson(Map<String, dynamic> json) {
+    return QuizType(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      subjectId: json['subjectId'] ?? '',
+    );
+  }
+
+  // 기존 메서드 유지
   factory QuizType.fromMap(Map<String, dynamic> map) {
     return QuizType(
       id: map['id'] ?? '',
@@ -24,6 +33,9 @@ class QuizType {
       subjectId: map['subjectId'] ?? '',
     );
   }
+
+  // toJson 메서드 추가
+  Map<String, dynamic> toJson() => toFirestore();
 
   Map<String, dynamic> toFirestore() => {
         'id': id,

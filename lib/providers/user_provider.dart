@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
@@ -16,9 +18,11 @@ class UserProvider with ChangeNotifier {
 
   Map<String, dynamic> _quizData = {};
   Set<String> _deletedQuizzes = {};
+  bool _needsSync = false;
 
   User? get user => _user;
   Map<String, dynamic> get quizData => _quizData;
+  bool get needsSync => _needsSync;
 
   bool get isAdmin {
     if (_user == null) {
@@ -125,19 +129,11 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  //수정시 주의사항
-  //기기내부와 서버에서 reviewlist에서 삭제됨. quizlist와는 무관하고,
-  //quizpage에서 사용자가 기존에 선택한 ui는 변하지 않음.
   Future<void> deleteUserQuizData(
       String userId, String subjectId, String quizTypeId, String quizId) async {
     _logger.i(
         'Deleting user quiz data for user: $userId, subject: $subjectId, quizType: $quizTypeId, quiz: $quizId');
     try {
-      // Delete data from Firestore
-      await FirebaseFirestore.instance.collection('users').doc(userId).update({
-        'quizData.$subjectId.$quizTypeId.$quizId': FieldValue.delete(),
-      });
-
       // Update local state
       _quizData[subjectId]?[quizTypeId]?.remove(quizId);
       _deletedQuizzes.add(quizId);
@@ -159,7 +155,7 @@ class UserProvider with ChangeNotifier {
   // <<수정 시 주의 사항>>
   // 1. 사용자가 선택한 답은 무조건 기억해야 함.
   // 2. 기억한 답은 초기화 버튼을 누르기 전까지 유지되어야 함.
-  // 유지해야하는 기능 : 사용자 데이터 로드 시 캐시 -> 기기 내부 저장소 -> Firestore 순으로 데이터 로드
+  // 유지해야하는 기능 : 사용자 데이터 로드 시 캐시 -> 기��� 내부 저장소 -> Firestore 순으로 데이터 로드
   Future<void> loadUserData() async {
     if (_user == null) {
       _logger.w('Attempted to load quiz data for null user');
@@ -195,29 +191,9 @@ class UserProvider with ChangeNotifier {
         return;
       }
 
-      // 3. Firestore에서 데이터 로드
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_user!.uid)
-          .get();
-
-      if (doc.exists) {
-        final firestoreData = doc.data();
-        _logger.d('Firestore data found: $firestoreData');
-        if (firestoreData != null && firestoreData['quizData'] != null) {
-          _quizData = firestoreData['quizData'] as Map<String, dynamic>;
-          _logger.i('User data loaded from Firestore');
-        } else {
-          _logger.w('No quizData found in Firestore document');
-          _quizData = {};
-        }
-      } else {
-        _logger.w('No user document found in Firestore');
-        _quizData = {};
-      }
-
+      _logger.w('No local data found, initializing empty quiz data');
+      _quizData = {};
       _loadDeletedQuizzes(prefs);
-      await _saveQuizData(); // 데이터를 모든 저장소에 동기화
       notifyListeners();
     } catch (e) {
       _logger.e('Error loading user data: $e');
@@ -294,15 +270,7 @@ class UserProvider with ChangeNotifier {
         await prefs.setString(
             'user_quiz_data_local_${_user!.uid}', json.encode(_quizData));
 
-        // 3. Firestore에 저장
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(_user!.uid)
-            .set({
-          'quizData': _quizData,
-        }, SetOptions(merge: true));
-
-        _logger.i('Quiz data saved successfully to all storage');
+        _logger.i('Quiz data saved successfully to local storage');
       } catch (e) {
         _logger.e('Error saving quiz data: $e');
       }
@@ -335,10 +303,12 @@ class UserProvider with ChangeNotifier {
       {String? quizId}) async {
     if (quizId != null) {
       _quizData[subjectId]?[quizTypeId]?[quizId]?.remove('selectedAnswer');
+      _quizData[subjectId]?[quizTypeId]?[quizId]?.remove('selectedOptionIndex');
       _logger.i('Reset user answer for quiz: $quizId');
     } else {
       _quizData[subjectId]?[quizTypeId]?.forEach((quizId, quizData) {
         quizData.remove('selectedAnswer');
+        quizData.remove('selectedOptionIndex');
       });
       _logger.i(
           'Reset all user answers for subject: $subjectId, quizType: $quizTypeId');
@@ -347,8 +317,6 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 수정 시 주의 사항:
-  // 유저의 모든 데이터에 대한 UI는 바로바로 갱신되어야 함.
   Future<void> updateUserQuizData(
       String subjectId, String quizTypeId, String quizId, bool isCorrect,
       {Duration? answerTime,
@@ -377,7 +345,7 @@ class UserProvider with ChangeNotifier {
                   'consecutiveCorrect': 0,
                   'selectedOptionIndex': null, // 선택한 옵션 인덱스 저장
                   'mistakeCount': 0,
-                }); // 퀴즈 데이터 초기화
+                }); // 퀴�� 데이터 초기화
 
     quizData['total'] = (quizData['total'] as int? ?? 0) + 1; // 총 퀴즈 수 증가
     if (isCorrect) {
@@ -419,6 +387,7 @@ class UserProvider with ChangeNotifier {
         'User quiz data updated. New accuracy: ${quizData['accuracy']}, Next review: ${quizData['nextReviewDate']}');
 
     await _saveQuizData(); // 퀴즈 데이터 저장
+    _needsSync = true;
     notifyListeners(); // 리스너들에게 알림
   }
 
@@ -427,6 +396,26 @@ class UserProvider with ChangeNotifier {
     return _quizData[subjectId]?[quizTypeId]?[quizId]?['mistakeCount']
             as int? ??
         0;
+  }
+
+  // 사용자의 데이터를 Firebase에 동기화하는 메소드
+  Future<void> syncUserData() async {
+    if (_user == null || !_needsSync) {
+      _logger.w('No need to sync user data');
+      return;
+    }
+
+    _logger.i('Syncing user data with Firebase');
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set({
+        'quizData': _quizData,
+      }, SetOptions(merge: true));
+      _needsSync = false;
+      notifyListeners();
+      _logger.i('User data synced successfully with Firebase');
+    } catch (e) {
+      _logger.e('Error syncing user data with Firebase: $e');
+    }
   }
 
   // 주의 사항:
@@ -513,6 +502,53 @@ class UserProvider with ChangeNotifier {
     } else {
       return '${difference.inSeconds}초';
     }
+  }
+
+  Future<void> markQuizForReview(
+      String subjectId, String quizTypeId, String quizId) async {
+    _logger.i('Marking quiz for review: $quizId');
+    if (_user == null) {
+      _logger.w('Attempted to mark quiz for review for null user');
+      return;
+    }
+
+    try {
+      final quizData = _quizData[subjectId]?[quizTypeId]?[quizId] ?? {};
+      quizData['markedForReview'] = true;
+      quizData['markedForReviewAt'] = DateTime.now().toIso8601String();
+
+      // Update local state
+      _quizData[subjectId] ??= {};
+      _quizData[subjectId]![quizTypeId] ??= {};
+      _quizData[subjectId]![quizTypeId]![quizId] = quizData;
+
+      // Update Firestore
+      await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set({
+        'quizData': {
+          subjectId: {
+            quizTypeId: {
+              quizId: quizData,
+            },
+          },
+        },
+      }, SetOptions(merge: true));
+
+      // Update SharedPreferences
+      await _saveQuizData();
+
+      _logger.i('Quiz marked for review successfully');
+      notifyListeners();
+    } catch (e) {
+      _logger.e('Error marking quiz for review: $e');
+    }
+  }
+
+  List<String> getQuizzesMarkedForReview(String subjectId, String quizTypeId) {
+    final quizzes = _quizData[subjectId]?[quizTypeId] ?? {};
+    return quizzes.entries
+        .where((entry) => entry.value['markedForReview'] == true)
+        .map((entry) => entry.key)
+        .toList();
   }
 
   authStateChanges() {}

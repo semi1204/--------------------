@@ -5,7 +5,7 @@ import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:nursing_quiz_app_6/pages/home_page.dart';
+import 'package:nursing_quiz_app_6/pages/home_page.dart' show DraggablePage;
 
 class LoginPage extends StatefulWidget {
   final bool isFromDrawer;
@@ -37,9 +37,9 @@ class _LoginPageState extends State<LoginPage> {
       logger.i('Login successful from Drawer, popping context');
       Navigator.of(context).pop(); // Close the login page (and drawer)
     } else {
-      logger.i('Login successful, navigating to HomePage');
+      logger.i('Login successful, navigating to DraggablePage');
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const HomePage()),
+        MaterialPageRoute(builder: (context) => const DraggablePage()),
         (Route<dynamic> route) => false,
       );
     }

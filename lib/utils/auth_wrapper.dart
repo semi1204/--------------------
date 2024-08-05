@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/pages/login_page.dart';
 import 'package:provider/provider.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
-import 'package:nursing_quiz_app_6/pages/home_page.dart';
+import 'package:nursing_quiz_app_6/pages/home_page.dart' show DraggablePage;
 import 'package:logger/logger.dart';
 
 class AuthWrapper extends StatelessWidget {
@@ -24,8 +24,8 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.data == true) {
-          logger.i('User is logged in, loading HomePage');
-          return const HomePage();
+          logger.i('User is logged in, loading DraggablePage');
+          return const DraggablePage();
         } else {
           logger.i('User is not logged in, showing LoginPage');
           return const LoginPage();

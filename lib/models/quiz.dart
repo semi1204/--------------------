@@ -10,6 +10,8 @@ class Quiz {
   final String typeId;
   final List<String> keywords;
   final String? imageUrl;
+  final int? year; //year field
+  final String? examType;
 
   final Logger _logger = Logger();
 
@@ -22,15 +24,16 @@ class Quiz {
     required this.typeId,
     this.keywords = const [],
     this.imageUrl,
+    this.year, // year parameter
+    this.examType, // examType parameter
   }) {
     _logger.d('Quiz object created with Markdown support');
   }
 
   Map<String, dynamic> toJson() => toFirestore();
 
-  factory Quiz.fromFirestore(DocumentSnapshot doc) {
-    final logger = Logger();
-    Map data = doc.data() as Map<String, dynamic>;
+  factory Quiz.fromFirestore(DocumentSnapshot doc, Logger logger) {
+    final data = doc.data() as Map<String, dynamic>;
     logger.d('Creating Quiz from Firestore data with image support: $data');
 
     // imageUrl 처리 로직 개선
@@ -50,6 +53,8 @@ class Quiz {
       typeId: data['typeId'] ?? '',
       keywords: List<String>.from(data['keywords'] ?? []),
       imageUrl: imageUrl,
+      year: data['year'], // year field
+      examType: data['examType'], // examType field
     );
   }
 
@@ -63,6 +68,8 @@ class Quiz {
       typeId: json['typeId'] ?? '',
       keywords: List<String>.from(json['keywords'] ?? []),
       imageUrl: json['imageUrl'],
+      year: json['year'], // year field
+      examType: json['examType'], // examType field
     );
   }
 
@@ -77,6 +84,8 @@ class Quiz {
       typeId: map['typeId'] ?? '',
       keywords: List<String>.from(map['keywords'] ?? []),
       imageUrl: map['imageUrl'], // Ensure this is included in the map parsing
+      year: map['year'], // year field
+      examType: map['examType'], // examType field
     );
   }
 
@@ -91,6 +100,8 @@ class Quiz {
       'typeId': typeId,
       'keywords': keywords,
       'imageUrl': imageUrl,
+      'year': year, // year field
+      'examType': examType, // examType field
     };
   }
 }

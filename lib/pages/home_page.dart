@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nursing_quiz_app_6/pages/incorrect_answer_page.dart';
+import 'package:nursing_quiz_app_6/pages/review_quizzes_page.dart';
 import 'package:nursing_quiz_app_6/pages/subject_page.dart';
 import 'package:nursing_quiz_app_6/pages/add_quiz_page.dart';
 import 'package:nursing_quiz_app_6/widgets/drawer/app_drawer.dart';
@@ -7,14 +7,14 @@ import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({Key? key});
+class DraggablePage extends StatefulWidget {
+  const DraggablePage({Key? key}) : super(key: key);
 
   @override
-  _HomePageState createState() => _HomePageState();
+  _DraggablePageState createState() => _DraggablePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _DraggablePageState extends State<DraggablePage> {
   int _selectedIndex = 0;
   late final Logger _logger;
 
@@ -22,9 +22,9 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _logger = Provider.of<Logger>(context, listen: false);
-    _logger.i('HomePage initialized');
+    _logger.i('DraggablePage initialized');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _logger.i('HomePage built');
+      _logger.i('DraggablePage built');
     });
   }
 
@@ -33,42 +33,39 @@ class _HomePageState extends State<HomePage> {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         _logger.i(
-            'Building HomePage. User logged in: ${userProvider.user != null}. Is admin: ${userProvider.isAdmin}');
+            'Building DraggablePage. User logged in: ${userProvider.user != null}. Is admin: ${userProvider.isAdmin}');
 
         final List<Widget> _pages = [
           SubjectPage(key: const PageStorageKey('subject')),
-          SubjectPage(key: const PageStorageKey('quiz')),
-          const IncorrectAnswersPage(key: PageStorageKey('incorrect')),
+          const ReviewQuizzesPage(key: PageStorageKey('review')),
           if (userProvider.isAdmin)
             const AddQuizPage(key: PageStorageKey('add_quiz')),
         ];
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Nursing Quiz App'),
+            title: _getAppBarTitle(_selectedIndex),
           ),
           drawer: const AppDrawer(),
           body: IndexedStack(
             index: _selectedIndex,
             children: _pages,
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (int index) {
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            onTap: (int index) {
               setState(() {
                 _selectedIndex = index;
               });
               _logger.i('User navigated to page index: $index');
             },
-            destinations: [
-              const NavigationDestination(
+            items: [
+              const BottomNavigationBarItem(
                   icon: Icon(Icons.home), label: 'Home'),
-              const NavigationDestination(
-                  icon: Icon(Icons.quiz), label: 'Quiz'),
-              const NavigationDestination(
-                  icon: Icon(Icons.error_outline), label: 'Incorrect'),
+              const BottomNavigationBarItem(
+                  icon: Icon(Icons.error_outline), label: 'Review'),
               if (userProvider.isAdmin)
-                const NavigationDestination(
+                const BottomNavigationBarItem(
                     icon: Icon(Icons.add), label: 'Add Quiz'),
             ],
           ),
@@ -77,9 +74,22 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _getAppBarTitle(int index) {
+    switch (index) {
+      case 0:
+        return const Text('Subjects');
+      case 1:
+        return const Text('Review');
+      case 2:
+        return const Text('Add Quiz');
+      default:
+        return const Text('Nursing Quiz App');
+    }
+  }
+
   @override
   void dispose() {
-    _logger.i('HomePage disposed');
+    _logger.i('DraggablePage disposed');
     super.dispose();
   }
 }

@@ -36,6 +36,9 @@ class _AddQuizPageState extends State<AddQuizPage> {
   final List<TextEditingController> _keywordControllers = [
     TextEditingController()
   ];
+  final TextEditingController _yearController =
+      TextEditingController(); // year field
+  String? _examType = 'CPA'; // CPA/CTA 선택을 위한 변수
 
   bool _isPreviewMode = false;
 
@@ -57,6 +60,7 @@ class _AddQuizPageState extends State<AddQuizPage> {
     for (var controller in _keywordControllers) {
       controller.dispose();
     }
+    _yearController.dispose(); // year field
     _logger.i('AddQuizPage disposed');
     super.dispose();
   }
@@ -158,6 +162,46 @@ class _AddQuizPageState extends State<AddQuizPage> {
                 isPreviewMode: _isPreviewMode,
                 logger: _logger,
               ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _yearController,
+                decoration: const InputDecoration(
+                  labelText: 'Year (Optional)',
+                  hintText: 'Enter the year of the quiz',
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value != null && value.isNotEmpty) {
+                    final year = int.tryParse(value);
+                    if (year == null ||
+                        year < 1900 ||
+                        year > DateTime.now().year) {
+                      return 'Please enter a valid year';
+                    }
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _examType,
+                decoration: const InputDecoration(
+                  labelText: 'Exam Type',
+                ),
+                items: ['CPA', 'CTA'].map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _examType = newValue;
+                  });
+                },
+                validator: (value) =>
+                    value == null ? 'Please select an exam type' : null,
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _submitQuiz,
@@ -217,6 +261,10 @@ class _AddQuizPageState extends State<AddQuizPage> {
               .where((keyword) => keyword.isNotEmpty)
               .toList(),
           imageUrl: imageUrl,
+          year: _yearController.text.isNotEmpty
+              ? int.parse(_yearController.text)
+              : null,
+          examType: _examType,
         );
         await _quizService.addQuiz(
             _selectedSubjectId!, _selectedTypeId!, newQuiz);
@@ -259,6 +307,8 @@ class _AddQuizPageState extends State<AddQuizPage> {
       _selectedTypeId = null;
       _correctOptionIndex = 0;
       _imageFile = null;
+      _yearController.clear();
+      _examType = 'CPA';
     });
     _logger.i('Form reset completed');
   }

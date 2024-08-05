@@ -33,8 +33,9 @@ class QuizOptions extends StatelessWidget {
         final bool showSelection = isQuizPage ? isSelected : false;
 
         return InkWell(
-          onTap:
-              hasAnswered && !isQuizPage ? null : () => onSelectOption(index),
+          onTap: hasAnswered || selectedOptionIndex != null
+              ? null
+              : () => onSelectOption(index),
           child: Container(
             padding:
                 const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),

@@ -83,19 +83,34 @@ class _QuizCardState extends State<QuizCard> {
     _loadMistakeCount();
   }
 
-  // 사용자의 실수 횟수 로드 메소드
-  void _loadMistakeCount() {
-    _mistakeCount = _userProvider.getQuizMistakeCount(
-        widget.subjectId, widget.quizTypeId, widget.quiz.id);
-    _logger.i('Loaded mistake count: $_mistakeCount');
-  }
-
-  // 사용자의 답변 로드 메소드
   void _loadUserAnswer() {
     _selectedOptionIndex = _userProvider.getUserAnswer(
-        widget.subjectId, widget.quizTypeId, widget.quiz.id);
-    _hasAnswered = _selectedOptionIndex != null;
-    _logger.i('Loaded user answer: $_selectedOptionIndex');
+      widget.subjectId,
+      widget.quizTypeId,
+      widget.quiz.id,
+    );
+    _logger.i(
+        'Loaded user answer for quiz ${widget.quiz.id}: $_selectedOptionIndex');
+  }
+
+  void _loadMistakeCount() {
+    _mistakeCount = _userProvider.getQuizMistakeCount(
+      widget.subjectId,
+      widget.quizTypeId,
+      widget.quiz.id,
+    );
+    _logger
+        .i('Loaded mistake count for quiz ${widget.quiz.id}: $_mistakeCount');
+  }
+
+  @override
+  void didUpdateWidget(QuizCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedOptionIndex != oldWidget.selectedOptionIndex) {
+      _logger.i(
+          'QuizCard updated: selectedOptionIndex changed to ${widget.selectedOptionIndex}');
+      _loadUserAnswer();
+    }
   }
 
   @override
@@ -134,6 +149,10 @@ class _QuizCardState extends State<QuizCard> {
               QuizExplanation(
                 explanation: widget.quiz.explanation,
                 logger: _logger,
+                keywords: widget.quiz.keywords,
+                quizId: widget.quiz.id,
+                subjectId: widget.subjectId,
+                quizTypeId: widget.quizTypeId,
               ),
             ],
             if (widget.isAdmin)
@@ -161,85 +180,81 @@ class _QuizCardState extends State<QuizCard> {
 
   void _selectOption(int index) {
     _logger.i('Selecting option $index for quiz ${widget.quiz.id}');
-    setState(() {
-      _selectedOptionIndex = index;
-      _hasAnswered = true;
-    });
-
-    final endTime = DateTime.now();
-    final answerTime = endTime.difference(_startTime!);
-    final isCorrect = index == widget.quiz.correctOptionIndex;
-
-    if (!isCorrect) {
+    if (_selectedOptionIndex == null || !widget.isQuizPage) {
+      // 조건문 실행조건 : 사용자가 선택한 옵션이 없거나, 퀴즈 페이지가 아닐 때
       setState(() {
-        _mistakeCount++;
+        _selectedOptionIndex = index;
+        _hasAnswered = true;
       });
+
+      final endTime = DateTime.now();
+      final answerTime = endTime.difference(_startTime!);
+      final isCorrect = index == widget.quiz.correctOptionIndex;
+
+      if (!isCorrect) {
+        setState(() {
+          _mistakeCount++;
+        });
+      }
+
+      _userProvider.updateUserQuizData(
+        widget.subjectId,
+        widget.quizTypeId,
+        widget.quiz.id,
+        isCorrect,
+        answerTime: answerTime,
+        selectedOptionIndex: index,
+        mistakeCount: _mistakeCount,
+      );
+
+      widget.onAnswerSelected?.call(index);
+
+      _showAnswerSnackBar(isCorrect);
+
+      _logger.i(
+          'User selected option $index. Correct: $isCorrect. Mistake count: $_mistakeCount');
+    } else {
+      _logger.i('Option already selected. Ignoring new selection.');
     }
-
-    _userProvider.updateUserQuizData(
-      widget.subjectId,
-      widget.quizTypeId,
-      widget.quiz.id,
-      isCorrect,
-      answerTime: answerTime,
-      selectedOptionIndex: index,
-      mistakeCount: _mistakeCount,
-    );
-
-    widget.onAnswerSelected?.call(index);
-
-    _showAnswerSnackBar(isCorrect);
-
-    _logger.i(
-        'User selected option $index. Correct: $isCorrect. Mistake count: $_mistakeCount');
   }
 
   void _showAnswerSnackBar(bool isCorrect) {
-    // 수정: getNextReviewTimeString 메서드 호출 수정
-    final reviewTimeString = _userProvider.getNextReviewTimeString(
-      widget.subjectId,
-      widget.quizTypeId,
-      widget.quiz.id,
-    );
+    String message;
+    Color backgroundColor;
+
+    // 정답일 때
+    if (isCorrect) {
+      message = '정답입니다! 🎉';
+      backgroundColor = const Color.fromARGB(255, 144, 223, 146);
+    } else {
+      // 오답일 때
+      message = '오답입니다. 다시 도전해보세요! 💪';
+      backgroundColor = const Color.fromARGB(255, 218, 141, 135);
+    }
+
+    if (!widget.isQuizPage) {
+      // quizpage가 아닐 때
+      final reviewTimeString = _userProvider.getNextReviewTimeString(
+        widget.subjectId,
+        widget.quizTypeId,
+        widget.quiz.id,
+      );
+      message += '\n다음 복습은 $reviewTimeString 후입니다.'; // snackbar에 복습 시간 표시
+    }
 
     _logger.i(
-        'Showing answer snackbar. IsCorrect: $isCorrect, Next review: $reviewTimeString');
+        'Showing answer snackbar. IsCorrect: $isCorrect, IsQuizPage: ${widget.isQuizPage}');
 
     final snackBar = SnackBar(
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isCorrect ? Icons.check_circle : Icons.cancel,
-                color: Colors.white,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isCorrect ? '정답입니다! 🎉' : '오답입니다. 다시 도전해보세요! 💪',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '다음 복습은 $reviewTimeString 후입니다.',
-            style: const TextStyle(
-              color: Colors.black87,
-              fontSize: 14,
-            ),
-          ),
-        ],
+      content: Text(
+        message,
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
       ),
-      backgroundColor: isCorrect
-          ? const Color.fromARGB(255, 144, 223, 146)
-          : const Color.fromARGB(255, 218, 141, 135),
+      backgroundColor: backgroundColor,
       duration: const Duration(seconds: 3),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/pages/home_page.dart';
 import 'package:nursing_quiz_app_6/pages/login_page.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
@@ -7,7 +8,7 @@ import 'drawer_header.dart';
 import 'package:logger/logger.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({Key? key}) : super(key: key);
+  const AppDrawer({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +46,13 @@ class AppDrawer extends StatelessWidget {
                 userProvider.setUser(null);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Successfully logged out')),
+                  SnackBar(
+                    content: const Text(
+                      '👋 로그아웃 완료! 다음에 또 만나요 😊',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    backgroundColor: Colors.pink[100],
+                  ),
                 );
               },
             ),
@@ -55,7 +62,10 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               logger.i('Home menu item tapped');
               Navigator.pop(context);
-              // TODO: Navigate to home page
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const DraggablePage()),
+              );
             },
           ),
           ListTile(
@@ -65,6 +75,24 @@ class AppDrawer extends StatelessWidget {
               logger.i('Settings menu item tapped');
               Navigator.pop(context);
               // TODO: Navigate to settings page
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.sync),
+            title: const Text('Sync User Info'),
+            onTap: () async {
+              logger.i('Sync User Info button tapped');
+              await userProvider.syncUserData();
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    '🔄 사용자 데이터 동기화 완료! 🎉',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  backgroundColor: Colors.green[300],
+                ),
+              );
             },
           ),
         ],

@@ -13,11 +13,11 @@ class EditQuizPage extends StatefulWidget {
   final String quizTypeId;
 
   const EditQuizPage({
-    Key? key,
+    super.key,
     required this.quiz,
     required this.subjectId,
     required this.quizTypeId,
-  }) : super(key: key);
+  });
 
   @override
   _EditQuizPageState createState() => _EditQuizPageState();
@@ -33,6 +33,8 @@ class _EditQuizPageState extends State<EditQuizPage> {
   late int _correctOptionIndex;
   late final TextEditingController _explanationController;
   late final List<TextEditingController> _keywordControllers;
+  late final TextEditingController _yearController;
+  late String? _examType;
 
   bool _isPreviewMode = false;
 
@@ -53,6 +55,9 @@ class _EditQuizPageState extends State<EditQuizPage> {
     _keywordControllers = widget.quiz.keywords
         .map((keyword) => TextEditingController(text: keyword))
         .toList();
+    _yearController =
+        TextEditingController(text: widget.quiz.year?.toString() ?? '');
+    _examType = widget.quiz.examType;
   }
 
   @override
@@ -65,6 +70,7 @@ class _EditQuizPageState extends State<EditQuizPage> {
     for (var controller in _keywordControllers) {
       controller.dispose();
     }
+    _yearController.dispose();
     _logger.i('EditQuizPage disposed');
     super.dispose();
   }
@@ -126,6 +132,46 @@ class _EditQuizPageState extends State<EditQuizPage> {
                 isPreviewMode: _isPreviewMode,
                 logger: _logger,
               ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _yearController,
+                decoration: const InputDecoration(
+                  labelText: 'Year (Optional)',
+                  hintText: 'Enter the year of the quiz',
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value != null && value.isNotEmpty) {
+                    final year = int.tryParse(value);
+                    if (year == null ||
+                        year < 1900 ||
+                        year > DateTime.now().year) {
+                      return 'Please enter a valid year';
+                    }
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _examType,
+                decoration: const InputDecoration(
+                  labelText: 'Exam Type',
+                ),
+                items: ['CPA', 'CTA'].map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _examType = newValue;
+                  });
+                },
+                validator: (value) =>
+                    value == null ? 'Please select an exam type' : null,
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _updateQuiz,
@@ -154,6 +200,10 @@ class _EditQuizPageState extends State<EditQuizPage> {
               .where((keyword) => keyword.isNotEmpty)
               .toList(),
           imageUrl: widget.quiz.imageUrl,
+          year: _yearController.text.isNotEmpty
+              ? int.parse(_yearController.text)
+              : null,
+          examType: _examType,
         );
         await _quizService.updateQuiz(
             widget.subjectId, widget.quizTypeId, updatedQuiz);

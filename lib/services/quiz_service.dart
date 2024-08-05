@@ -32,10 +32,13 @@ class QuizService {
   final Map<String, Map<String, Map<String, List<Quiz>>>> _cachedQuizzes =
       {}; // 캐시된 주제 데이터를 저장하는 맵
 
-  Future<List<Quiz>> getIncorrectQuizzes(
-      String userId, String subjectId) async {
-    _logger
-        .i('Fetching incorrect quizzes for user: $userId, subject: $subjectId');
+  Future<List<Quiz>> getQuizzesForReview(
+      // 사용자 ID를 이용해, 사용자 복습할 퀴즈 데이터를 가져옴
+      String userId,
+      String subjectId,
+      String selectedQuizTypeId) async {
+    _logger.i(
+        'Fetching quizzes for review: user: $userId, subject: $subjectId, quizType: $selectedQuizTypeId');
     final userData = await getUserQuizData(userId); // 사용자 퀴즈 데이터를 가져옴
     final now = DateTime.now();
 
@@ -44,53 +47,49 @@ class QuizService {
         Set.from(prefs.getStringList('deleted_quizzes_$userId') ?? []);
     _logger.d('Deleted quizzes: $deletedQuizzes'); // 삭제된 퀴즈 목록을 가져옴
 
-    List<Quiz> incorrectQuizzes = []; // 틀린 퀴즈 목록 초기화
+    List<Quiz> quizzesForReview = []; // 복습할 퀴즈 목록 초기화
 
     try {
-      final quizTypes = await getQuizTypes(subjectId);
+      final quizzes = await getQuizzes(subjectId, selectedQuizTypeId);
       _logger.d(
-          'Quiz types for subject $subjectId: ${quizTypes.map((qt) => qt.id).toList()}'); // 주제의 퀴즈 타입을 가져옴
-      for (var quizType in quizTypes) {
-        final quizzes = await getQuizzes(subjectId, quizType.id);
-        _logger.d(
-            'Fetched ${quizzes.length} quizzes for quiz type: ${quizType.id}'); // 퀴즈 목록을 가져옴
-        for (var quiz in quizzes) {
-          if (!deletedQuizzes.contains(quiz.id)) {
-            // 퀴즈가 삭제된 목록에 없을 경우
-            final quizData =
-                userData[subjectId]?[quizType.id]?[quiz.id]; // 퀴즈 데이터를 가져옴
-            if (quizData != null) {
-              final accuracy = quizData['accuracy'] ?? 0.0; // 정확도
-              final nextReviewDate =
-                  DateTime.parse(quizData['nextReviewDate']); // 다음 리뷰 날짜
-              if (accuracy < 1.0 && now.isAfter(nextReviewDate)) {
-                // 정확도가 100% 미만이고, 복습 날짜가 지났을 경우
-                incorrectQuizzes.add(quiz); // 틀린 퀴즈 목록에 추가
-                _logger.d('Added incorrect quiz: ${quiz.id} to review list');
-              } else {
-                _logger.d(
-                    'Quiz ${quiz.id} not added to review list. Reason: ${accuracy >= 1.0 ? "Perfect accuracy" : "Review date in future"}');
-              }
+          'Fetched ${quizzes.length} quizzes for quiz type: $selectedQuizTypeId'); // 퀴즈 목록을 가져옴
+      for (var quiz in quizzes) {
+        if (!deletedQuizzes.contains(quiz.id)) {
+          // 퀴즈가 삭제된 목록에 없을 경우
+          final quizData =
+              userData[subjectId]?[selectedQuizTypeId]?[quiz.id]; // 퀴즈 데이터를 가져옴
+          if (quizData != null) {
+            final accuracy = quizData['accuracy'] ?? 0.0; // 정확도
+            final nextReviewDate =
+                DateTime.parse(quizData['nextReviewDate']); // 다음 리뷰 날짜
+            if (accuracy < 1.0 && now.isAfter(nextReviewDate)) {
+              // 정확도가 100% 미만이고, 복습 날짜가 지났을 경우
+              quizzesForReview.add(quiz); // 복습할 퀴즈 목록에 추가
+              _logger.d('Added quiz: ${quiz.id} to review list');
             } else {
-              _logger.d('No data found for quiz: ${quiz.id}');
+              _logger.d(
+                  'Quiz ${quiz.id} not added to review list. Reason: ${accuracy >= 1.0 ? "Perfect accuracy" : "Review date in future"}');
             }
+          } else {
+            _logger.d('No data found for quiz: ${quiz.id}');
           }
         }
       }
       // 실수 횟수에 따라 틀린 퀴즈를 정렬 (내림차순)
-      incorrectQuizzes.sort((a, b) {
-        final aMistakeCount =
-            userData[subjectId]?[a.typeId]?[a.id]?['mistakeCount'] ?? 0;
-        final bMistakeCount =
-            userData[subjectId]?[b.typeId]?[b.id]?['mistakeCount'] ?? 0;
+      quizzesForReview.sort((a, b) {
+        final aMistakeCount = userData[subjectId]?[selectedQuizTypeId]?[a.id]
+                ?['mistakeCount'] ??
+            0;
+        final bMistakeCount = userData[subjectId]?[selectedQuizTypeId]?[b.id]
+                ?['mistakeCount'] ??
+            0;
         return bMistakeCount.compareTo(aMistakeCount);
       });
 
-      _logger
-          .i('Fetched ${incorrectQuizzes.length} incorrect quizzes for review');
-      return incorrectQuizzes; // 틀린 퀴즈 목록 반환
+      _logger.i('Fetched ${quizzesForReview.length} quizzes for review');
+      return quizzesForReview;
     } catch (e) {
-      _logger.e('Error fetching incorrect quizzes: $e');
+      _logger.e('Error fetching quizzes for review: $e');
       rethrow;
     }
   }
@@ -128,8 +127,8 @@ class QuizService {
     return _getDataWithCache(
       key: '${_userQuizDataKey}_$userId',
       fetchFromFirestore: () async {
-        final doc = await _firestore.collection('users').doc(userId).get();
-        return doc.data()?['quizData'] ?? {};
+        // Return empty map if there's no cached data
+        return {};
       },
       parseData: (data) => json.decode(data),
       encodeData: (data) => json.encode(data),
@@ -235,7 +234,9 @@ class QuizService {
               .doc(quizTypeId)
               .collection('quizzes')
               .get();
-          return snapshot.docs.map((doc) => Quiz.fromFirestore(doc)).toList();
+          return snapshot.docs
+              .map((doc) => Quiz.fromFirestore(doc, _logger))
+              .toList();
         },
         parseData: (data) => (json.decode(data) as List)
             .map((item) => Quiz.fromJson(item as Map<String, dynamic>))
@@ -332,6 +333,7 @@ class QuizService {
         typeId: quiz.typeId,
         keywords: quiz.keywords,
         imageUrl: quizData['imageUrl'],
+        year: quiz.year,
       );
 
       // 캐시 업데이트 로직 개선
@@ -674,6 +676,43 @@ class QuizService {
     } catch (e) {
       _logger.e('Error generating performance analytics: $e');
       return {'error': 'Failed to generate performance analytics'};
+    }
+  }
+
+  Future<List<Quiz>> getQuizzesByIds(
+      String subjectId, String quizTypeId, List<String> quizIds) async {
+    _logger.i(
+        'Fetching quizzes by IDs for subject: $subjectId, quizType: $quizTypeId');
+    try {
+      final quizzes = await _firestore
+          .collection('subjects')
+          .doc(subjectId)
+          .collection('quizTypes')
+          .doc(quizTypeId)
+          .collection('quizzes')
+          .where(FieldPath.documentId, whereIn: quizIds)
+          .get();
+
+      return quizzes.docs
+          .map((doc) => Quiz.fromFirestore(doc, _logger))
+          .toList();
+    } catch (e) {
+      _logger.e('Error fetching quizzes by IDs: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> syncUserData(
+      String userId, Map<String, dynamic> userData) async {
+    _logger.i('Syncing user data for user: $userId');
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(userId).set({
+        'quizData': userData,
+      }, SetOptions(merge: true));
+      _logger.i('User data synced successfully with Firestore');
+    } catch (e) {
+      _logger.e('Error syncing user data: $e');
+      rethrow;
     }
   }
 }

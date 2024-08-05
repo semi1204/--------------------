@@ -101,6 +101,23 @@ class _QuizPageState extends State<QuizPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quiz'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () {
+              _logger.i('Close button pressed on QuizPage');
+              Navigator.of(context).popUntil((route) {
+                return route.settings.name == '/';
+              });
+            },
+          ),
+        ],
       ),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, child) {
@@ -111,6 +128,13 @@ class _QuizPageState extends State<QuizPage> {
                   itemCount: _quizzes.length,
                   itemBuilder: (context, index) {
                     final quiz = _quizzes[index];
+                    final selectedAnswer = userProvider.getUserAnswer(
+                      widget.subjectId,
+                      widget.quizTypeId,
+                      quiz.id,
+                    );
+                    _logger.i(
+                        'Quiz ${quiz.id} - Selected answer: $selectedAnswer');
                     return QuizCard(
                       key: ValueKey(quiz.id),
                       quiz: quiz,
@@ -119,11 +143,20 @@ class _QuizPageState extends State<QuizPage> {
                       onEdit: () => _editQuiz(quiz),
                       onDelete: () => _deleteQuiz(quiz),
                       onAnswerSelected: (answerIndex) {
-                        _logger.i('Answer selected for quiz: ${quiz.id}');
+                        _logger.i(
+                            'Answer selected for quiz: ${quiz.id}, answer: $answerIndex');
+                        userProvider.saveUserAnswer(
+                          widget.subjectId,
+                          widget.quizTypeId,
+                          quiz.id,
+                          answerIndex,
+                        );
                       },
                       onResetQuiz: () => _resetQuiz(quiz.id),
                       subjectId: widget.subjectId,
                       quizTypeId: widget.quizTypeId,
+                      selectedOptionIndex: selectedAnswer,
+                      isQuizPage: true,
                     );
                   },
                 );

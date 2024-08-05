@@ -9,78 +9,62 @@ import '../models/subject.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:math' show min;
 
-class IncorrectAnswersPage extends StatefulWidget {
-  const IncorrectAnswersPage({super.key});
+class ReviewQuizzesPage extends StatefulWidget {
+  const ReviewQuizzesPage({super.key});
 
   @override
-  State<IncorrectAnswersPage> createState() => _IncorrectAnswersPageState();
+  State<ReviewQuizzesPage> createState() => _ReviewQuizzesPageState();
 }
 
-class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
+class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   late final QuizService _quizService;
   late final UserProvider _userProvider;
   late final Logger _logger;
   String? _selectedSubjectId;
-  List<Quiz> _incorrectQuizzes = [];
+  List<Quiz> _quizzesForReview = [];
   bool _isOffline = false;
   bool _isLoading = false;
   String? _errorMessage;
-
+  String? _selectedQuizTypeId;
   @override
   void initState() {
     super.initState();
     _quizService = Provider.of<QuizService>(context, listen: false);
     _userProvider = Provider.of<UserProvider>(context, listen: false);
     _logger = Provider.of<Logger>(context, listen: false);
-    _logger.i('IncorrectAnswersPage initialized');
-    _checkConnectivity();
+    _logger.i('ReviewQuizzesPage initialized');
   }
 
-  Future<void> _checkConnectivity() async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    setState(() {
-      _isOffline = connectivityResult == ConnectivityResult.none;
-    });
-    _logger.i('Connectivity status: ${_isOffline ? 'Offline' : 'Online'}');
-  }
-
-  Future<void> _loadIncorrectQuizzes() async {
-    if (_selectedSubjectId == null) {
-      _logger.w('No subject selected, cannot load incorrect quizzes');
+  Future<void> _loadQuizzesForReview() async {
+    if (_selectedSubjectId == null || _selectedQuizTypeId == null) {
+      _logger.w(
+          'Subject or quiz type not selected, cannot load quizzes for review');
       return;
     }
 
-    _logger.i('Loading incorrect quizzes for subject: $_selectedSubjectId');
+    _logger.i('Loading quizzes for review: subject: $_selectedSubjectId');
     setState(() => _isLoading = true);
 
     try {
-      final quizzes = await _quizService.getIncorrectQuizzes(
+      final quizzesForReview = await _quizService.getQuizzesForReview(
         _userProvider.user!.uid,
         _selectedSubjectId!,
+        _selectedQuizTypeId!,
       );
-
-      _logger.d('Received ${quizzes.length} incorrect quizzes from service');
 
       if (mounted) {
         setState(() {
-          _incorrectQuizzes = quizzes;
+          _quizzesForReview = quizzesForReview;
           _isLoading = false;
         });
       }
 
-      _logger.i('Loaded ${_incorrectQuizzes.length} incorrect quizzes');
-
-      // Log details of each quiz for debugging
-      _incorrectQuizzes.forEach((quiz) {
-        _logger.d(
-            'Quiz ID: ${quiz.id}, Question: ${quiz.question.substring(0, min(20, quiz.question.length))}...');
-      });
+      _logger.i('Loaded ${_quizzesForReview.length} quizzes for review');
     } catch (e) {
-      _logger.e('Error loading incorrect quizzes: $e');
+      _logger.e('Error loading quizzes for review: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _incorrectQuizzes = [];
         });
       }
     }
@@ -88,29 +72,24 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Review Cards'),
-      ),
-      body: Column(
-        children: [
-          _buildSubjectDropdown(),
-          Expanded(
-            child: _selectedSubjectId == null
-                ? const Center(child: Text('Please select a subject'))
-                : RefreshIndicator(
-                    onRefresh: _refreshQuizzes,
-                    child: _buildQuizList(),
-                  ),
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        _buildSubjectDropdown(),
+        Expanded(
+          child: _selectedSubjectId == null
+              ? const Center(child: Text('Please select a subject'))
+              : RefreshIndicator(
+                  onRefresh: _refreshQuizzes,
+                  child: _buildQuizList(),
+                ),
+        ),
+      ],
     );
   }
 
   Future<void> _refreshQuizzes() async {
     _logger.i('Manually refreshing quiz list');
-    await _loadIncorrectQuizzes();
+    await _loadQuizzesForReview();
   }
 
   Widget _buildSubjectDropdown() {
@@ -130,9 +109,9 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
             _logger.i('Subject selected: $newValue');
             setState(() {
               _selectedSubjectId = newValue;
-              _incorrectQuizzes = [];
+              _quizzesForReview = [];
             });
-            _loadIncorrectQuizzes();
+            _loadQuizzesForReview();
           },
           items:
               snapshot.data!.map<DropdownMenuItem<String>>((Subject subject) {
@@ -150,18 +129,18 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_incorrectQuizzes.isEmpty) {
-      return const Center(child: Text('No incorrect quizzes available'));
+    if (_quizzesForReview.isEmpty) {
+      return const Center(child: Text('No quizzes for review available'));
     }
     return ListView.builder(
-      itemCount: _incorrectQuizzes.length,
+      itemCount: _quizzesForReview.length,
       itemBuilder: (context, index) {
-        final quiz = _incorrectQuizzes[index];
+        final quiz = _quizzesForReview[index];
         return QuizCard(
           key: ValueKey(quiz.id),
           quiz: quiz,
           questionNumber: index + 1,
-          isIncorrectAnswersMode: true,
+          isIncorrectAnswersMode: false,
           onAnswerSelected: (answerIndex) {
             _logger.i(
                 'Answer selected for quiz: ${quiz.id}, answer: $answerIndex');
@@ -175,11 +154,6 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
     );
   }
 
-// 수정시 주의 사항:
-// deletereview 버튼의 역할 :=> incorrectquizpage에서 카드를 삭제함.
-//기기내부와 서버에서 reviewlist에서 삭제됨.
-//quizlist와는 무관하고,
-//quizpage에서 사용자가 기존에 선택한 ui는 변하지 않음.
   Future<void> _deleteReview(Quiz quiz) async {
     _logger.i('Deleting review for quiz: ${quiz.id}');
     try {
@@ -190,7 +164,7 @@ class _IncorrectAnswersPageState extends State<IncorrectAnswersPage> {
         quiz.id,
       );
       setState(() {
-        _incorrectQuizzes.removeWhere((q) => q.id == quiz.id);
+        _quizzesForReview.removeWhere((q) => q.id == quiz.id);
       });
       _logger.i('Review deleted successfully');
 

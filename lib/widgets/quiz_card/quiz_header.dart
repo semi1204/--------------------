@@ -13,46 +13,64 @@ class QuizHeader extends StatelessWidget {
   final Logger logger;
 
   const QuizHeader({
-    Key? key,
+    super.key,
     required this.quiz,
     required this.subjectId,
     required this.quizTypeId,
     required this.onResetQuiz,
     required this.logger,
-  }) : super(key: key);
+  });
+
   // 수정시 주의사항:
   // 문제의 가장 상단엔, keyword, accuracy, reset button이 Row로 표시되어야 합니다.
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(child: _buildKeywords()),
-        Consumer<UserProvider>(
-          builder: (context, userProvider, child) {
-            final accuracy = userProvider.getQuizAccuracy(
-              subjectId,
-              quizTypeId,
-              quiz.id,
-            );
-            logger.d('Quiz accuracy: $accuracy');
-            return AccuracyDisplay(accuracy: accuracy);
-          },
+        // 좌측: 기출문제 연도와 시험 유형
+        Text(
+          _getExamInfo(),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+            color: Colors.grey[600],
+          ),
         ),
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          onPressed: onResetQuiz,
-          tooltip: 'Reset Quiz',
+        // 우측: 정답률과 초기화 버튼
+        Row(
+          children: [
+            Consumer<UserProvider>(
+              builder: (context, userProvider, child) {
+                final accuracy = userProvider.getQuizAccuracy(
+                  subjectId,
+                  quizTypeId,
+                  quiz.id,
+                );
+                logger.d('Quiz accuracy: $accuracy');
+                return AccuracyDisplay(accuracy: accuracy);
+              },
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.refresh, size: 20),
+              onPressed: onResetQuiz,
+              tooltip: 'Reset Quiz',
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildKeywords() {
-    return Wrap(
-      spacing: 4.0,
-      runSpacing: 2.0,
-      children:
-          quiz.keywords.map((keyword) => Chip(label: Text(keyword))).toList(),
-    );
+  String _getExamInfo() {
+    String examInfo = '';
+    if (quiz.year != null) {
+      examInfo += '${quiz.year} ';
+    }
+    if (quiz.examType != null && quiz.examType!.isNotEmpty) {
+      examInfo += quiz.examType!;
+    }
+    return examInfo.isNotEmpty ? examInfo : '기출문제';
   }
 }

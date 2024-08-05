@@ -36,8 +36,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Nursing Quiz App',
       theme: ThemeData(
-        colorScheme:
-            ColorScheme.fromSeed(seedColor: Color.fromARGB(255, 84, 119, 148)),
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color.fromARGB(255, 84, 119, 148)),
         useMaterial3: true,
       ),
       home: const AuthWrapper(),

@@ -6,6 +6,7 @@ import '../../providers/user_provider.dart';
 import '../../services/auth_service.dart';
 import 'drawer_header.dart';
 import 'package:logger/logger.dart';
+import '../common_widgets.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -46,13 +47,7 @@ class AppDrawer extends StatelessWidget {
                 userProvider.setUser(null);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text(
-                      '👋 로그아웃 완료! 다음에 또 만나요 😊',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    backgroundColor: Colors.pink[100],
-                  ),
+                  CommonSnackBar(message: '👋 로그아웃 완료! 다음에 또 만나요 😊'),
                 );
               },
             ),
@@ -85,12 +80,9 @@ class AppDrawer extends StatelessWidget {
               await userProvider.syncUserData();
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text(
-                    '🔄 사용자 데이터 동기화 완료! 🎉',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  backgroundColor: Colors.green[300],
+                CommonSnackBar(
+                  message: '사용자 데이터 동기화 완료! 🔄',
+                  backgroundColor: Colors.green[300]!,
                 ),
               );
             },

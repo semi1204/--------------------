@@ -74,3 +74,26 @@ class InfoDialog extends StatelessWidget {
     );
   }
 }
+
+class CommonSnackBar extends SnackBar {
+  CommonSnackBar({
+    super.key,
+    required String message,
+    Color backgroundColor = const Color.fromARGB(255, 106, 105, 106),
+    Duration duration = const Duration(seconds: 3),
+  }) : super(
+          content: Text(
+            message,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: backgroundColor,
+          duration: duration,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        );
+}

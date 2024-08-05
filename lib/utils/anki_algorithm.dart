@@ -28,8 +28,13 @@ class AnkiAlgorithm {
       return _handleIncorrectAnswer(interval, easeFactor, mistakeCount);
     }
 
-    return _handleCorrectAnswer(interval, easeFactor, consecutiveCorrect,
-        qualityOfRecall, mistakeCount);
+    Map<String, dynamic> result = _handleCorrectAnswer(interval, easeFactor,
+        consecutiveCorrect, qualityOfRecall, mistakeCount);
+
+    _logger.i(
+        'calculateNextReview 결과: interval=${result['interval']}, nextReviewDate=${DateTime.now().add(Duration(days: result['interval'] as int))}');
+
+    return result;
   }
 
   // 새로운 메서드: 오답 처리

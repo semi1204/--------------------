@@ -36,53 +36,64 @@ class QuizService {
       // 사용자 ID를 이용해, 사용자 복습할 퀴즈 데이터를 가져옴
       String userId,
       String subjectId,
-      String selectedQuizTypeId) async {
+      String quizTypeId) async {
     _logger.i(
-        'Fetching quizzes for review: user: $userId, subject: $subjectId, quizType: $selectedQuizTypeId');
-    final userData = await getUserQuizData(userId); // 사용자 퀴즈 데이터를 가져옴
-    final now = DateTime.now();
-
-    final prefs = await SharedPreferences.getInstance();
-    final deletedQuizzes =
-        Set.from(prefs.getStringList('deleted_quizzes_$userId') ?? []);
-    _logger.d('Deleted quizzes: $deletedQuizzes'); // 삭제된 퀴즈 목록을 가져옴
-
-    List<Quiz> quizzesForReview = []; // 복습할 퀴즈 목록 초기화
+        'getQuizzesForReview 시작: userId=$userId, subjectId=$subjectId, quizTypeId=$quizTypeId');
 
     try {
-      final quizzes = await getQuizzes(subjectId, selectedQuizTypeId);
-      _logger.d(
-          'Fetched ${quizzes.length} quizzes for quiz type: $selectedQuizTypeId'); // 퀴즈 목록을 가져옴
+      final userData = await getUserQuizData(userId);
+      _logger.d('사용자 데이터 타입: ${userData.runtimeType}');
+
+      final now = DateTime.now();
+      final prefs = await SharedPreferences.getInstance();
+      final deletedQuizzes =
+          Set.from(prefs.getStringList('deleted_quizzes_$userId') ?? []);
+      _logger.d('삭제된 퀴즈: $deletedQuizzes');
+
+      final quizzes = await getQuizzes(subjectId, quizTypeId);
+      _logger.d('퀴즈 타입 $quizTypeId에 대해 ${quizzes.length}개의 퀴즈 가져옴');
+
+      List<Quiz> quizzesForReview = [];
+
       for (var quiz in quizzes) {
         if (!deletedQuizzes.contains(quiz.id)) {
           // 퀴즈가 삭제된 목록에 없을 경우
-          final quizData =
-              userData[subjectId]?[selectedQuizTypeId]?[quiz.id]; // 퀴즈 데이터를 가져옴
+          final quizData = userData[subjectId]?[quizTypeId]?[quiz.id];
           if (quizData != null) {
-            final accuracy = quizData['accuracy'] ?? 0.0; // 정확도
-            final nextReviewDate =
-                DateTime.parse(quizData['nextReviewDate']); // 다음 리뷰 날짜
-            if (accuracy < 1.0 && now.isAfter(nextReviewDate)) {
-              // 정확도가 100% 미만이고, 복습 날짜가 지났을 경우
-              quizzesForReview.add(quiz); // 복습할 퀴즈 목록에 추가
-              _logger.d('Added quiz: ${quiz.id} to review list');
+            // 퀴즈 데이터가 있을 경우
+            final accuracy = quizData['accuracy'] ?? 0.0;
+            final nextReviewDate = DateTime.parse(
+                quizData['nextReviewDate'] ?? now.toIso8601String());
+            // 일시적으로 정확도 조건 제거 실제 프로덕션 환경에선
+            // 정확도 조건 추가 필요
+            // if (accuracy < 1.0 && now.isAfter(nextReviewDate)) { <- 프로덕션 환경의 조건문
+            // 정확도가 1.0 미만이고, 다음 리뷰 날짜가 현재 날짜보다 이전일 경우
+
+            // 다음 리뷰 날짜가 현재 날짜보다 이전일 경우 <- 개발 환경에서는
+            if (now.isAfter(nextReviewDate)) {
+              // 개발환경에서의 조건문
+              // Removed accuracy check
+              quizzesForReview.add(quiz);
+              _logger.d('Quiz added to review list: ${quiz.id}');
             } else {
               _logger.d(
-                  'Quiz ${quiz.id} not added to review list. Reason: ${accuracy >= 1.0 ? "Perfect accuracy" : "Review date in future"}');
+                  'Quiz not added to review list: ${quiz.id}. Accuracy: $accuracy, Next review date: $nextReviewDate');
             }
           } else {
-            _logger.d('No data found for quiz: ${quiz.id}');
+            _logger.d('No data for quiz ${quiz.id}. Adding to review list.');
+            quizzesForReview
+                .add(quiz); // Add quizzes without data to review list
           }
+        } else {
+          _logger.d('Quiz ${quiz.id} is in deleted list');
         }
       }
       // 실수 횟수에 따라 틀린 퀴즈를 정렬 (내림차순)
       quizzesForReview.sort((a, b) {
-        final aMistakeCount = userData[subjectId]?[selectedQuizTypeId]?[a.id]
-                ?['mistakeCount'] ??
-            0;
-        final bMistakeCount = userData[subjectId]?[selectedQuizTypeId]?[b.id]
-                ?['mistakeCount'] ??
-            0;
+        final aMistakeCount =
+            userData[subjectId]?[quizTypeId]?[a.id]?['mistakeCount'] ?? 0;
+        final bMistakeCount =
+            userData[subjectId]?[quizTypeId]?[b.id]?['mistakeCount'] ?? 0;
         return bMistakeCount.compareTo(aMistakeCount);
       });
 
@@ -123,16 +134,26 @@ class QuizService {
     return data;
   }
 
+  // 사용자의 퀴즈 데이터를 가져오는 함수
   Future<Map<String, dynamic>> getUserQuizData(String userId) async {
-    return _getDataWithCache(
-      key: '${_userQuizDataKey}_$userId',
+    _logger.i('getUserQuizData 시작: userId=$userId');
+
+    // 캐시를 사용하여 데이터를 가져오는 _getDataWithCache 함수 호출
+    final userData = await _getDataWithCache<Map<String, dynamic>>(
+      key: '${_userQuizDataKey}_$userId', // 캐시 키 설정
       fetchFromFirestore: () async {
-        // Return empty map if there's no cached data
-        return {};
+        // Firestore에서 데이터를 가져오는 비동기 함수
+        final docSnapshot =
+            await _firestore.collection('users').doc(userId).get();
+        return docSnapshot.data() ?? {}; // 데이터가 없으면 빈 맵 반환
       },
-      parseData: (data) => json.decode(data),
-      encodeData: (data) => json.encode(data),
+      parseData: (data) =>
+          json.decode(data) as Map<String, dynamic>, // 문자열을 맵으로 파싱
+      encodeData: (data) => json.encode(data), // 맵을 JSON 문자열로 인코딩
     );
+
+    _logger.i('사용자 퀴즈 데이터 로드 완료: ${userData.runtimeType}');
+    return userData; // 가져온 사용자 퀴즈 데이터 반환
   }
 
   // Future를 반환하도록 변경하여 일관성 유지

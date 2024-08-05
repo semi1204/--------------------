@@ -65,10 +65,39 @@ class QuizExplanation extends StatelessWidget {
 
   void _markForReview(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    userProvider.markQuizForReview(subjectId, quizTypeId, quizId);
-    logger.i('Quiz marked for review: $quizId');
+
+    // Anki 알고리즘을 즉시 적용
+    final result = userProvider.updateUserQuizData(
+      subjectId,
+      quizTypeId,
+      quizId,
+      false, // isCorrect를 false로 설정하여 복습이 필요함을 나타냅니다
+      answerTime: const Duration(seconds: 1), // 임의의 답변 시간
+      selectedOptionIndex: null, // 선택된 옵션 없음
+      mistakeCount: 1, // 실수 횟수를 1로 설정
+    );
+
+    logger.i('Quiz marked for review with Anki algorithm applied: $quizId');
+
+    final nextReviewTime =
+        userProvider.getNextReviewTimeString(subjectId, quizTypeId, quizId);
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('복습 목록에 추가되었습니다.')),
+      SnackBar(
+        content: Text(
+          '🎉 복습 목록에 추가되었습니다!\n⏰ 다음 복습: $nextReviewTime 후',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: const Color.fromARGB(255, 106, 105, 106),
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
     );
   }
 }

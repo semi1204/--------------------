@@ -157,6 +157,13 @@ class _QuizPageState extends State<QuizPage> {
                       quizTypeId: widget.quizTypeId,
                       selectedOptionIndex: selectedAnswer,
                       isQuizPage: true,
+                      nextReviewDate: userProvider
+                          .getNextReviewDate(
+                            widget.subjectId,
+                            widget.quizTypeId,
+                            quiz.id,
+                          )
+                          .toIso8601String(),
                     );
                   },
                 );

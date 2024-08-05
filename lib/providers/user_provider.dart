@@ -228,8 +228,8 @@ class UserProvider with ChangeNotifier {
   // 사용자가 선택한 답을 기억하고 있어야 함.
   // QuizPage에서는 사용자가 선택한 답을 기억하고 있어야 하며,
   // incorrectAnswerPage에서는 사용자가 선택한 답을 기억하고 있으면 안됨.
-  // Quizpage에서 RadioButton을 초기화하는 유일한 방법은 초기화 버튼을 누르는 것임
-  // 초기화 버튼을 누르면, 퀴즈와 관련된 모든 유저 데이터가 초기화 됨.
+  // Quizpage에서는 RadioButton을 초기화하는 유일한 방법은 초기화 버튼을 누르는 것임
+  // 초기화 버튼을 누르면, 퀴즈와 관련된 모든 유저 데이터가 초기화 ���.
   Future<void> saveUserAnswer(String subjectId, String quizTypeId,
       String quizId, int answerIndex) async {
     _logger.i(
@@ -243,6 +243,8 @@ class UserProvider with ChangeNotifier {
     await _saveQuizData();
     notifyListeners();
     _logger.i('User answer saved successfully');
+
+    _logger.d('Saved quiz data: ${_quizData[subjectId]?[quizTypeId]?[quizId]}');
   }
 
   // 유지해야하는 기능 : 사용자 답변 가져오기 (QuizPage에서만 사용)
@@ -317,18 +319,19 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // 사용자 퀴즈 데이터 업데이트
   Future<void> updateUserQuizData(
       String subjectId, String quizTypeId, String quizId, bool isCorrect,
       {Duration? answerTime,
       int? selectedOptionIndex,
       int mistakeCount = 0}) async {
+    _logger.i(
+        'Updating user quiz data: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect');
+
     if (_user == null) {
       _logger.w('Attempted to update quiz data for null user');
       return;
     }
-
-    _logger.i(
-        'Updating user quiz data: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect, selectedOptionIndex=$selectedOptionIndex');
 
     var quizData = _quizData
         .putIfAbsent(subjectId, () => {})
@@ -343,52 +346,44 @@ class UserProvider with ChangeNotifier {
                   'interval': 1,
                   'easeFactor': 2.5,
                   'consecutiveCorrect': 0,
-                  'selectedOptionIndex': null, // 선택한 옵션 인덱스 저장
+                  'selectedOptionIndex': null,
                   'mistakeCount': 0,
-                }); // 퀴�� 데이터 초기화
+                });
 
-    quizData['total'] = (quizData['total'] as int? ?? 0) + 1; // 총 퀴즈 수 증가
-    if (isCorrect) {
-      quizData['correct'] = (quizData['correct'] as int? ?? 0) + 1; // 정답 수 증가
-    }
-
-    quizData['accuracy'] =
-        (quizData['correct'] as int) / (quizData['total'] as int); // 정확도 계산
-    quizData['selectedOptionIndex'] =
-        selectedOptionIndex; // 추가: 선택한 옵션 인덱스 업데이트
-    quizData['mistakeCount'] = mistakeCount; // 실수 횟수 업데이트
-
-    int? qualityOfRecall;
-    if (answerTime != null) {
-      qualityOfRecall = AnkiAlgorithm.evaluateRecallQuality(
-          answerTime, isCorrect); // 기억의 질 평가
-    }
-
+    // Anki 알고리즘 적용
     final ankiResult = AnkiAlgorithm.calculateNextReview(
       interval: quizData['interval'] as int? ?? 1,
       easeFactor: quizData['easeFactor'] as double? ?? 2.5,
       consecutiveCorrect: quizData['consecutiveCorrect'] as int? ?? 0,
       isCorrect: isCorrect,
-      qualityOfRecall: qualityOfRecall,
+      qualityOfRecall: answerTime != null
+          ? AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect)
+          : null,
       mistakeCount: mistakeCount,
-    ); // anki 알고리즘 결과 계산
+    );
 
-    quizData['interval'] = (ankiResult['interval'] as num).toInt(); // 간격 업데이트
-    quizData['easeFactor'] = ankiResult['easeFactor'] as double; // 용이성 계수 업데이트
-    quizData['consecutiveCorrect'] =
-        (ankiResult['consecutiveCorrect'] as num).toInt(); // 연속 정답 횟수 업데이트
-
-    final now = DateTime.now();
-    quizData['nextReviewDate'] = now
+    // 퀴즈 데이터 업데이트
+    quizData['total'] = (quizData['total'] as int? ?? 0) + 1;
+    if (isCorrect) {
+      quizData['correct'] = (quizData['correct'] as int? ?? 0) + 1;
+    }
+    quizData['accuracy'] =
+        (quizData['correct'] as int) / (quizData['total'] as int);
+    quizData['selectedOptionIndex'] = selectedOptionIndex;
+    quizData['mistakeCount'] = mistakeCount;
+    quizData['interval'] = ankiResult['interval'] as int;
+    quizData['easeFactor'] = ankiResult['easeFactor'] as double;
+    quizData['consecutiveCorrect'] = ankiResult['consecutiveCorrect'] as int;
+    quizData['nextReviewDate'] = DateTime.now()
         .add(Duration(days: ankiResult['interval'] as int))
-        .toIso8601String(); // 다음 복습 날짜 설정
+        .toIso8601String();
 
-    _logger.i(
-        'User quiz data updated. New accuracy: ${quizData['accuracy']}, Next review: ${quizData['nextReviewDate']}');
-
-    await _saveQuizData(); // 퀴즈 데이터 저장
+    // 로컬 저장소에만 저장
+    await _saveQuizData();
     _needsSync = true;
-    notifyListeners(); // 리스너들에게 알림
+    notifyListeners();
+
+    _logger.i('User quiz data updated locally');
   }
 
   // 특정 퀴즈의 실수 횟수를 가져오는 메소드
@@ -411,6 +406,14 @@ class UserProvider with ChangeNotifier {
         'quizData': _quizData,
       }, SetOptions(merge: true));
       _needsSync = false;
+      _logger.i('사용자 데이터가 Firebase와 성공적으로 동기화되었습니다');
+
+      // 로컬 저장소 업데이트
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          'user_quiz_data_${_user!.uid}', json.encode(_quizData));
+      _logger.i('로컬 저장소의 사용자 데이터가 업데이트되었습니다');
+
       notifyListeners();
       _logger.i('User data synced successfully with Firebase');
     } catch (e) {
@@ -419,7 +422,7 @@ class UserProvider with ChangeNotifier {
   }
 
   // 주의 사항:
-  // 0으로 나누는 상황을 방지해야 함.
+  // 0으 나누는 상황을 방지해야 함.
   double getQuizAccuracy(String subjectId, String quizTypeId, String quizId) {
     final accuracy =
         _quizData[subjectId]?[quizTypeId]?[quizId]?['accuracy'] as double? ??
@@ -542,14 +545,4 @@ class UserProvider with ChangeNotifier {
       _logger.e('Error marking quiz for review: $e');
     }
   }
-
-  List<String> getQuizzesMarkedForReview(String subjectId, String quizTypeId) {
-    final quizzes = _quizData[subjectId]?[quizTypeId] ?? {};
-    return quizzes.entries
-        .where((entry) => entry.value['markedForReview'] == true)
-        .map((entry) => entry.key)
-        .toList();
-  }
-
-  authStateChanges() {}
 }

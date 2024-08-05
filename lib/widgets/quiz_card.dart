@@ -36,6 +36,7 @@ class QuizCard extends StatefulWidget {
   final String subjectId;
   final String quizTypeId;
   final bool isQuizPage; // QuizPage에서 사용되는지 여부
+  final String nextReviewDate; // 이 줄을 추가합니다.
 
   const QuizCard({
     super.key, // super 키워드 사용
@@ -53,6 +54,7 @@ class QuizCard extends StatefulWidget {
     required this.subjectId,
     required this.quizTypeId,
     this.isQuizPage = false,
+    required this.nextReviewDate, // 이 줄을 추가합니다.
   });
 
   @override
@@ -70,17 +72,14 @@ class _QuizCardState extends State<QuizCard> {
   DateTime? _startTime;
   int? _selectedOptionIndex;
   bool _hasAnswered = false;
-  int _mistakeCount = 0;
 
   @override
   void initState() {
     super.initState();
     _logger = Provider.of<Logger>(context, listen: false);
     _userProvider = Provider.of<UserProvider>(context, listen: false);
-    _logger.i('QuizCard initialized for quiz: ${widget.quiz.question}');
     _startTime = DateTime.now();
     _loadUserAnswer();
-    _loadMistakeCount();
   }
 
   void _loadUserAnswer() {
@@ -89,18 +88,6 @@ class _QuizCardState extends State<QuizCard> {
       widget.quizTypeId,
       widget.quiz.id,
     );
-    _logger.i(
-        'Loaded user answer for quiz ${widget.quiz.id}: $_selectedOptionIndex');
-  }
-
-  void _loadMistakeCount() {
-    _mistakeCount = _userProvider.getQuizMistakeCount(
-      widget.subjectId,
-      widget.quizTypeId,
-      widget.quiz.id,
-    );
-    _logger
-        .i('Loaded mistake count for quiz ${widget.quiz.id}: $_mistakeCount');
   }
 
   @override
@@ -171,7 +158,6 @@ class _QuizCardState extends State<QuizCard> {
       _selectedOptionIndex = null;
       _hasAnswered = false;
       _startTime = DateTime.now();
-      _mistakeCount = 0;
     });
     _userProvider.resetUserAnswers(widget.subjectId, widget.quizTypeId,
         quizId: widget.quiz.id);
@@ -181,7 +167,6 @@ class _QuizCardState extends State<QuizCard> {
   void _selectOption(int index) {
     _logger.i('Selecting option $index for quiz ${widget.quiz.id}');
     if (_selectedOptionIndex == null || !widget.isQuizPage) {
-      // 조건문 실행조건 : 사용자가 선택한 옵션이 없거나, 퀴즈 페이지가 아닐 때
       setState(() {
         _selectedOptionIndex = index;
         _hasAnswered = true;
@@ -191,12 +176,6 @@ class _QuizCardState extends State<QuizCard> {
       final answerTime = endTime.difference(_startTime!);
       final isCorrect = index == widget.quiz.correctOptionIndex;
 
-      if (!isCorrect) {
-        setState(() {
-          _mistakeCount++;
-        });
-      }
-
       _userProvider.updateUserQuizData(
         widget.subjectId,
         widget.quizTypeId,
@@ -204,15 +183,13 @@ class _QuizCardState extends State<QuizCard> {
         isCorrect,
         answerTime: answerTime,
         selectedOptionIndex: index,
-        mistakeCount: _mistakeCount,
       );
 
       widget.onAnswerSelected?.call(index);
 
       _showAnswerSnackBar(isCorrect);
 
-      _logger.i(
-          'User selected option $index. Correct: $isCorrect. Mistake count: $_mistakeCount');
+      _logger.i('User selected option $index. Correct: $isCorrect.');
     } else {
       _logger.i('Option already selected. Ignoring new selection.');
     }

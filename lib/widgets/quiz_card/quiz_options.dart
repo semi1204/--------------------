@@ -11,14 +11,14 @@ class QuizOptions extends StatelessWidget {
   final Logger logger;
 
   const QuizOptions({
-    Key? key,
+    super.key,
     required this.quiz,
     required this.selectedOptionIndex,
     required this.hasAnswered,
     required this.isQuizPage,
     required this.onSelectOption,
     required this.logger,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

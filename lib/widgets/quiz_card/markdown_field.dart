@@ -58,21 +58,27 @@ class _MarkdownFieldState extends State<MarkdownField> {
   }
 
   Widget _buildMarkdownEditor() {
-    return TextFormField(
-      controller: widget.controller,
-      decoration: InputDecoration(
-        border: const OutlineInputBorder(),
-        hintText: 'Enter ${widget.labelText.toLowerCase()}',
-        suffixIcon: IconButton(
-          icon: const Icon(Icons.paste),
-          onPressed: _pasteImage,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 300), // 최대 높이 설정
+      child: SingleChildScrollView(
+        child: TextFormField(
+          controller: widget.controller,
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            hintText: 'Enter ${widget.labelText.toLowerCase()}',
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.paste),
+              onPressed: _pasteImage,
+            ),
+          ),
+          maxLines: null, // 무제한 줄 허용 text에서 스크롤이 되지 않음
+          keyboardType: TextInputType.multiline, // 여러 줄 입력 가능하도록 설정
+          validator: widget.validator,
+          onChanged: (value) {
+            widget.logger.i('Text changed in ${widget.labelText} field');
+          },
         ),
       ),
-      maxLines: 10,
-      validator: widget.validator,
-      onChanged: (value) {
-        widget.logger.i('Text changed in ${widget.labelText} field');
-      },
     );
   }
 

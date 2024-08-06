@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../services/quiz_service.dart';
 import '../models/quiz.dart';
 import '../providers/user_provider.dart';
@@ -26,6 +27,10 @@ class _QuizPageState extends State<QuizPage> {
   late final UserProvider _userProvider;
   late final Logger _logger;
   List<Quiz> _quizzes = []; // admin만 접근이 가능한, 원래의 퀴즈 목록
+  final ItemScrollController _scrollController = ItemScrollController();
+  final ItemPositionsListener _positionsListener =
+      ItemPositionsListener.create();
+  int _initialScrollIndex = 0;
 
   @override
   void initState() {
@@ -33,26 +38,47 @@ class _QuizPageState extends State<QuizPage> {
     _quizService = Provider.of<QuizService>(context, listen: false);
     _userProvider = Provider.of<UserProvider>(context, listen: false);
     _logger = Provider.of<Logger>(context, listen: false);
-    _loadQuizzes();
+    _loadQuizzesAndSetInitialScroll();
   }
 
-  Future<void> _loadQuizzes() async {
-    _logger.i(
-        'Loading quizzes for subject: ${widget.subjectId}, quizType: ${widget.quizTypeId}');
+  Future<void> _loadQuizzesAndSetInitialScroll() async {
+    _logger.i('Loading quizzes and setting initial scroll position');
     try {
-      // 수정: await 사용
       final quizzes =
           await _quizService.getQuizzes(widget.subjectId, widget.quizTypeId);
       if (mounted) {
         // 추가: mounted 체크
         setState(() {
           _quizzes = quizzes;
+          _initialScrollIndex = _findLastAnsweredQuizIndex();
+        });
+        // 스크롤 위치 설정
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_initialScrollIndex > 0 && _scrollController.isAttached) {
+            _scrollController.scrollTo(
+              index: _initialScrollIndex,
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+            );
+          }
         });
       }
-      _logger.i('Loaded ${_quizzes.length} quizzes');
+      _logger.i(
+          'Loaded ${_quizzes.length} quizzes, initial scroll index: $_initialScrollIndex');
     } catch (e) {
       _logger.e('Error loading quizzes: $e');
     }
+  }
+
+  int _findLastAnsweredQuizIndex() {
+    for (int i = _quizzes.length - 1; i >= 0; i--) {
+      if (_userProvider.getUserAnswer(
+              widget.subjectId, widget.quizTypeId, _quizzes[i].id) !=
+          null) {
+        return i + 1; // 마지막으로 답변한 퀴즈의 다음 인덱스 반환
+      }
+    }
+    return 0; // 모든 퀴즈가 미답변 상태일 경우
   }
 
   Future<void> _resetQuiz(String quizId) async {
@@ -116,8 +142,10 @@ class _QuizPageState extends State<QuizPage> {
           _logger.i('Rebuilding QuizPage');
           return _quizzes.isEmpty
               ? const Center(child: CircularProgressIndicator())
-              : ListView.builder(
+              : ScrollablePositionedList.builder(
                   itemCount: _quizzes.length,
+                  itemScrollController: _scrollController,
+                  itemPositionsListener: _positionsListener,
                   itemBuilder: (context, index) {
                     final quiz = _quizzes[index];
                     final selectedAnswer = userProvider.getUserAnswer(

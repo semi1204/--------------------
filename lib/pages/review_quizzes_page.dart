@@ -7,9 +7,6 @@ import '../models/quiz.dart';
 import '../providers/user_provider.dart';
 import '../widgets/quiz_card.dart';
 import 'package:logger/logger.dart';
-import '../models/subject.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'dart:math' show min;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ReviewQuizzesPage extends StatefulWidget {

@@ -7,7 +7,6 @@ class QuizOptions extends StatelessWidget {
   final int? selectedOptionIndex;
   final bool hasAnswered;
   final bool isQuizPage;
-  final bool isIncorrectAnswersMode;
   final Function(int) onSelectOption;
   final Logger logger;
 
@@ -17,7 +16,6 @@ class QuizOptions extends StatelessWidget {
     required this.selectedOptionIndex,
     required this.hasAnswered,
     required this.isQuizPage,
-    required this.isIncorrectAnswersMode,
     required this.onSelectOption,
     required this.logger,
   }) : super(key: key);
@@ -28,14 +26,22 @@ class QuizOptions extends StatelessWidget {
       children: quiz.options.asMap().entries.map((entry) {
         final index = entry.key;
         final option = entry.value;
-        final isSelected = selectedOptionIndex == index;
-        final isCorrect = index == quiz.correctOptionIndex;
-        final bool showSelection = isQuizPage ? isSelected : false;
+        final isSelected = selectedOptionIndex == index; // 사용자가 선택한 옵션값을 받고
+        final isCorrect = index == quiz.correctOptionIndex; // 정답인지 확인
+        final bool showSelection =
+            isQuizPage ? isSelected : false; // 퀴즈페이지일 때만 선택된 옵션을 보여줌
+        final bool isSelectable =
+            !isQuizPage || hasAnswered; // 퀴즈 페이지가 아니거나 이미 답변한 경우 선택 가능
+
+        // 로그 추가
+        logger.d(
+            '옵션 $index: 선택됨=$isSelected, 정답=$isCorrect, 표시=$showSelection, 선택가능=$isSelectable');
 
         return InkWell(
-          onTap: hasAnswered || selectedOptionIndex != null
-              ? null
-              : () => onSelectOption(index),
+          // 퀴즈 페이지가 아니거나 아직 답변하지 않은 경우 선택 가능
+          onTap: (!isQuizPage || !hasAnswered)
+              ? () => onSelectOption(index)
+              : null,
           child: Container(
             padding:
                 const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -88,7 +94,7 @@ class QuizOptions extends StatelessWidget {
   }
 
   Color _getOptionIconColor(bool isSelected, bool isCorrect) {
-    if (!hasAnswered && !isIncorrectAnswersMode) return Colors.grey;
+    if (!hasAnswered) return Colors.grey;
     if (isCorrect) return const Color.fromARGB(255, 134, 210, 137);
     if (isSelected) return const Color.fromARGB(255, 232, 105, 96);
     return Colors.grey;

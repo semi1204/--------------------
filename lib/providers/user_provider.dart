@@ -155,7 +155,7 @@ class UserProvider with ChangeNotifier {
   // <<수정 시 주의 사항>>
   // 1. 사용자가 선택한 답은 무조건 기억해야 함.
   // 2. 기억한 답은 초기화 버튼을 누르기 전까지 유지되어야 함.
-  // 유지해야하는 기능 : 사용자 데이터 로드 시 캐시 -> 기��� 내부 저장소 -> Firestore 순으로 데이터 로드
+  // 유지해야하는 기능 : 사용자 데이터 로드 시 캐시 -> 기 내부 저장소 -> Firestore 순으로 데이터 로드
   Future<void> loadUserData() async {
     if (_user == null) {
       _logger.w('Attempted to load quiz data for null user');
@@ -229,7 +229,7 @@ class UserProvider with ChangeNotifier {
   // QuizPage에서는 사용자가 선택한 답을 기억하고 있어야 하며,
   // incorrectAnswerPage에서는 사용자가 선택한 답을 기억하고 있으면 안됨.
   // Quizpage에서는 RadioButton을 초기화하는 유일한 방법은 초기화 버튼을 누르는 것임
-  // 초기화 버튼을 누르면, 퀴즈와 관련된 모든 유저 데이터가 초기화 ���.
+  // 초기화 버튼을 누르면, 퀴즈와 관련된 모든 유저 데이터가 초기화 .
   Future<void> saveUserAnswer(String subjectId, String quizTypeId,
       String quizId, int answerIndex) async {
     _logger.i(
@@ -363,27 +363,41 @@ class UserProvider with ChangeNotifier {
     );
 
     // 퀴즈 데이터 업데이트
-    quizData['total'] = (quizData['total'] as int? ?? 0) + 1;
-    if (isCorrect) {
-      quizData['correct'] = (quizData['correct'] as int? ?? 0) + 1;
+    bool dataChanged = false;
+
+    void updateField(String key, dynamic value) {
+      if (quizData[key] != value) {
+        quizData[key] = value;
+        dataChanged = true;
+      }
     }
-    quizData['accuracy'] =
-        (quizData['correct'] as int) / (quizData['total'] as int);
-    quizData['selectedOptionIndex'] = selectedOptionIndex;
-    quizData['mistakeCount'] = mistakeCount;
-    quizData['interval'] = ankiResult['interval'] as int;
-    quizData['easeFactor'] = ankiResult['easeFactor'] as double;
-    quizData['consecutiveCorrect'] = ankiResult['consecutiveCorrect'] as int;
-    quizData['nextReviewDate'] = DateTime.now()
-        .add(Duration(days: ankiResult['interval'] as int))
-        .toIso8601String();
+
+    updateField('total', (quizData['total'] as int? ?? 0) + 1);
+    if (isCorrect) {
+      updateField('correct', (quizData['correct'] as int? ?? 0) + 1);
+    }
+    updateField(
+        'accuracy', (quizData['correct'] as int) / (quizData['total'] as int));
+    updateField('selectedOptionIndex', selectedOptionIndex);
+    updateField('mistakeCount', mistakeCount);
+    updateField('interval', ankiResult['interval'] as int);
+    updateField('easeFactor', ankiResult['easeFactor'] as double);
+    updateField('consecutiveCorrect', ankiResult['consecutiveCorrect'] as int);
+    updateField(
+        'nextReviewDate',
+        DateTime.now()
+            .add(Duration(days: ankiResult['interval'] as int))
+            .toIso8601String());
 
     // 로컬 저장소에만 저장
-    await _saveQuizData();
-    _needsSync = true;
-    notifyListeners();
-
-    _logger.i('User quiz data updated locally');
+    if (dataChanged) {
+      await _saveQuizData();
+      _needsSync = true;
+      // notifyListeners() 호출을 제거하고 필요한 경우에만 호출하도록 변경
+      _logger.i('User quiz data updated locally');
+    } else {
+      _logger.i('No changes in user quiz data');
+    }
   }
 
   // 특정 퀴즈의 실수 횟수를 가져오는 메소드

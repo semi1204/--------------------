@@ -152,7 +152,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
           quiz: quiz,
           isAdmin: _userProvider.isAdmin,
           questionNumber: index + 1,
-          isIncorrectAnswersMode: false,
           onAnswerSelected: (answerIndex) {
             _logger.i(
                 'Answer selected for quiz: ${quiz.id}, answer: $answerIndex');

@@ -29,7 +29,6 @@ class QuizCard extends StatefulWidget {
   final int questionNumber;
   final int? selectedOptionIndex;
   final Function(int)? onAnswerSelected;
-  final bool isIncorrectAnswersMode;
   final bool isScrollable;
   final VoidCallback? onResetQuiz;
   final VoidCallback? onDeleteReview;
@@ -47,7 +46,6 @@ class QuizCard extends StatefulWidget {
     required this.questionNumber,
     this.selectedOptionIndex,
     this.onAnswerSelected,
-    this.isIncorrectAnswersMode = false,
     this.isScrollable = false,
     this.onResetQuiz,
     this.onDeleteReview,
@@ -83,6 +81,7 @@ class _QuizCardState extends State<QuizCard> {
   }
 
   void _loadUserAnswer() {
+    // 사용자의 답변을 가져와 변수에 할당
     _selectedOptionIndex = _userProvider.getUserAnswer(
       widget.subjectId,
       widget.quizTypeId,
@@ -91,6 +90,7 @@ class _QuizCardState extends State<QuizCard> {
   }
 
   @override
+  // 사용자의 답변이 변경되었을 때, 로그를 출력하고 사용자의 답변을 가져옴
   void didUpdateWidget(QuizCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selectedOptionIndex != oldWidget.selectedOptionIndex) {
@@ -102,54 +102,59 @@ class _QuizCardState extends State<QuizCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.all(8.0),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            QuizHeader(
-              quiz: widget.quiz,
-              subjectId: widget.subjectId,
-              quizTypeId: widget.quizTypeId,
-              onResetQuiz: _resetQuiz,
-              logger: _logger,
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        return Card(
+          margin: const EdgeInsets.all(8.0),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                QuizHeader(
+                  quiz: widget.quiz,
+                  subjectId: widget.subjectId,
+                  quizTypeId: widget.quizTypeId,
+                  onResetQuiz: _resetQuiz,
+                  logger: _logger,
+                ),
+                const SizedBox(height: 16),
+                QuizQuestion(
+                  question: widget.quiz.question,
+                  logger: _logger,
+                ),
+                const SizedBox(height: 16),
+                QuizOptions(
+                  quiz: widget.quiz,
+                  selectedOptionIndex: _selectedOptionIndex,
+                  hasAnswered: _hasAnswered,
+                  isQuizPage: widget.isQuizPage,
+                  onSelectOption: (index) {
+                    _selectOption(index, userProvider);
+                  },
+                  logger: _logger,
+                ),
+                if (_hasAnswered) ...[
+                  const SizedBox(height: 16),
+                  QuizExplanation(
+                    explanation: widget.quiz.explanation,
+                    logger: _logger,
+                    keywords: widget.quiz.keywords,
+                    quizId: widget.quiz.id,
+                    subjectId: widget.subjectId,
+                    quizTypeId: widget.quizTypeId,
+                  ),
+                ],
+                if (widget.isAdmin)
+                  QuizAdminActions(
+                    onEdit: widget.onEdit,
+                    onDelete: widget.onDelete,
+                  ),
+              ],
             ),
-            const SizedBox(height: 16),
-            QuizQuestion(
-              question: widget.quiz.question,
-              logger: _logger,
-            ),
-            const SizedBox(height: 16),
-            QuizOptions(
-              quiz: widget.quiz,
-              selectedOptionIndex: _selectedOptionIndex,
-              hasAnswered: _hasAnswered,
-              isQuizPage: widget.isQuizPage,
-              isIncorrectAnswersMode: widget.isIncorrectAnswersMode,
-              onSelectOption: _selectOption,
-              logger: _logger,
-            ),
-            if (_hasAnswered || widget.isIncorrectAnswersMode) ...[
-              const SizedBox(height: 16),
-              QuizExplanation(
-                explanation: widget.quiz.explanation,
-                logger: _logger,
-                keywords: widget.quiz.keywords,
-                quizId: widget.quiz.id,
-                subjectId: widget.subjectId,
-                quizTypeId: widget.quizTypeId,
-              ),
-            ],
-            if (widget.isAdmin)
-              QuizAdminActions(
-                onEdit: widget.onEdit,
-                onDelete: widget.onDelete,
-              ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -164,19 +169,22 @@ class _QuizCardState extends State<QuizCard> {
     _logger.i('Quiz reset for: ${widget.quiz.id}');
   }
 
-  void _selectOption(int index) {
+  void _selectOption(int index, UserProvider userProvider) {
     _logger.i('Selecting option $index for quiz ${widget.quiz.id}');
+    // 사용자가 선택한 옵션이 없거나, quizpage가 아닐 때
     if (_selectedOptionIndex == null || !widget.isQuizPage) {
       setState(() {
+        // 사용자가 선택한 옵션값을 받고
         _selectedOptionIndex = index;
-        _hasAnswered = true;
+        _hasAnswered = true; // 저장할 수 있게 함
       });
 
       final endTime = DateTime.now();
       final answerTime = endTime.difference(_startTime!);
       final isCorrect = index == widget.quiz.correctOptionIndex;
 
-      _userProvider.updateUserQuizData(
+      // 값을 저장함
+      userProvider.updateUserQuizData(
         widget.subjectId,
         widget.quizTypeId,
         widget.quiz.id,

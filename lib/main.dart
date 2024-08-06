@@ -7,6 +7,7 @@ import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
 import 'package:logger/logger.dart';
 import 'firebase_options.dart';
+import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
 
 final logger = Logger();
 
@@ -21,6 +22,7 @@ void main() async {
         Provider<AuthService>(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         Provider<QuizService>(create: (_) => QuizService()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: const MyApp(),
     ),
@@ -33,14 +35,25 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     logger.i('Building MyApp');
-    return MaterialApp(
-      title: 'Nursing Quiz App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color.fromARGB(255, 84, 119, 148)),
-        useMaterial3: true,
-      ),
-      home: const AuthWrapper(),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'Nursing Quiz App',
+          theme: themeProvider.isDarkMode
+              ? ThemeData.dark().copyWith(
+                  colorScheme: const ColorScheme.dark(
+                    primary: Color.fromARGB(255, 84, 119, 148),
+                  ),
+                )
+              : ThemeData(
+                  colorScheme: ColorScheme.fromSeed(
+                    seedColor: const Color.fromARGB(255, 84, 119, 148),
+                  ),
+                  useMaterial3: true,
+                ),
+          home: const AuthWrapper(),
+        );
+      },
     );
   }
 }

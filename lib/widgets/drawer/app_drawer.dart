@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import 'drawer_header.dart';
 import 'package:logger/logger.dart';
 import '../common_widgets.dart';
+import '../../providers/theme_provider.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -16,6 +17,7 @@ class AppDrawer extends StatelessWidget {
     final userProvider = Provider.of<UserProvider>(context);
     final authService = Provider.of<AuthService>(context, listen: false);
     final logger = Provider.of<Logger>(context, listen: false);
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Drawer(
       child: ListView(
@@ -25,7 +27,7 @@ class AppDrawer extends StatelessWidget {
           if (userProvider.user == null)
             ListTile(
               leading: const Icon(Icons.login),
-              title: const Text('Login'),
+              title: const Text('로그인'),
               onTap: () {
                 logger.i('Login button tapped from Drawer');
                 Navigator.pop(context); // Close the drawer
@@ -40,7 +42,7 @@ class AppDrawer extends StatelessWidget {
           else
             ListTile(
               leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
+              title: const Text('로그아웃'),
               onTap: () async {
                 logger.i('Logout button tapped');
                 await authService.signOut();
@@ -53,7 +55,7 @@ class AppDrawer extends StatelessWidget {
             ),
           ListTile(
             leading: const Icon(Icons.home),
-            title: const Text('Home'),
+            title: const Text('홈'),
             onTap: () {
               logger.i('Home menu item tapped');
               Navigator.pop(context);
@@ -65,7 +67,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.settings),
-            title: const Text('Settings'),
+            title: const Text('설정'),
             onTap: () {
               logger.i('Settings menu item tapped');
               Navigator.pop(context);
@@ -74,7 +76,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.sync),
-            title: const Text('Sync User Info'),
+            title: const Text('사용자 정보 동기화'),
             onTap: () async {
               logger.i('Sync User Info button tapped');
               await userProvider.syncUserData();
@@ -85,6 +87,16 @@ class AppDrawer extends StatelessWidget {
                   backgroundColor: Colors.green[300]!,
                 ),
               );
+            },
+          ),
+          ListTile(
+            leading: Icon(
+                themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            title: Text(themeProvider.isDarkMode ? '라이트 모드' : '다크 모드'),
+            onTap: () {
+              logger.i('Theme toggle button tapped');
+              themeProvider.toggleTheme();
+              Navigator.pop(context);
             },
           ),
         ],

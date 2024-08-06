@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
+import 'package:nursing_quiz_app_6/widgets/review_quiz/subject_dropdown.dart';
 import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
 import '../models/quiz.dart';
@@ -105,7 +106,17 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     return Scaffold(
       body: Column(
         children: [
-          _buildSubjectDropdown(),
+          SubjectDropdown(
+            selectedSubjectId: _selectedSubjectId,
+            onSubjectSelected: (String? newValue) {
+              setState(() {
+                _selectedSubjectId = newValue;
+              });
+              if (newValue != null) {
+                _loadQuizzesForReview();
+              }
+            },
+          ),
           Expanded(
             child: _selectedSubjectId == null
                 ? const Center(child: Text('과목을 선택해주세요'))
@@ -122,39 +133,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   Future<void> _refreshQuizzes() async {
     _logger.i('Manually refreshing quiz list');
     await _loadQuizzesForReview();
-  }
-
-  Widget _buildSubjectDropdown() {
-    return FutureBuilder<List<Subject>>(
-      future: _quizService.getSubjects(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const CircularProgressIndicator();
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Text('No subjects available');
-        }
-        return DropdownButton<String>(
-          value: _selectedSubjectId,
-          hint: const Text('Select a subject'),
-          onChanged: (String? newValue) {
-            _logger.i('Subject selected: $newValue');
-            setState(() {
-              _selectedSubjectId = newValue;
-              _quizzesForReview = [];
-            });
-            _loadQuizzesForReview();
-          },
-          items:
-              snapshot.data!.map<DropdownMenuItem<String>>((Subject subject) {
-            return DropdownMenuItem<String>(
-              value: subject.id,
-              child: Text(subject.name),
-            );
-          }).toList(),
-        );
-      },
-    );
   }
 
   Widget _buildQuizList() {

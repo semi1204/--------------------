@@ -10,7 +10,7 @@ import 'package:logger/logger.dart';
 class QuizTypePage extends StatelessWidget {
   final Subject subject;
 
-  const QuizTypePage({Key? key, required this.subject}) : super(key: key);
+  const QuizTypePage({super.key, required this.subject});
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +22,15 @@ class QuizTypePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(subject.name),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
+        actions: const [
+          CloseButton(),
+        ],
       ),
       body: FutureBuilder<List<QuizType>>(
         future: quizService.getQuizTypes(subject.id),
@@ -40,20 +49,24 @@ class QuizTypePage extends StatelessWidget {
             itemCount: snapshot.data!.length,
             itemBuilder: (context, index) {
               final quizType = snapshot.data![index];
-              return ListTile(
-                title: Text(quizType.name),
-                onTap: () {
-                  logger.i('User tapped on quiz type: ${quizType.name}');
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => QuizPage(
-                        subjectId: subject.id,
-                        quizTypeId: quizType.id,
+              return Card(
+                elevation: 0.5,
+                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: ListTile(
+                  title: Text(quizType.name),
+                  onTap: () {
+                    logger.i('User tapped on quiz type: ${quizType.name}');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => QuizPage(
+                          subjectId: subject.id,
+                          quizTypeId: quizType.id,
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               );
             },
           );

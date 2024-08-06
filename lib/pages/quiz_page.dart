@@ -107,16 +107,8 @@ class _QuizPageState extends State<QuizPage> {
             Navigator.of(context).pop();
           },
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () {
-              _logger.i('Close button pressed on QuizPage');
-              Navigator.of(context).popUntil((route) {
-                return route.settings.name == '/';
-              });
-            },
-          ),
+        actions: const [
+          CloseButton(),
         ],
       ),
       body: Consumer<UserProvider>(

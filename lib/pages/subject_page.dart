@@ -8,7 +8,7 @@ import 'package:logger/logger.dart';
 class SubjectPage extends StatelessWidget {
   final Logger _logger = Logger();
 
-  SubjectPage({Key? key}) : super(key: key);
+  SubjectPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -38,17 +38,21 @@ class SubjectPage extends StatelessWidget {
           itemCount: subjects.length,
           itemBuilder: (context, index) {
             final subject = subjects[index];
-            return ListTile(
-              title: Text(subject.name),
-              onTap: () {
-                _logger.i('Tapped on subject: ${subject.name}');
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => QuizTypePage(subject: subject),
-                  ),
-                );
-              },
+            return Card(
+              elevation: 0.5,
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: ListTile(
+                title: Text(subject.name),
+                onTap: () {
+                  _logger.i('Tapped on subject: ${subject.name}');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => QuizTypePage(subject: subject),
+                    ),
+                  );
+                },
+              ),
             );
           },
         );

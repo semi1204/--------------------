@@ -39,16 +39,8 @@ class UserProvider with ChangeNotifier {
       _user = user;
       _logger.i('User state changed: ${user?.email ?? 'No user'}');
       if (user != null) {
-        // 토큰 저장
-        final String? token = await user.getIdToken();
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_token', token ?? '');
-
         await loadUserData(); // 사용자 변경 시 데이터 로드
       } else {
-        // 로그아웃 시 토큰 및 데이터 삭제
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('user_token');
         _quizData = {};
         _deletedQuizzes.clear();
       }
@@ -56,29 +48,19 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  // 유지되어야하는 기능 : 로그인 상태 확인 시 토큰 유효성 검사
+  // Firebase의 currentUser를 사용하여 로그인 상태 확인
   Future<bool> isUserLoggedIn() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? token = prefs.getString('user_token');
-
-      if (token != null) {
-        // 토큰 유효성 검사
-        final currentUser = _auth.currentUser;
-        if (currentUser != null) {
-          final String? newToken = await currentUser.getIdToken();
-          if (newToken == token) {
-            await setUser(currentUser);
-            _logger.i('User is logged in: ${currentUser.email}');
-            return true;
-          }
-        }
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        await setUser(currentUser);
+        _logger.i('User is logged in: ${currentUser.email}');
+        return true;
+      } else {
+        await setUser(null);
+        _logger.i('User is not logged in');
+        return false;
       }
-
-      // 토큰이 없거나 유효하지 않은 경우
-      await setUser(null);
-      _logger.i('User is not logged in');
-      return false;
     } catch (e) {
       _logger.e('Error checking login status: $e');
       return false;
@@ -224,12 +206,7 @@ class UserProvider with ChangeNotifier {
     return null;
   }
 
-  // 수정시 주의사항
-  // 사용자가 선택한 답을 기억하고 있어야 함.
-  // QuizPage에서는 사용자가 선택한 답을 기억하고 있어야 하며,
-  // incorrectAnswerPage에서는 사용자가 선택한 답을 기억하고 있으면 안됨.
-  // Quizpage에서는 RadioButton을 초기화하는 유일한 방법은 초기화 버튼을 누르는 것임
-  // 초기화 버튼을 누르면, 퀴즈와 관련된 모든 유저 데이터가 초기화 .
+  // 사용자가 최초 선택한 답을 저장하는 메서드
   Future<void> saveUserAnswer(String subjectId, String quizTypeId,
       String quizId, int answerIndex) async {
     _logger.i(

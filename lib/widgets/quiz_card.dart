@@ -130,6 +130,7 @@ class _QuizCardState extends State<QuizCard> {
                   hasAnswered: _hasAnswered,
                   isQuizPage: widget.isQuizPage,
                   onSelectOption: (index) {
+                    // updateUserProvider에 값이 저장됨
                     _selectOption(index, userProvider);
                   },
                   logger: _logger,

@@ -24,13 +24,12 @@ class NetworkImageWithLoader extends StatefulWidget {
   final Logger logger;
 
   const NetworkImageWithLoader({
-    Key? key,
     required this.imageUrl,
     this.width,
     this.height,
     this.fit,
     required this.logger,
-  }) : super(key: key);
+  });
 
   @override
   _NetworkImageWithLoaderState createState() => _NetworkImageWithLoaderState();

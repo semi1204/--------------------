@@ -162,14 +162,16 @@ class _QuizPageState extends State<QuizPage> {
                       isAdmin: userProvider.isAdmin,
                       onEdit: () => _editQuiz(quiz),
                       onDelete: () => _deleteQuiz(quiz),
+                      // 선택된 답은 updateUserQuizData 에 저장됨
                       onAnswerSelected: (answerIndex) {
                         _logger.i(
                             'Answer selected for quiz: ${quiz.id}, answer: $answerIndex');
-                        userProvider.saveUserAnswer(
+                        userProvider.updateUserQuizData(
                           widget.subjectId,
                           widget.quizTypeId,
                           quiz.id,
-                          answerIndex,
+                          answerIndex == quiz.correctOptionIndex,
+                          selectedOptionIndex: answerIndex,
                         );
                       },
                       onResetQuiz: () => _resetQuiz(quiz.id),

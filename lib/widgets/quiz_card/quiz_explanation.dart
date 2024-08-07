@@ -56,7 +56,8 @@ class QuizExplanation extends StatelessWidget {
           child: ElevatedButton.icon(
             icon: const Icon(Icons.refresh),
             label: const Text('다시 복습할래요!'),
-            onPressed: () => _markForReview(context),
+            onPressed: () => _markForReview(
+                context), // TODO: 그냥 곧바로 userProvider.updateUserQuizData 함수 호출하는 것으로 변경
           ),
         ),
       ],

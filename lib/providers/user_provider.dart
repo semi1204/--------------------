@@ -322,10 +322,14 @@ class UserProvider with ChangeNotifier {
   // 사용자 퀴즈 데이터 업데이트
   // 사용자의 퀴즈 데이터를 업데이트하는 비동기 메서드
   Future<void> updateUserQuizData(
-      String subjectId, String quizTypeId, String quizId, bool isCorrect,
-      {Duration? answerTime,
-      int? selectedOptionIndex,
-      int mistakeCount = 0}) async {
+    String subjectId,
+    String quizTypeId,
+    String quizId,
+    bool isCorrect, {
+    Duration? answerTime,
+    int? selectedOptionIndex,
+    bool isUnderstandingImproved = false,
+  }) async {
     // 로그에 업데이트 정보 기록
     _logger.i(
         'Updating user quiz data: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect');
@@ -336,71 +340,66 @@ class UserProvider with ChangeNotifier {
       return;
     }
 
-    // 퀴즈 데이터 구조 초기화 및 기존 데이터 가져오기
-    final quizData = _quizData
-        .putIfAbsent(subjectId, () => {})
-        .putIfAbsent(quizTypeId, () => {})
-        .putIfAbsent(
-            quizId,
-            () => {
-                  'correct': 0,
-                  'total': 0,
-                  'nextReviewDate': DateTime.now().toIso8601String(),
-                  'accuracy': 0.0,
-                  'interval': 1,
-                  'easeFactor': 2.5,
-                  'consecutiveCorrect': 0,
-                  'selectedOptionIndex': null,
-                  'mistakeCount': 0,
-                });
+    try {
+      final quizData = _quizData[subjectId]?[quizTypeId]?[quizId] ?? {};
 
-    // 기존 퀴즈 데이터에서 필요한 값들을 추출
-    final interval = quizData['interval'] ?? 1;
-    final easeFactor = quizData['easeFactor'] ?? 2.5;
-    final consecutiveCorrect = quizData['consecutiveCorrect'] ?? 0;
-    final currentMistakeCount = quizData['mistakeCount'] ?? 0;
+      int correct = quizData['correct'] ?? 0;
+      int total = quizData['total'] ?? 0;
+      int consecutiveCorrect = quizData['consecutiveCorrect'] ?? 0;
+      int interval = quizData['interval'] ?? AnkiAlgorithm.initialInterval;
+      double easeFactor =
+          quizData['easeFactor'] ?? AnkiAlgorithm.defaultEaseFactor;
+      int mistakeCount = quizData['mistakeCount'] ?? 0;
 
-    // 답변 시간이 주어졌다면 회상 품질을 평가
-    final qualityOfRecall = answerTime != null
-        ? AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect)
-        : null;
+      total++;
+      if (isCorrect) {
+        correct++;
+      } else {
+        mistakeCount++;
+      }
 
-    // Anki 알고리즘을 사용하여 다음 복습 일정 계산
-    final ankiResult = AnkiAlgorithm.calculateNextReview(
-      interval: interval,
-      easeFactor: easeFactor,
-      consecutiveCorrect: consecutiveCorrect,
-      isCorrect: isCorrect,
-      qualityOfRecall: qualityOfRecall,
-      mistakeCount: currentMistakeCount, // 실수 횟수는 오답일 경우에만 증가
-    );
+      int? qualityOfRecall;
+      if (answerTime != null) {
+        qualityOfRecall =
+            AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect);
+      }
 
-    // 다음 복습 날짜 계산
-    final now = DateTime.now();
-    final nextReviewDate =
-        now.add(Duration(days: ankiResult['interval'] as int));
+      final ankiResult = AnkiAlgorithm.calculateNextReview(
+        interval: interval,
+        easeFactor: easeFactor,
+        consecutiveCorrect: consecutiveCorrect,
+        isCorrect: isCorrect,
+        qualityOfRecall: qualityOfRecall,
+        mistakeCount: mistakeCount,
+        isUnderstandingImproved: isUnderstandingImproved,
+      );
 
-    // 퀴즈 데이터 업데이트
-    quizData.addAll({
-      'lastAnswered': now.toIso8601String(),
-      'nextReviewDate': nextReviewDate.toIso8601String(),
-      'interval': ankiResult['interval'],
-      'easeFactor': ankiResult['easeFactor'],
-      'consecutiveCorrect': ankiResult['consecutiveCorrect'],
-      'mistakeCount': isCorrect ? currentMistakeCount : currentMistakeCount + 1,
-      'selectedOptionIndex': selectedOptionIndex,
-    });
+      final now = DateTime.now();
+      final nextReviewDate =
+          now.add(Duration(days: ankiResult['interval'] as int));
 
-    // 로컬 상태 업데이트
-    _quizData[subjectId] ??= {};
-    _quizData[subjectId]![quizTypeId] ??= {};
-    _quizData[subjectId]![quizTypeId]![quizId] = quizData;
+      _quizData[subjectId] ??= {};
+      _quizData[subjectId]![quizTypeId] ??= {};
+      _quizData[subjectId]![quizTypeId]![quizId] = {
+        'correct': correct,
+        'total': total,
+        'accuracy': correct / total,
+        'interval': ankiResult['interval'],
+        'easeFactor': ankiResult['easeFactor'],
+        'consecutiveCorrect': ankiResult['consecutiveCorrect'],
+        'nextReviewDate': nextReviewDate.toIso8601String(),
+        'mistakeCount': ankiResult['mistakeCount'],
+        'lastAnswered': now.toIso8601String(),
+        'selectedOptionIndex': selectedOptionIndex,
+      };
 
-    // 업데이트된 퀴즈 데이터를 영구 저장소에 저장
-    await _saveQuizData();
-
-    // 데이터 변경을 리스너들에게 알림
-    notifyListeners();
+      await _saveQuizData();
+      notifyListeners();
+      _logger.i('User quiz data updated successfully');
+    } catch (e) {
+      _logger.e('Error updating user quiz data: $e');
+      rethrow;
+    }
   }
 
   // 특정 퀴즈의 실수 횟수를 가져오는 메소드
@@ -517,7 +516,9 @@ class UserProvider with ChangeNotifier {
                 quizId,
                 quizData['isCorrect'],
                 selectedOptionIndex: quizData['selectedOptionIndex'],
-                mistakeCount: quizData['mistakeCount'],
+                answerTime: Duration(seconds: quizData['answerTime'] ?? 0),
+                isUnderstandingImproved:
+                    quizData['isUnderstandingImproved'] ?? false,
               );
             }
           }

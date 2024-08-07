@@ -74,7 +74,6 @@ class QuizExplanation extends StatelessWidget {
       false, // isCorrect를 false로 설정하여 복습이 필요함을 나타냅니다
       answerTime: const Duration(seconds: 1), // 임의의 답변 시간
       selectedOptionIndex: null, // 선택된 옵션 없음
-      mistakeCount: 1, // 실수 횟수를 1로 설정
     );
 
     logger.i('Quiz marked for review with Anki algorithm applied: $quizId');
@@ -85,7 +84,7 @@ class QuizExplanation extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '🎉 복습 목록에 추가되었습니다!\n⏰ 다음 복습: $nextReviewTime 후',
+          '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $nextReviewTime 후',
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,

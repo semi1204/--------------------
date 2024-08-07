@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
 import '../models/subject.dart';
 import '../models/quiz_type.dart';
 import '../models/quiz.dart';
@@ -7,7 +6,6 @@ import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:connectivity_plus/connectivity_plus.dart'; // Add this import
 
 class QuizService {
   static final QuizService _instance = QuizService._internal();
@@ -447,152 +445,6 @@ class QuizService {
       await prefs.setInt(
           '${key}_timestamp', DateTime.now().millisecondsSinceEpoch);
     }
-  }
-
-  // 사용자 퀴즈 데이터를 업데이트하는 메소드
-  Future<void> updateUserQuizData(String userId, String subjectId,
-      String quizTypeId, String quizId, bool isCorrect,
-      {Duration? answerTime, int? selectedOptionIndex}) async {
-    // 새로 추가: answerTime  selectedOptionIndex 매개변수
-    if (userId.isEmpty) {
-      _logger.w('Attempted to update quiz data for empty user ID');
-      return;
-    }
-
-    _logger.i(
-        'Updating user quiz data: userId=$userId, subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect, selectedOptionIndex=$selectedOptionIndex');
-
-    try {
-      var connectivityResult = await (Connectivity().checkConnectivity());
-      if (connectivityResult == ConnectivityResult.none) {
-        _logger.i('Device is offline. Saving data locally.');
-        await _saveOfflineQuizData(userId, subjectId, quizTypeId, quizId,
-            isCorrect, selectedOptionIndex);
-        return;
-      }
-
-      final userDocRef = // 사용자 문서 참조
-          FirebaseFirestore.instance.collection('users').doc(userId);
-      final userDoc = await userDocRef.get(); // 사용자 문서 가져오기
-
-      if (!userDoc.exists) {
-        await userDocRef.set({'quizData': {}}); // 사용자 문서가 없을 경우 생성
-      }
-
-      final quizDataPath =
-          'quizData.$subjectId.$quizTypeId.$quizId'; // 퀴즈 데이터 경로
-      final quizData = userDoc.data()?['quizData']?[subjectId]?[quizTypeId]
-              ?[quizId] ??
-          {}; // 퀴즈 데이터 가져오기
-
-      int correct = quizData['correct'] ?? 0; // 정답 수
-      int total = quizData['total'] ?? 0; // 전체 퀴즈 수
-      int consecutiveCorrect = quizData['consecutiveCorrect'] ?? 0; // 연속 정답 수
-      int interval =
-          quizData['interval'] ?? AnkiAlgorithm.initialInterval; // 간격
-      double easeFactor =
-          quizData['easeFactor'] ?? AnkiAlgorithm.defaultEaseFactor; // 용이성 계수
-      int mistakeCount = quizData['mistakeCount'] ?? 0; // 실수 횟수
-
-      total++;
-      if (isCorrect) {
-        correct++;
-        consecutiveCorrect++;
-      } else {
-        consecutiveCorrect = 0;
-        mistakeCount++;
-      }
-
-      double accuracy = correct / total;
-
-      int? qualityOfRecall;
-      if (answerTime != null) {
-        qualityOfRecall =
-            AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect);
-      }
-
-      final ankiResult = AnkiAlgorithm.calculateNextReview(
-        interval: interval,
-        easeFactor: easeFactor,
-        consecutiveCorrect: consecutiveCorrect,
-        isCorrect: isCorrect,
-        qualityOfRecall: qualityOfRecall,
-        mistakeCount: mistakeCount,
-      );
-
-      final now = DateTime.now();
-      final nextReviewDate =
-          now.add(Duration(days: ankiResult['interval'] as int));
-
-      await userDocRef.update({
-        '$quizDataPath.correct': correct,
-        '$quizDataPath.total': total,
-        '$quizDataPath.accuracy': accuracy,
-        '$quizDataPath.interval': (ankiResult['interval'] as num).toInt(),
-        '$quizDataPath.easeFactor': ankiResult['easeFactor'] as double,
-        '$quizDataPath.consecutiveCorrect':
-            (ankiResult['consecutiveCorrect'] as num).toInt(),
-        '$quizDataPath.nextReviewDate': nextReviewDate.toIso8601String(),
-        '$quizDataPath.mistakeCount': ankiResult['mistakeCount'],
-        '$quizDataPath.lastAnswered': now.toIso8601String(),
-        '$quizDataPath.selectedOptionIndex': selectedOptionIndex,
-      });
-
-      _logger.i('User quiz data updated successfully');
-    } catch (e) {
-      _logger.e('Error updating user quiz data: $e');
-      rethrow;
-    }
-  }
-
-  // method for offline support
-  Future<void> _saveOfflineQuizData(
-      String userId,
-      String subjectId,
-      String quizTypeId,
-      String quizId,
-      bool isCorrect,
-      int? selectedOptionIndex) async {
-    final prefs = await SharedPreferences.getInstance();
-    final offlineData = prefs.getString('offline_quiz_data') ?? '{}';
-    final decodedData = json.decode(offlineData) as Map<String, dynamic>;
-
-    if (!decodedData.containsKey(userId)) {
-      decodedData[userId] = {};
-    }
-    if (!decodedData[userId].containsKey(subjectId)) {
-      decodedData[userId][subjectId] = {};
-    }
-    if (!decodedData[userId][subjectId].containsKey(quizTypeId)) {
-      decodedData[userId][subjectId][quizTypeId] = {};
-    }
-
-    decodedData[userId][subjectId][quizTypeId][quizId] = {
-      'isCorrect': isCorrect,
-      'selectedOptionIndex': selectedOptionIndex,
-      'timestamp': DateTime.now().toIso8601String(),
-    };
-
-    await prefs.setString('offline_quiz_data', json.encode(decodedData));
-    _logger.i('Offline quiz data saved successfully');
-  }
-
-  Future<void> clearCache() async {
-    _logger.i('Clearing all cached quiz data');
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys();
-    for (final key in keys) {
-      if (key.startsWith(_subjectsKey) ||
-          key.startsWith(_quizTypesKey) ||
-          key.startsWith(_quizzesKey) ||
-          key.startsWith(_userQuizDataKey)) {
-        await prefs.remove(key);
-      }
-    }
-    _cachedSubjects.clear();
-    _cachedQuizTypes.clear();
-    _cachedQuizzes.clear();
-    _logger.i('Cache cleared successfully');
   }
 
   // 새로 추가: 메모리 캐시 새로고침 메서드

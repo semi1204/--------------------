@@ -24,6 +24,8 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   List<Quiz> _quizzesForReview = [];
   bool _isLoading = false;
   String? _errorMessage;
+  int? _currentQuizIndex;
+  bool _showFeedbackButtons = false;
 
   @override
   void initState() {
@@ -124,6 +126,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                     child: _buildQuizList(),
                   ),
           ),
+          if (_showFeedbackButtons) _buildFeedbackButtons(),
         ],
       ),
     );
@@ -151,7 +154,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
         quiz.typeId,
         quiz.id,
       );
-      return nextReviewTime == '지금';
+      return nextReviewTime == '지��';
     }).toList();
 
     if (quizzesToReview.isEmpty) {
@@ -215,6 +218,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
             final endTime = DateTime.now();
             final answerTime = endTime.difference(startTime);
 
+            // 사용자의 답변을 즉시 저장
             await _userProvider.updateUserQuizData(
               _selectedSubjectId!,
               quiz.typeId,
@@ -224,7 +228,10 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
               selectedOptionIndex: answerIndex,
             );
 
-            await _refreshQuizzes(); // 퀴즈 리스트 새로고침
+            setState(() {
+              _currentQuizIndex = index;
+              _showFeedbackButtons = true;
+            });
           },
           onDeleteReview: () => _deleteReview(quiz),
           subjectId: _selectedSubjectId!,
@@ -235,6 +242,61 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
         );
       },
     );
+  }
+
+  Widget _buildFeedbackButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        ElevatedButton(
+          onPressed: () => _giveFeedback(false),
+          child: Text('어려워요 🤔'),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: Color.fromARGB(255, 245, 127, 121)),
+        ),
+        ElevatedButton(
+          onPressed: () => _giveFeedback(true),
+          child: Text('이제 알겠어요! 😊'),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: Color.fromARGB(255, 123, 245, 129)),
+        ),
+      ],
+    );
+  }
+
+  void _giveFeedback(bool isUnderstandingImproved) async {
+    if (_currentQuizIndex != null) {
+      final quiz = _quizzesForReview[_currentQuizIndex!];
+      final userAnswer = _userProvider.getUserAnswer(
+        _selectedSubjectId!,
+        quiz.typeId,
+        quiz.id,
+      );
+
+      if (userAnswer != null) {
+        final isCorrect = quiz.correctOptionIndex == userAnswer;
+
+        await _userProvider.updateUserQuizData(
+          _selectedSubjectId!,
+          quiz.typeId,
+          quiz.id,
+          isCorrect,
+          isUnderstandingImproved: isUnderstandingImproved,
+          selectedOptionIndex: userAnswer,
+        );
+
+        setState(() {
+          _showFeedbackButtons = false;
+          _currentQuizIndex = null;
+        });
+
+        await _refreshQuizzes();
+      } else {
+        // 사용자 답변이 없는 경우 처리
+        _logger.w('사용자 답변이 없습니다. 퀴즈 ID: ${quiz.id}');
+        // 적절한 오류 처리 또는 사용자에게 알림
+      }
+    }
   }
 
   Future<void> _deleteReview(Quiz quiz) async {

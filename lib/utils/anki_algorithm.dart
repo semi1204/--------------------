@@ -4,10 +4,9 @@ import 'package:logger/logger.dart';
 Logger _logger = Logger();
 
 class AnkiAlgorithm {
-  static const int _initialInterval = 1; // 초기 간격을 1일로 설정
-  static const double _defaultEaseFactor = 2.5; // 기본 용이성 계수를 2.5로 설정
+  static const int initialInterval = 1; // private에서 public으로 변경
+  static const double defaultEaseFactor = 2.5; // private에서 public으로 변경
   static const double _minEaseFactor = 1.3; // 최소 용이성 계수를 1.3으로 설정
-
   static const bool _isDevelopmentMode = true;
 
   // 수정: calculateNextReview 메서드 업데이트
@@ -19,7 +18,7 @@ class AnkiAlgorithm {
     int? qualityOfRecall,
     int? mistakeCount,
   }) {
-    easeFactor ??= _defaultEaseFactor; // 용이성 계수가 주어지지 않으면 기본값 사용
+    easeFactor ??= defaultEaseFactor; // 용이성 계수가 주어지지 않으면 기본값 사용
 
     _logger.i(
         'Calculating next review: interval=$interval, easeFactor=$easeFactor, consecutiveCorrect=$consecutiveCorrect, isCorrect=$isCorrect, qualityOfRecall=$qualityOfRecall, mistakeCount=$mistakeCount');
@@ -73,7 +72,7 @@ class AnkiAlgorithm {
     if (consecutiveCorrect == 0) {
       newInterval = _isDevelopmentMode
           ? 1
-          : _initialInterval; // Original: _initialInterval;
+          : initialInterval; // Original: _initialInterval;
     } else if (consecutiveCorrect == 1) {
       newInterval = _isDevelopmentMode ? 3 : 6; // Original: 6;
     } else {

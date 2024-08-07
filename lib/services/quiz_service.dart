@@ -66,18 +66,20 @@ class QuizService {
                 quizData['nextReviewDate'] ?? now.toIso8601String());
             // 일시적으로 정확도 조건 제거 실제 프로덕션 환경에선
             // 정확도 조건 추가 필요
-            // if (accuracy < 1.0 && now.isAfter(nextReviewDate)) { <- 프로덕션 환경의 조건문
-            // 정확도가 1.0 미만이고, 다음 리뷰 날짜가 현재 날짜보다 이전일 경우
+            if (accuracy < 1.0 && now.isAfter(nextReviewDate)) {
+              //<- 프로덕션 환경의 조건문
+              // 정확도가 1.0 미만이고, 다음 리뷰 날짜가 현재 날짜보다 이전일 경우
 
-            // 다음 리뷰 날짜가 현재 날짜보다 이전일 경우 <- 개발 환경에서는
-            if (now.isAfter(nextReviewDate)) {
+              // 다음 리뷰 날짜가 현재 날짜보다 이전일 경우 <- 개발 환경에서는
+              _logger.d(
+                  'Quiz ${quiz.id}: nextReviewDate = $nextReviewDate, now = $now');
+              //if (now.isAfter(nextReviewDate)) {
               // 개발환경에서의 조건문
               // Removed accuracy check
+              _logger.d('Quiz ${quiz.id} added for review');
               quizzesForReview.add(quiz);
-              _logger.d('Quiz added to review list: ${quiz.id}');
             } else {
-              _logger.d(
-                  'Quiz not added to review list: ${quiz.id}. Accuracy: $accuracy, Next review date: $nextReviewDate');
+              _logger.d('Quiz ${quiz.id} not added for review');
             }
           } else {
             _logger.d('No data for quiz ${quiz.id}. Adding to review list.');
@@ -451,7 +453,7 @@ class QuizService {
   Future<void> updateUserQuizData(String userId, String subjectId,
       String quizTypeId, String quizId, bool isCorrect,
       {Duration? answerTime, int? selectedOptionIndex}) async {
-    // 새로 추가: answerTime 및 selectedOptionIndex 매개변수
+    // 새로 추가: answerTime  selectedOptionIndex 매개변수
     if (userId.isEmpty) {
       _logger.w('Attempted to update quiz data for empty user ID');
       return;
@@ -486,8 +488,10 @@ class QuizService {
       int correct = quizData['correct'] ?? 0; // 정답 수
       int total = quizData['total'] ?? 0; // 전체 퀴즈 수
       int consecutiveCorrect = quizData['consecutiveCorrect'] ?? 0; // 연속 정답 수
-      int interval = quizData['interval'] ?? 1; // 간격
-      double easeFactor = quizData['easeFactor'] ?? 2.5; // 용이성 계수
+      int interval =
+          quizData['interval'] ?? AnkiAlgorithm.initialInterval; // 간격
+      double easeFactor =
+          quizData['easeFactor'] ?? AnkiAlgorithm.defaultEaseFactor; // 용이성 계수
       int mistakeCount = quizData['mistakeCount'] ?? 0; // 실수 횟수
 
       total++;

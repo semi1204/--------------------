@@ -320,20 +320,24 @@ class UserProvider with ChangeNotifier {
   }
 
   // 사용자 퀴즈 데이터 업데이트
+  // 사용자의 퀴즈 데이터를 업데이트하는 비동기 메서드
   Future<void> updateUserQuizData(
       String subjectId, String quizTypeId, String quizId, bool isCorrect,
       {Duration? answerTime,
       int? selectedOptionIndex,
       int mistakeCount = 0}) async {
+    // 로그에 업데이트 정보 기록
     _logger.i(
         'Updating user quiz data: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect');
 
+    // 현재 사용자가 없으면 경고 로그를 남기고 종료
     if (_user == null) {
       _logger.w('Attempted to update quiz data for null user');
       return;
     }
 
-    var quizData = _quizData
+    // 퀴즈 데이터 구조 초기화 및 기존 데이터 가져오기
+    final quizData = _quizData
         .putIfAbsent(subjectId, () => {})
         .putIfAbsent(quizTypeId, () => {})
         .putIfAbsent(
@@ -350,54 +354,53 @@ class UserProvider with ChangeNotifier {
                   'mistakeCount': 0,
                 });
 
-    // Anki 알고리즘 적용
+    // 기존 퀴즈 데이터에서 필요한 값들을 추출
+    final interval = quizData['interval'] ?? 1;
+    final easeFactor = quizData['easeFactor'] ?? 2.5;
+    final consecutiveCorrect = quizData['consecutiveCorrect'] ?? 0;
+    final currentMistakeCount = quizData['mistakeCount'] ?? 0;
+
+    // 답변 시간이 주어졌다면 회상 품질을 평가
+    final qualityOfRecall = answerTime != null
+        ? AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect)
+        : null;
+
+    // Anki 알고리즘을 사용하여 다음 복습 일정 계산
     final ankiResult = AnkiAlgorithm.calculateNextReview(
-      interval: quizData['interval'] as int? ?? 1,
-      easeFactor: quizData['easeFactor'] as double? ?? 2.5,
-      consecutiveCorrect: quizData['consecutiveCorrect'] as int? ?? 0,
+      interval: interval,
+      easeFactor: easeFactor,
+      consecutiveCorrect: consecutiveCorrect,
       isCorrect: isCorrect,
-      qualityOfRecall: answerTime != null
-          ? AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect)
-          : null,
-      mistakeCount: mistakeCount,
+      qualityOfRecall: qualityOfRecall,
+      mistakeCount: currentMistakeCount, // 실수 횟수는 오답일 경우에만 증가
     );
 
+    // 다음 복습 날짜 계산
+    final now = DateTime.now();
+    final nextReviewDate =
+        now.add(Duration(days: ankiResult['interval'] as int));
+
     // 퀴즈 데이터 업데이트
-    bool dataChanged = false;
+    quizData.addAll({
+      'lastAnswered': now.toIso8601String(),
+      'nextReviewDate': nextReviewDate.toIso8601String(),
+      'interval': ankiResult['interval'],
+      'easeFactor': ankiResult['easeFactor'],
+      'consecutiveCorrect': ankiResult['consecutiveCorrect'],
+      'mistakeCount': isCorrect ? currentMistakeCount : currentMistakeCount + 1,
+      'selectedOptionIndex': selectedOptionIndex,
+    });
 
-    void updateField(String key, dynamic value) {
-      if (quizData[key] != value) {
-        quizData[key] = value;
-        dataChanged = true;
-      }
-    }
+    // 로컬 상태 업데이트
+    _quizData[subjectId] ??= {};
+    _quizData[subjectId]![quizTypeId] ??= {};
+    _quizData[subjectId]![quizTypeId]![quizId] = quizData;
 
-    updateField('total', (quizData['total'] as int? ?? 0) + 1);
-    if (isCorrect) {
-      updateField('correct', (quizData['correct'] as int? ?? 0) + 1);
-    }
-    updateField(
-        'accuracy', (quizData['correct'] as int) / (quizData['total'] as int));
-    updateField('selectedOptionIndex', selectedOptionIndex);
-    updateField('mistakeCount', mistakeCount);
-    updateField('interval', ankiResult['interval'] as int);
-    updateField('easeFactor', ankiResult['easeFactor'] as double);
-    updateField('consecutiveCorrect', ankiResult['consecutiveCorrect'] as int);
-    updateField(
-        'nextReviewDate',
-        DateTime.now()
-            .add(Duration(days: ankiResult['interval'] as int))
-            .toIso8601String());
+    // 업데이트된 퀴즈 데이터를 영구 저장소에 저장
+    await _saveQuizData();
 
-    // 로컬 저장소에만 저장
-    if (dataChanged) {
-      await _saveQuizData();
-      _needsSync = true;
-      // notifyListeners() 호출을 제거하고 필요한 경우에만 호출하도록 변경
-      _logger.i('User quiz data updated locally');
-    } else {
-      _logger.i('No changes in user quiz data');
-    }
+    // 데이터 변경을 리스너들에게 알림
+    notifyListeners();
   }
 
   // 특정 퀴즈의 실수 횟수를 가져오는 메소드
@@ -448,30 +451,51 @@ class UserProvider with ChangeNotifier {
 
   DateTime getNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
-    final nextReviewDateString = _quizData[subjectId]?[quizTypeId]?[quizId]
-        ?['nextReviewDate'] as String?;
-    if (nextReviewDateString != null) {
-      return DateTime.parse(nextReviewDateString);
+    final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
+    if (quizData == null) {
+      _logger.w('No quiz data found for $quizId. Returning current date.');
+      return DateTime.now();
     }
-    return DateTime.now().add(const Duration(days: 1));
+
+    final nextReviewDateString = quizData['nextReviewDate'];
+    if (nextReviewDateString == null) {
+      _logger
+          .w('No next review date found for $quizId. Returning current date.');
+      return DateTime.now();
+    }
+
+    try {
+      return DateTime.parse(nextReviewDateString);
+    } catch (e) {
+      _logger.e('Error parsing next review date for $quizId: $e');
+      return DateTime.now();
+    }
   }
 
   String getNextReviewTimeString(
       String subjectId, String quizTypeId, String quizId) {
+    final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
+    if (quizData == null) {
+      _logger.w('No quiz data found for $quizId. Returning "지금"');
+      return '지금';
+    }
+
     final nextReviewDate = getNextReviewDate(subjectId, quizTypeId, quizId);
     final now = DateTime.now();
     final difference = nextReviewDate.difference(now);
 
     _logger.i('Calculating next review time for quiz: $quizId');
 
-    if (difference.inDays > 0) {
+    if (difference.inSeconds <= 0) {
+      return '지금';
+    } else if (difference.inDays > 0) {
       return '${difference.inDays}일';
     } else if (difference.inHours > 0) {
       return '${difference.inHours}시간';
     } else if (difference.inMinutes > 0) {
       return '${difference.inMinutes}분';
     } else {
-      return '1분'; // 1분 미만일 경우 1분으로 표시
+      return '${difference.inSeconds}초';
     }
   }
 

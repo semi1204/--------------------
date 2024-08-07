@@ -22,7 +22,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   late final Logger _logger;
   String? _selectedSubjectId;
   List<Quiz> _quizzesForReview = [];
-  bool _isOffline = false;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -61,35 +60,38 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     setState(() => _isLoading = true);
 
     try {
+      // 퀴즈 타입을 가져오고, 모든 퀴즈를 한 번에 로드합니다.
       final quizTypes = await _quizService.getQuizTypes(_selectedSubjectId!);
-      List<Quiz> allQuizzesForReview = [];
+      final quizTypeIds = quizTypes.map((type) => type.id).toList();
+      final quizzesForReview = await _quizService.getQuizzesForReview(
+        _userProvider.user!.uid,
+        _selectedSubjectId!,
+        quizTypeIds.join('_'), // join을 사용해서 subject의 하위 데이터인 tpye을 한번에 가져옴
+      );
 
-      for (var quizType in quizTypes) {
-        final quizzesForReview = await _quizService.getQuizzesForReview(
-            _userProvider.user!.uid, _selectedSubjectId!, quizType.id);
-        allQuizzesForReview.addAll(quizzesForReview);
-      }
-
-      _logger.i('복습할 퀴즈 ${allQuizzesForReview.length}개를 찾았습니다');
+      _logger.i('복습할 퀴즈 ${quizzesForReview.length}개를 찾았습니다');
 
       if (mounted) {
         setState(() {
-          _quizzesForReview = allQuizzesForReview;
+          _quizzesForReview = quizzesForReview;
           _isLoading = false;
         });
       }
+
       if (_quizzesForReview.isEmpty) {
-        _logger.w('No quizzes available for review');
-        ScaffoldMessenger.of(context).showSnackBar(
-          CommonSnackBar(message: '현재 복습할 퀴즈가 없어요! 나중에 다시 확인해주세요~'),
-        );
+        _logger.w('복습할 퀴즈가 없습니다');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            CommonSnackBar(message: '현재 복습할 퀴즈가 없어요! 나중에 다시 확인해주세요~'),
+          );
+        }
       }
     } catch (e) {
-      _logger.e('Error loading quizzes for review: $e');
+      _logger.e('복습할 퀴즈 로딩 중 오류 발생: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Error loading quizzes for review. Please try again.';
+          _errorMessage = '복습할 퀴즈를 불러오는 중 오류가 발생했습니다. 다시 시도해 주세요.';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           CommonSnackBar(message: '복습할 퀴즈를 불러오는 중 오류가 발생했어요! 😢 다시 시도해 주세요~ '),
@@ -129,41 +131,105 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
 
   Future<void> _refreshQuizzes() async {
     _logger.i('Manually refreshing quiz list');
+    setState(() {
+      _isLoading = true;
+    });
     await _loadQuizzesForReview();
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   Widget _buildQuizList() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_quizzesForReview.isEmpty) {
-      return const Center(child: Text('No quizzes for review available'));
+
+    final quizzesToReview = _quizzesForReview.where((quiz) {
+      final nextReviewTime = _userProvider.getNextReviewTimeString(
+        _selectedSubjectId!,
+        quiz.typeId,
+        quiz.id,
+      );
+      return nextReviewTime == '지금';
+    }).toList();
+
+    if (quizzesToReview.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.celebration,
+                size: 80, color: Color.fromARGB(255, 255, 153, 0)),
+            SizedBox(height: 20),
+            Text(
+              '와! 모든 퀴즈를 완료했어요! 🎉',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            Text('잠시 후에 다시 확인해보세요!'),
+          ],
+        ),
+      );
     }
+
     return ListView.builder(
-      itemCount: _quizzesForReview.length,
+      itemCount: quizzesToReview.length,
       itemBuilder: (context, index) {
-        final quiz = _quizzesForReview[index];
-        _logger.d('퀴즈 카드 빌드 중: ${quiz.id}');
+        final quiz = quizzesToReview[index];
+        final nextReviewTime = _userProvider.getNextReviewTimeString(
+          _selectedSubjectId!,
+          quiz.typeId,
+          quiz.id,
+        );
+        _logger.d('Quiz ${quiz.id} next review time: $nextReviewTime');
+        if (nextReviewTime != '지금') {
+          _logger.d('Quiz ${quiz.id} skipped: next review time is not now');
+          return Container(); // 리뷰 시간이 되지 않은 퀴즈는 표시하지 않음
+        }
+        _logger.d('Building QuizCard for quiz ${quiz.id}');
+
+        // 안전한 날짜 문자열 생성
+        String safeNextReviewDate;
+        try {
+          final nextReviewDate = _userProvider.getNextReviewDate(
+            _selectedSubjectId!,
+            quiz.typeId,
+            quiz.id,
+          );
+          safeNextReviewDate = nextReviewDate?.toIso8601String() ??
+              DateTime.now().toIso8601String();
+        } catch (e) {
+          _logger.e('Error getting next review date for quiz ${quiz.id}: $e');
+          safeNextReviewDate = DateTime.now().toIso8601String();
+        }
+
         return QuizCard(
           key: ValueKey(quiz.id),
           quiz: quiz,
           isAdmin: _userProvider.isAdmin,
           questionNumber: index + 1,
-          onAnswerSelected: (answerIndex) {
-            _logger.i(
-                'Answer selected for quiz: ${quiz.id}, answer: $answerIndex');
-            setState(() {}); // Refresh UI when answer is selected
+          onAnswerSelected: (answerIndex) async {
+            final startTime = DateTime.now();
+            final isCorrect = quiz.correctOptionIndex == answerIndex;
+            final endTime = DateTime.now();
+            final answerTime = endTime.difference(startTime);
+
+            await _userProvider.updateUserQuizData(
+              _selectedSubjectId!,
+              quiz.typeId,
+              quiz.id,
+              isCorrect,
+              answerTime: answerTime,
+              selectedOptionIndex: answerIndex,
+            );
+
+            await _refreshQuizzes(); // 퀴즈 리스트 새로고침
           },
           onDeleteReview: () => _deleteReview(quiz),
           subjectId: _selectedSubjectId!,
           quizTypeId: quiz.typeId,
-          nextReviewDate: _userProvider
-              .getNextReviewDate(
-                _selectedSubjectId!,
-                quiz.typeId,
-                quiz.id,
-              )
-              .toIso8601String(),
+          nextReviewDate: safeNextReviewDate,
           isQuizPage: false,
           selectedOptionIndex: null,
         );

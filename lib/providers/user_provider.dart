@@ -16,12 +16,13 @@ class UserProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  Map<String, dynamic> _quizData = {};
+  Map<String, Map<String, Map<String, Map<String, dynamic>>>> _quizData = {};
   Set<String> _deletedQuizzes = {};
   bool _needsSync = false;
 
   User? get user => _user;
-  Map<String, dynamic> get quizData => _quizData;
+  Map<String, Map<String, Map<String, Map<String, dynamic>>>> get quizData =>
+      _quizData;
   bool get needsSync => _needsSync;
 
   bool get isAdmin {
@@ -153,7 +154,8 @@ class UserProvider with ChangeNotifier {
       final cachedData = prefs.getString('user_quiz_data_${_user!.uid}');
       if (cachedData != null) {
         try {
-          _quizData = json.decode(cachedData) as Map<String, dynamic>;
+          _quizData = json.decode(cachedData)
+              as Map<String, Map<String, Map<String, Map<String, dynamic>>>>;
           _logger.i('User data loaded from cache');
           _loadDeletedQuizzes(prefs);
           notifyListeners();
@@ -192,7 +194,8 @@ class UserProvider with ChangeNotifier {
   }
 
   // 기기 내부 저장소에서 데이터 로드
-  Future<Map<String, dynamic>?> _loadLocalData() async {
+  Future<Map<String, Map<String, Map<String, Map<String, dynamic>>>>?>
+      _loadLocalData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final localData = prefs.getString('user_quiz_data_${_user!.uid}');
@@ -206,7 +209,13 @@ class UserProvider with ChangeNotifier {
     return null;
   }
 
-  // 사용자가 최초 선택한 답을 저장하는 메서드
+  // 유지해야하는 기능 : 사용자 답변 가져오기 (QuizPage에서만 사용)
+  int? getUserAnswer(String subjectId, String quizTypeId, String quizId) {
+    return _quizData[subjectId]?[quizTypeId]?[quizId]?['selectedOptionIndex']
+        as int?;
+  }
+
+  // 사용자가 선택한 답을 저장하는 메서드
   Future<void> saveUserAnswer(String subjectId, String quizTypeId,
       String quizId, int answerIndex) async {
     _logger.i(
@@ -215,22 +224,14 @@ class UserProvider with ChangeNotifier {
     _quizData[subjectId] ??= {};
     _quizData[subjectId]![quizTypeId] ??= {};
     _quizData[subjectId]![quizTypeId]![quizId] ??= {};
-    _quizData[subjectId]![quizTypeId]![quizId]!['selectedAnswer'] = answerIndex;
+    _quizData[subjectId]![quizTypeId]![quizId]!['selectedOptionIndex'] =
+        answerIndex;
 
     await _saveQuizData();
     notifyListeners();
     _logger.i('User answer saved successfully');
 
     _logger.d('Saved quiz data: ${_quizData[subjectId]?[quizTypeId]?[quizId]}');
-  }
-
-  // 유지해야하는 기능 : 사용자 답변 가져오기 (QuizPage에서만 사용)
-  int? getUserAnswer(String subjectId, String quizTypeId, String quizId) {
-    final answer =
-        _quizData[subjectId]?[quizTypeId]?[quizId]?['selectedAnswer'] as int?;
-    _logger.i(
-        'Getting user answer: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, answer=$answer');
-    return answer;
   }
 
   // User마다 quizData를 저장하는 메서드

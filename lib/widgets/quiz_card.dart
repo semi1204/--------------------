@@ -81,12 +81,9 @@ class _QuizCardState extends State<QuizCard> {
   }
 
   void _loadUserAnswer() {
-    // 사용자의 답변을 가져와 변수에 할당
-    _selectedOptionIndex = _userProvider.getUserAnswer(
-      widget.subjectId,
-      widget.quizTypeId,
-      widget.quiz.id,
-    );
+    // 사용자가 선택한 답변을 가져와 _selectedOptionIndex에 저장
+    _selectedOptionIndex = widget.selectedOptionIndex;
+    _hasAnswered = _selectedOptionIndex != null;
   }
 
   @override

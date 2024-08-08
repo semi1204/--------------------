@@ -31,6 +31,7 @@ class _QuizPageState extends State<QuizPage> {
   final ItemPositionsListener _positionsListener =
       ItemPositionsListener.create();
   int _initialScrollIndex = 0;
+  final Map<String, int?> _selectedAnswers = {}; // 추가: 선택된 답변을 저장하는 맵
 
   @override
   void initState() {
@@ -42,7 +43,7 @@ class _QuizPageState extends State<QuizPage> {
   }
 
   Future<void> _loadQuizzesAndSetInitialScroll() async {
-    _logger.i('Loading quizzes and setting initial scroll position');
+    _logger.i('퀴즈 로딩 및 초기 스크롤 위치 설정 시작');
     try {
       final quizzes =
           await _quizService.getQuizzes(widget.subjectId, widget.quizTypeId);
@@ -51,6 +52,8 @@ class _QuizPageState extends State<QuizPage> {
         setState(() {
           _quizzes = quizzes;
           _initialScrollIndex = _findLastAnsweredQuizIndex();
+          // 추가: 저장된 사용자 답변 로드
+          _loadSavedAnswers();
         });
         // 스크롤 위치 설정
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -67,6 +70,17 @@ class _QuizPageState extends State<QuizPage> {
           'Loaded ${_quizzes.length} quizzes, initial scroll index: $_initialScrollIndex');
     } catch (e) {
       _logger.e('Error loading quizzes: $e');
+    }
+  }
+
+  // 추가: 저장된 사용자 답변 로드 메서드
+  void _loadSavedAnswers() {
+    for (var quiz in _quizzes) {
+      _selectedAnswers[quiz.id] = _userProvider.getUserAnswer(
+        widget.subjectId,
+        widget.quizTypeId,
+        quiz.id,
+      );
     }
   }
 
@@ -148,11 +162,8 @@ class _QuizPageState extends State<QuizPage> {
                   itemPositionsListener: _positionsListener,
                   itemBuilder: (context, index) {
                     final quiz = _quizzes[index];
-                    final selectedAnswer = userProvider.getUserAnswer(
-                      widget.subjectId,
-                      widget.quizTypeId,
-                      quiz.id,
-                    );
+                    final selectedAnswer =
+                        _selectedAnswers[quiz.id]; // 수정: 저장된 답변 사용
                     _logger.i(
                         'Quiz ${quiz.id} - Selected answer: $selectedAnswer');
                     return QuizCard(
@@ -166,6 +177,10 @@ class _QuizPageState extends State<QuizPage> {
                       onAnswerSelected: (answerIndex) {
                         _logger.i(
                             'Answer selected for quiz: ${quiz.id}, answer: $answerIndex');
+                        setState(() {
+                          _selectedAnswers[quiz.id] =
+                              answerIndex; // 수정: 선택된 답변 업데이트
+                        });
                         userProvider.updateUserQuizData(
                           widget.subjectId,
                           widget.quizTypeId,
@@ -177,7 +192,7 @@ class _QuizPageState extends State<QuizPage> {
                       onResetQuiz: () => _resetQuiz(quiz.id),
                       subjectId: widget.subjectId,
                       quizTypeId: widget.quizTypeId,
-                      selectedOptionIndex: selectedAnswer,
+                      selectedOptionIndex: selectedAnswer, // 수정: 저장된 답변 사용
                       isQuizPage: true,
                       nextReviewDate: userProvider
                           .getNextReviewDate(

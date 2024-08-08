@@ -181,7 +181,7 @@ class _QuizCardState extends State<QuizCard> {
       final answerTime = endTime.difference(_startTime!);
       final isCorrect = index == widget.quiz.correctOptionIndex;
 
-      // 값을 저장함
+      // 값을 저장함 => 복습 간격 계산
       userProvider.updateUserQuizData(
         widget.subjectId,
         widget.quizTypeId,

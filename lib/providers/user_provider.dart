@@ -16,8 +16,11 @@ class UserProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
+  // 사용자 퀴즈 데이터를 저장하는 맵
   Map<String, Map<String, Map<String, Map<String, dynamic>>>> _quizData = {};
+  // 사용자가 리뷰카드 중 삭제한 퀴즈를 저장하는 집합
   Set<String> _deletedQuizzes = {};
+  // 사용자 데이터가 동기화되어야 하는지 여부
   bool _needsSync = false;
 
   User? get user => _user;
@@ -426,8 +429,10 @@ class UserProvider with ChangeNotifier {
     return accuracy;
   }
 
+  // 다음 복습 날짜를 가져오는 메서드
   DateTime getNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
+    // quizData <= _quizData(updateUserQuizData에서 저장된 데이터)
     final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
     if (quizData == null) {
       _logger.w('No quiz data found for $quizId. Returning current date.');
@@ -449,6 +454,7 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+  // 다음 복습 시간을 표시하는 메서드
   String getNextReviewTimeString(
       String subjectId, String quizTypeId, String quizId) {
     final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
@@ -457,6 +463,7 @@ class UserProvider with ChangeNotifier {
       return '지금';
     }
 
+    // getNextReviewDate 메서드를 사용하여 다음 복습 날짜를 가져옴
     final nextReviewDate = getNextReviewDate(subjectId, quizTypeId, quizId);
     final now = DateTime.now();
     final difference = nextReviewDate.difference(now);
@@ -509,21 +516,6 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  String getDebugNextReviewTimeString(
-      String subjectId, String quizTypeId, String quizId) {
-    final nextReviewDate = getNextReviewDate(subjectId, quizTypeId, quizId);
-    final now = DateTime.now();
-    final difference = nextReviewDate.difference(now);
-
-    _logger.i('Calculating debug next review time for quiz: $quizId');
-
-    if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}분';
-    } else {
-      return '${difference.inSeconds}초';
-    }
-  }
-
   Future<void> markQuizForReview(
       String subjectId, String quizTypeId, String quizId) async {
     _logger.i('Marking quiz for review: $quizId');
@@ -541,17 +533,6 @@ class UserProvider with ChangeNotifier {
       _quizData[subjectId] ??= {};
       _quizData[subjectId]![quizTypeId] ??= {};
       _quizData[subjectId]![quizTypeId]![quizId] = quizData;
-
-      // Update Firestore
-      await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set({
-        'quizData': {
-          subjectId: {
-            quizTypeId: {
-              quizId: quizData,
-            },
-          },
-        },
-      }, SetOptions(merge: true));
 
       // Update SharedPreferences
       await _saveQuizData();

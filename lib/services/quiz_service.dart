@@ -6,6 +6,7 @@ import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../providers/user_provider.dart';
 
 class QuizService {
   static final QuizService _instance = QuizService._internal();
@@ -30,23 +31,18 @@ class QuizService {
   final Map<String, Map<String, Map<String, List<Quiz>>>> _cachedQuizzes =
       {}; // 캐시된 주제 데이터를 저장하는 맵
 
-  Future<List<Quiz>> getQuizzesForReview(
-      // 사용자 ID를 이용해, 사용자 복습할 퀴즈 데이터를 가져옴
-      String userId,
-      String subjectId,
-      String quizTypeId) async {
+  Future<List<Quiz>> getQuizzesForReview(String userId, String subjectId,
+      String quizTypeId, UserProvider userProvider) async {
     _logger.i(
         'getQuizzesForReview 시작: userId=$userId, subjectId=$subjectId, quizTypeId=$quizTypeId');
 
     try {
-      final userData = await getUserQuizData(userId);
+      final userData = userProvider.quizData;
       _logger.d('사용자 데이터 타입: ${userData.runtimeType}');
 
       final now = DateTime.now();
-      final prefs = await SharedPreferences.getInstance();
-      final deletedQuizzes =
-          Set.from(prefs.getStringList('deleted_quizzes_$userId') ?? []);
-      _logger.d('삭제된 퀴즈: $deletedQuizzes');
+      // deletedQuizzes를 사용하지 않고 대신 userData에서 확인
+      _logger.d('퀴즈 데이터 확인 시작');
 
       final quizzes = await getQuizzes(subjectId, quizTypeId);
       _logger.d('퀴즈 타입 $quizTypeId에 대해 ${quizzes.length}개의 퀴즈 가져옴');
@@ -54,40 +50,25 @@ class QuizService {
       List<Quiz> quizzesForReview = [];
 
       for (var quiz in quizzes) {
-        if (!deletedQuizzes.contains(quiz.id)) {
-          // 퀴즈가 삭제된 목록에 없을 경우
-          final quizData = userData[subjectId]?[quizTypeId]?[quiz.id];
-          if (quizData != null) {
-            // 퀴즈 데이터가 있을 경우
-            final accuracy = quizData['accuracy'] ?? 0.0;
-            final nextReviewDate = DateTime.parse(
-                quizData['nextReviewDate'] ?? now.toIso8601String());
-            // 일시적으로 정확도 조건 제거 실제 프로덕션 환경에선
-            // 정확도 조건 추가 필요
-            if (accuracy < 1.0 && now.isAfter(nextReviewDate)) {
-              //<- 프로덕션 환경의 조건문
-              // 정확도가 1.0 미만이고, 다음 리뷰 날짜가 현재 날짜보다 이전일 경우
+        final quizData = userData[subjectId]?[quizTypeId]?[quiz.id];
+        if (quizData != null) {
+          final accuracy = quizData['accuracy'] ?? 0.0;
+          final nextReviewDate = quizData['nextReviewDate'] != null
+              ? DateTime.parse(quizData['nextReviewDate'])
+              : now;
 
-              // 다음 리뷰 날짜가 현재 날짜보다 이전일 경우 <- 개발 환경에서는
-              _logger.d(
-                  'Quiz ${quiz.id}: nextReviewDate = $nextReviewDate, now = $now');
-              //if (now.isAfter(nextReviewDate)) {
-              // 개발환경에서의 조건문
-              // Removed accuracy check
-              _logger.d('Quiz ${quiz.id} added for review');
-              quizzesForReview.add(quiz);
-            } else {
-              _logger.d('Quiz ${quiz.id} not added for review');
-            }
+          if (accuracy < 1.0 && now.isAfter(nextReviewDate)) {
+            _logger.d('Quiz ${quiz.id} added for review');
+            quizzesForReview.add(quiz);
           } else {
-            _logger.d('No data for quiz ${quiz.id}. Adding to review list.');
-            quizzesForReview
-                .add(quiz); // Add quizzes without data to review list
+            _logger.d('Quiz ${quiz.id} not added for review');
           }
         } else {
-          _logger.d('Quiz ${quiz.id} is in deleted list');
+          _logger.d('No data for quiz ${quiz.id}. Adding to review list.');
+          quizzesForReview.add(quiz);
         }
       }
+
       // 실수 횟수에 따라 틀린 퀴즈를 정렬 (내림차순)
       quizzesForReview.sort((a, b) {
         final aMistakeCount =
@@ -152,7 +133,7 @@ class QuizService {
       encodeData: (data) => json.encode(data), // 맵을 JSON 문자열로 인코딩
     );
 
-    _logger.i('사용자 퀴즈 데이터 로드 완료: ${userData.runtimeType}');
+    _logger.i('사용자 퀴즈 데이�� 로드 완료: ${userData.runtimeType}');
     return userData; // 가져온 사용자 퀴즈 데이터 반환
   }
 
@@ -191,7 +172,7 @@ class QuizService {
     }
   }
 
-  // 수정: Stream 대신 Future를 반환하도록 변경
+  // 수정: Stream 대신 Future를 반환하록 변경
   Future<List<QuizType>> getQuizTypes(String subjectId) async {
     _logger.i('Fetching quiz types for subject: $subjectId');
     final key = '${_quizTypesKey}_$subjectId';

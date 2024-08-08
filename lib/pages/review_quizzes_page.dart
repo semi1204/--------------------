@@ -23,7 +23,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   String? _selectedSubjectId;
   List<Quiz> _quizzesForReview = [];
   bool _isLoading = false;
-  String? _errorMessage;
   int? _currentQuizIndex;
   bool _showFeedbackButtons = false;
 
@@ -68,7 +67,8 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       final quizzesForReview = await _quizService.getQuizzesForReview(
         _userProvider.user!.uid,
         _selectedSubjectId!,
-        quizTypeIds.join('_'), // join을 사용해서 subject의 하위 데이터인 tpye을 한번에 가져옴
+        quizTypeIds.join('_'),
+        _userProvider, // UserProvider 인스턴스 전달
       );
 
       _logger.i('복습할 퀴즈 ${quizzesForReview.length}개를 찾았습니다');
@@ -93,7 +93,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = '복습할 퀴즈를 불러오는 중 오류가 발생했습니다. 다시 시도해 주세요.';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           CommonSnackBar(message: '복습할 퀴즈를 불러오는 중 오류가 발생했어요! 😢 다시 시도해 주세요~ '),
@@ -154,7 +153,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
         quiz.typeId,
         quiz.id,
       );
-      return nextReviewTime == '지��';
+      return nextReviewTime == '지금';
     }).toList();
 
     if (quizzesToReview.isEmpty) {

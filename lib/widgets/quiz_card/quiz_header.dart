@@ -54,7 +54,30 @@ class QuizHeader extends StatelessWidget {
             const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.refresh, size: 20),
-              onPressed: onResetQuiz,
+              onPressed: () async {
+                final confirmed = await showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('퀴즈 초기화'),
+                    content: const Text(
+                        '이 퀴즈의 모든 데이터를 초기화하시겠습니까? \n이 작업은 되돌릴 수 없습니다.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('취소'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('초기화'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirmed == true) {
+                  onResetQuiz();
+                }
+              },
               tooltip: 'Reset Quiz',
             ),
           ],

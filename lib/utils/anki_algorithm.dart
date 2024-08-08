@@ -36,6 +36,7 @@ class AnkiAlgorithm {
     // 1. 이해도 향상 여부에 따라 감소폭 결정 (향상: 0.1, 미향상: 0.2)
     // 2. 실수 횟수를 곱해 감소폭 조절
     // 3. 최소값(_minEaseFactor)을 넘지 않도록 함
+
     double newEaseFactor = max(
         _minEaseFactor,
         easeFactor -
@@ -133,8 +134,9 @@ class AnkiAlgorithm {
 
     if (kDebugMode) {
       // 디버그 모드: 분 단위로 조정
-      adjustedInterval *= 60;
+      // adjustedInterval *= 60; // 이 부분을 제거하거나 주석 처리
     }
+    // 실제 모드: 일 단위 (기존 로직 유지)
     // 최종 조정:
     // 1. 실수 횟수를 반영하여 간격 감소
     // 2. 이해도 향상 시 1일 추가

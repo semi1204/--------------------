@@ -51,21 +51,20 @@ class QuizService {
 
       for (var quiz in quizzes) {
         final quizData = userData[subjectId]?[quizTypeId]?[quiz.id];
-        if (quizData != null) {
+        if (quizData != null && quizData.isNotEmpty) {
           final accuracy = quizData['accuracy'] ?? 0.0;
           final nextReviewDate = quizData['nextReviewDate'] != null
               ? DateTime.parse(quizData['nextReviewDate'])
               : now;
 
           if (accuracy < 1.0 && now.isAfter(nextReviewDate)) {
-            _logger.d('Quiz ${quiz.id} added for review');
+            _logger.d('복습 목록에 추가된 퀴즈: ${quiz.id}');
             quizzesForReview.add(quiz);
           } else {
-            _logger.d('Quiz ${quiz.id} not added for review');
+            _logger.d('복습 목록에 추가되지 않은 퀴즈: ${quiz.id}');
           }
         } else {
-          _logger.d('No data for quiz ${quiz.id}. Adding to review list.');
-          quizzesForReview.add(quiz);
+          _logger.d('퀴즈 ${quiz.id}에 대한 데이터가 없음. 복습 목록에 추가하지 않음.');
         }
       }
 
@@ -133,7 +132,7 @@ class QuizService {
       encodeData: (data) => json.encode(data), // 맵을 JSON 문자열로 인코딩
     );
 
-    _logger.i('사용자 퀴즈 데이�� 로드 완료: ${userData.runtimeType}');
+    _logger.i('사용��� 퀴즈 데이터 로드 완료: ${userData.runtimeType}');
     return userData; // 가져온 사용자 퀴즈 데이터 반환
   }
 
@@ -446,7 +445,7 @@ class QuizService {
     _logger.i('Memory cache refreshed successfully');
   }
 
-  // 새로 추가: 특정 주제의 퀴즈 타입 및 퀴즈 새로고침 메서드
+  // 새로 추가: 특정 주제의 ���즈 타입 및 퀴즈 새로고침 메서드
   Future<void> refreshSubjectData(String subjectId) async {
     _logger.i('Refreshing data for subject: $subjectId');
     _cachedQuizTypes.remove(subjectId);

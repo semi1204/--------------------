@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/widgets/review_quiz/subject_dropdown.dart';
 import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
@@ -34,6 +33,41 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     _logger = Provider.of<Logger>(context, listen: false);
     _logger.i('ReviewQuizzesPage initialized');
     _logLocalData();
+    _loadQuizzesForReview();
+  }
+
+  Future<void> _loadQuizzesForReview() async {
+    if (_selectedSubjectId == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // 모든 퀴즈를 가져옴
+      final allQuizzes = await _quizService.getQuizzes(_selectedSubjectId!, '');
+      final now = DateTime.now();
+
+      // 복습할 퀴즈 필터링 시작
+      _quizzesForReview = allQuizzes.where((quiz) {
+        // 다음 복습 날짜가 현재 날짜보다 이전인 퀴즈만 가져옴
+        final nextReviewDate = _userProvider.getNextReviewDate(
+          // TODO: 복습할 퀴즈를 가져오는 대해서 getQuizzesForReview 메소드 사용해야하면서 추가적으로 필터링을 해야함
+          _selectedSubjectId!,
+          quiz.typeId,
+          quiz.id,
+        );
+        return nextReviewDate != null && nextReviewDate.isBefore(now);
+      }).toList();
+
+      _logger.i('Loaded ${_quizzesForReview.length} quizzes for review');
+    } catch (e) {
+      _logger.e('Error loading quizzes for review: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _logLocalData() async {
@@ -45,58 +79,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
         _logger.d('로컬 저장소의 퀴즈 데이터: $localData');
       } else {
         _logger.d('로컬 저장소에 저장된 퀴즈 데이터가 없습니다.');
-      }
-    }
-  }
-
-  Future<void> _loadQuizzesForReview() async {
-    _logger.i('_loadQuizzesForReview 시작');
-    _logger.d('선택된 과목: $_selectedSubjectId'); // 복습은 과목 단위로 이루어짐
-
-    if (_selectedSubjectId == null) {
-      _logger.w('과목이 선택되지 않았습니다');
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      // 퀴즈 타입을 가져오고, 모든 퀴즈를 한 번에 로드합니다.
-      final quizTypes = await _quizService.getQuizTypes(_selectedSubjectId!);
-      final quizTypeIds = quizTypes.map((type) => type.id).toList();
-      final quizzesForReview = await _quizService.getQuizzesForReview(
-        _userProvider.user!.uid,
-        _selectedSubjectId!,
-        quizTypeIds.join('_'),
-        _userProvider, // UserProvider 인스턴스 전달
-      );
-
-      _logger.i('복습할 퀴즈 ${quizzesForReview.length}개를 찾았습니다');
-
-      if (mounted) {
-        setState(() {
-          _quizzesForReview = quizzesForReview;
-          _isLoading = false;
-        });
-      }
-
-      if (_quizzesForReview.isEmpty) {
-        _logger.w('복습할 퀴즈가 없습니다');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            CommonSnackBar(message: '현재 복습할 퀴즈가 없어요! 나중에 다시 확인해주세요~'),
-          );
-        }
-      }
-    } catch (e) {
-      _logger.e('복습할 퀴즈 로딩 중 오류 발생: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          CommonSnackBar(message: '복습할 퀴즈를 불러오는 중 오류가 발생했어요! 😢 다시 시도해 주세요~ '),
-        );
       }
     }
   }
@@ -125,7 +107,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                     child: _buildQuizList(),
                   ),
           ),
-          if (_showFeedbackButtons) _buildFeedbackButtons(),
         ],
       ),
     );
@@ -147,16 +128,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final quizzesToReview = _quizzesForReview.where((quiz) {
-      final nextReviewTime = _userProvider.getNextReviewTimeString(
-        _selectedSubjectId!,
-        quiz.typeId,
-        quiz.id,
-      );
-      return nextReviewTime == '지금';
-    }).toList();
-
-    if (quizzesToReview.isEmpty) {
+    if (_quizzesForReview.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -176,37 +148,16 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     }
 
     return ListView.builder(
-      itemCount: quizzesToReview.length,
+      itemCount: _quizzesForReview.length,
       itemBuilder: (context, index) {
-        final quiz = quizzesToReview[index];
+        final quiz = _quizzesForReview[index];
         final nextReviewTime = _userProvider.getNextReviewTimeString(
           _selectedSubjectId!,
           quiz.typeId,
           quiz.id,
         );
-        _logger.d('Quiz ${quiz.id} next review time: $nextReviewTime');
-        if (nextReviewTime != '지금') {
-          _logger.d('Quiz ${quiz.id} skipped: next review time is not now');
-          return Container(); // 리뷰 시간이 되지 않은 퀴즈는 표시하지 않음
-        }
-        _logger.d('Building QuizCard for quiz ${quiz.id}');
 
-        // 안전한 날짜 문자열 생성
-        String safeNextReviewDate;
-        try {
-          final nextReviewDate = _userProvider.getNextReviewDate(
-            _selectedSubjectId!,
-            quiz.typeId,
-            quiz.id,
-          );
-          safeNextReviewDate = nextReviewDate?.toIso8601String() ??
-              DateTime.now().toIso8601String();
-        } catch (e) {
-          _logger.e('Error getting next review date for quiz ${quiz.id}: $e');
-          safeNextReviewDate = DateTime.now().toIso8601String();
-        }
-
-        return QuizCard(
+        return ReviewPageCard(
           key: ValueKey(quiz.id),
           quiz: quiz,
           isAdmin: _userProvider.isAdmin,
@@ -217,7 +168,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
             final endTime = DateTime.now();
             final answerTime = endTime.difference(startTime);
 
-            // 사용자의 답변을 즉시 저장
             await _userProvider.updateUserQuizData(
               _selectedSubjectId!,
               quiz.typeId,
@@ -235,9 +185,15 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
           onDeleteReview: () => _deleteReview(quiz),
           subjectId: _selectedSubjectId!,
           quizTypeId: quiz.typeId,
-          nextReviewDate: safeNextReviewDate,
-          isQuizPage: false,
-          selectedOptionIndex: null,
+          nextReviewDate: _userProvider
+                  .getNextReviewDate(
+                    _selectedSubjectId!, // 동적으로 변하는 값임
+                    quiz.typeId,
+                    quiz.id,
+                  )
+                  ?.toIso8601String() ??
+              DateTime.now().toIso8601String(),
+          buildFeedbackButtons: () => _buildFeedbackButtons(),
         );
       },
     );
@@ -249,15 +205,21 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       children: [
         ElevatedButton(
           onPressed: () => _giveFeedback(false),
-          child: Text('어려워요 🤔'),
+          child: const Text('어려워요 🤔'),
           style: ElevatedButton.styleFrom(
-              backgroundColor: Color.fromARGB(255, 245, 127, 121)),
+            backgroundColor: Color.fromARGB(255, 245, 127, 121),
+            minimumSize: const Size(100, 36), // 버튼 크기 조정
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
         ),
         ElevatedButton(
           onPressed: () => _giveFeedback(true),
-          child: Text('이제 알겠어요! 😊'),
+          child: const Text('이제 알겠어요! 😊'),
           style: ElevatedButton.styleFrom(
-              backgroundColor: Color.fromARGB(255, 123, 245, 129)),
+            backgroundColor: Color.fromARGB(255, 176, 243, 179),
+            minimumSize: const Size(100, 36), // 버튼 크기 조정
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
         ),
       ],
     );

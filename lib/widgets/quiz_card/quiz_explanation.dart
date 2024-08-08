@@ -11,6 +11,7 @@ class QuizExplanation extends StatelessWidget {
   final String quizId;
   final String subjectId;
   final String quizTypeId;
+  final bool rebuildTrigger;
 
   const QuizExplanation({
     super.key,
@@ -20,10 +21,20 @@ class QuizExplanation extends StatelessWidget {
     required this.quizId,
     required this.subjectId,
     required this.quizTypeId,
+    required this.rebuildTrigger,
   });
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final nextReviewDate =
+        userProvider.getNextReviewDate(subjectId, quizTypeId, quizId);
+    final isInReviewList =
+        nextReviewDate != null && nextReviewDate.isAfter(DateTime.now());
+
+    logger.d(
+        'QuizExplanation build: quizId=$quizId, isInReviewList=$isInReviewList, nextReviewDate=$nextReviewDate');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -54,10 +65,15 @@ class QuizExplanation extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: ElevatedButton.icon(
-            icon: const Icon(Icons.refresh),
-            label: const Text('다시 복습할래요!'),
-            onPressed: () => _markForReview(
-                context), // TODO: 그냥 곧바로 userProvider.updateUserQuizData 함수 호출하는 것으로 변경
+            icon: Icon(
+              isInReviewList ? Icons.check_circle : Icons.refresh,
+              color: isInReviewList ? Colors.green : null,
+            ), // 복습목록에 있다면 체크 아이콘, 아니면 새로고침 아이콘
+            label: Text(isInReviewList ? '복습 목록에 있음' : '다시 복습할래요!'),
+            onPressed: isInReviewList ? null : () => _markForReview(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isInReviewList ? Colors.grey[300] : null,
+            ),
           ),
         ),
       ],
@@ -67,25 +83,32 @@ class QuizExplanation extends StatelessWidget {
   void _markForReview(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-    // Anki 알고리즘을 즉시 적용
-    final result = userProvider.updateUserQuizData(
+    logger.d(
+        'Marking quiz for review: quizId=$quizId, subjectId=$subjectId, quizTypeId=$quizTypeId');
+
+    // 기존의 updateUserQuizData 메서드를 사용하여 복습 목록에 추가
+    userProvider.updateUserQuizData(
       subjectId,
       quizTypeId,
       quizId,
-      false, // isCorrect를 false로 설정하여 복습이 필요함을 나타냅니다
-      answerTime: const Duration(seconds: 1), // 임의의 답변 시간
-      selectedOptionIndex: null, // 선택된 옵션 없음
+      false, // isCorrect를 false로 설정하여 복습이 필요함을 나타냄
+      isUnderstandingImproved: false, // 이해도버튼이 나타나지 않음
     );
 
-    logger.i('Quiz marked for review with Anki algorithm applied: $quizId');
+    logger.d('Quiz marked for review: quizId=$quizId');
 
-    final nextReviewTime =
-        userProvider.getNextReviewTimeString(subjectId, quizTypeId, quizId);
+    final reviewTimeString = userProvider.getNextReviewTimeString(
+      subjectId,
+      quizTypeId,
+      quizId,
+    );
+
+    logger.d('Next review time: $reviewTimeString');
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $nextReviewTime 후',
+          '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $reviewTimeString 후',
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,

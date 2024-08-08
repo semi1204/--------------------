@@ -32,6 +32,7 @@ class _QuizPageState extends State<QuizPage> {
       ItemPositionsListener.create();
   int _initialScrollIndex = 0;
   final Map<String, int?> _selectedAnswers = {}; // 추가: 선택된 답변을 저장하는 맵
+  bool _rebuildExplanation = false; // 추가: QuizExplanation 위젯 리빌드를 위한 더미 상태 변수
 
   @override
   void initState() {
@@ -97,39 +98,17 @@ class _QuizPageState extends State<QuizPage> {
 
   Future<void> _resetQuiz(String quizId) async {
     _logger.i('Resetting quiz: $quizId');
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Reset Quiz'),
-          content: const Text(
-              'Are you sure you want to reset this quiz? This will clear your answer and reset the accuracy.'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: const Text('Reset'),
-              onPressed: () async {
-                // quizId를 named parameter로 전달
-                await _userProvider.resetUserAnswers(
-                    widget.subjectId, widget.quizTypeId,
-                    quizId: quizId);
-                if (mounted) {
-                  // mounted 체크 추가
-                  setState(() {});
-                  Navigator.of(context).pop();
-                }
-                _logger.i('Quiz reset completed');
-              },
-            ),
-          ],
-        );
-      },
+    await _userProvider.resetUserAnswers(
+      widget.subjectId,
+      widget.quizTypeId,
+      quizId: quizId,
     );
+    setState(() {
+      _selectedAnswers[quizId] = null;
+      // 추가: QuizExplanation 위젯 리빌드를 위한 더미 상태 변수 업데이트
+      _rebuildExplanation = !_rebuildExplanation;
+    });
+    _logger.i('Quiz reset completed');
   }
 
 // 수정 시 주의 사항
@@ -163,10 +142,10 @@ class _QuizPageState extends State<QuizPage> {
                   itemBuilder: (context, index) {
                     final quiz = _quizzes[index];
                     final selectedAnswer =
-                        _selectedAnswers[quiz.id]; // 수정: 저장된 답변 사용
+                        _selectedAnswers[quiz.id]; // 수정: 저장 답변 사용
                     _logger.i(
                         'Quiz ${quiz.id} - Selected answer: $selectedAnswer');
-                    return QuizCard(
+                    return QuizPageCard(
                       key: ValueKey(quiz.id),
                       quiz: quiz,
                       questionNumber: index + 1,
@@ -193,14 +172,17 @@ class _QuizPageState extends State<QuizPage> {
                       subjectId: widget.subjectId,
                       quizTypeId: widget.quizTypeId,
                       selectedOptionIndex: selectedAnswer, // 수정: 저장된 답변 사용
-                      isQuizPage: true,
+                      isQuizPage: true, // 추가: isQuizPage 매개변수
                       nextReviewDate: userProvider
-                          .getNextReviewDate(
-                            widget.subjectId,
-                            widget.quizTypeId,
-                            quiz.id,
-                          )
-                          .toIso8601String(),
+                              .getNextReviewDate(
+                                widget.subjectId, // 위젯속성으로 고정된 값임
+                                widget.quizTypeId,
+                                quiz.id,
+                              )
+                              ?.toIso8601String() ??
+                          DateTime.now().toIso8601String(),
+                      rebuildExplanation:
+                          _rebuildExplanation, // 추가: QuizExplanation 위젯 리빌드 트리거
                     );
                   },
                 );

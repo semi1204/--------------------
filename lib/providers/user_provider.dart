@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
@@ -196,7 +195,7 @@ class UserProvider with ChangeNotifier {
     _logger.d('Loaded ${_deletedQuizzes.length} deleted quizzes');
   }
 
-  // 기기 내부 저장소에서 데이터 로드
+  // 기기 내부 저장소에서 데이터 드
   Future<Map<String, Map<String, Map<String, Map<String, dynamic>>>>?>
       _loadLocalData() async {
     try {
@@ -285,19 +284,17 @@ class UserProvider with ChangeNotifier {
   Future<void> resetUserAnswers(String subjectId, String quizTypeId,
       {String? quizId}) async {
     if (quizId != null) {
-      _quizData[subjectId]?[quizTypeId]?[quizId]?.remove('selectedAnswer');
-      _quizData[subjectId]?[quizTypeId]?[quizId]?.remove('selectedOptionIndex');
-      _logger.i('Reset user answer for quiz: $quizId');
+      // 특정 퀴즈 항목 전체 삭제
+      _quizData[subjectId]?[quizTypeId]?.remove(quizId);
+      _logger.i('퀴즈 데이터 초기화: $quizId');
     } else {
-      _quizData[subjectId]?[quizTypeId]?.forEach((quizId, quizData) {
-        quizData.remove('selectedAnswer');
-        quizData.remove('selectedOptionIndex');
-      });
-      _logger.i(
-          'Reset all user answers for subject: $subjectId, quizType: $quizTypeId');
+      // 해당 과목과 퀴즈 유형의 모든 데이터 초기화
+      _quizData[subjectId]?[quizTypeId]?.clear();
+      _logger.i('모든 퀴즈 데이터 초기화: 과목 $subjectId, 퀴즈 유형 $quizTypeId');
     }
     await _saveQuizData();
     notifyListeners();
+    _logger.i('User answers reset successfully');
   }
 
   // 사용자 퀴즈 데이터 업데이트
@@ -375,7 +372,7 @@ class UserProvider with ChangeNotifier {
       };
 
       await _saveQuizData();
-      notifyListeners();
+      //notifyListeners();
       _logger.i('User quiz data updated successfully');
     } catch (e) {
       _logger.e('Error updating user quiz data: $e');
@@ -430,27 +427,25 @@ class UserProvider with ChangeNotifier {
   }
 
   // 다음 복습 날짜를 가져오는 메서드
-  DateTime getNextReviewDate(
+  DateTime? getNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
-    // quizData <= _quizData(updateUserQuizData에서 저장된 데이터)
     final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
-    if (quizData == null) {
-      _logger.w('No quiz data found for $quizId. Returning current date.');
-      return DateTime.now();
+    if (quizData == null || quizData.isEmpty) {
+      _logger.w('$quizId에 대한 퀴즈 데이터를 찾을 수 없습니다. null을 반환합니다.');
+      return null;
     }
 
     final nextReviewDateString = quizData['nextReviewDate'];
     if (nextReviewDateString == null) {
-      _logger
-          .w('No next review date found for $quizId. Returning current date.');
-      return DateTime.now();
+      _logger.w('$quizId에 대한 다음 복습 날짜를 찾을 수 없습니다. null을 반환합니다.');
+      return null;
     }
 
     try {
       return DateTime.parse(nextReviewDateString);
     } catch (e) {
-      _logger.e('Error parsing next review date for $quizId: $e');
-      return DateTime.now();
+      _logger.e('$quizId의 다음 복습 날짜 파싱 중 오류 발생: $e');
+      return null;
     }
   }
 
@@ -466,20 +461,26 @@ class UserProvider with ChangeNotifier {
     // getNextReviewDate 메서드를 사용하여 다음 복습 날짜를 가져옴
     final nextReviewDate = getNextReviewDate(subjectId, quizTypeId, quizId);
     final now = DateTime.now();
-    final difference = nextReviewDate.difference(now);
+    final difference = nextReviewDate?.difference(now) ?? Duration.zero;
 
     _logger.i('Calculating next review time for quiz: $quizId');
 
-    if (difference.inSeconds <= 0) {
-      return '지금';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays}일';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}시간';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}분';
+    if (kDebugMode) {
+      if (difference.inMinutes > 0) {
+        return '${difference.inMinutes}분';
+      } else {
+        return '${difference.inSeconds}초';
+      }
     } else {
-      return '${difference.inSeconds}초';
+      if (difference.inDays > 0) {
+        return '${difference.inDays}일';
+      } else if (difference.inHours > 0) {
+        return '${difference.inHours}시간';
+      } else if (difference.inMinutes > 0) {
+        return '${difference.inMinutes}분';
+      } else {
+        return '${difference.inSeconds}초';
+      }
     }
   }
 

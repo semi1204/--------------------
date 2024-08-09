@@ -344,10 +344,11 @@ class UserProvider with ChangeNotifier {
     Duration? answerTime, // 답변 시간
     int? selectedOptionIndex, // 선택한 옵션 인덱스
     bool isUnderstandingImproved = false, // 이해도 향상 여부
+    bool removeFromReview = false, // 복습 목록에서 제거
   }) async {
     // 로그에 업데이트 정보 기록
     _logger.i(
-        'Updating user quiz data: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect');
+        '업데이트 된 데이터: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect, removeFromReview=$removeFromReview');
 
     // 현재 사용자가 없으면 경고 로그를 남기고 종료
     if (_user == null) {
@@ -395,8 +396,9 @@ class UserProvider with ChangeNotifier {
 
       // 학습데이터 업데이트하고 저장
       final now = DateTime.now();
-      final nextReviewDate =
-          now.add(Duration(days: ankiResult['interval'] as int));
+      final nextReviewDate = removeFromReview
+          ? null // 복습 목록에서 제거하는 경우 nextReviewDate를 null로 설정
+          : now.add(Duration(days: ankiResult['interval'] as int));
 
       _quizData[subjectId] ??= {};
       _quizData[subjectId]![quizTypeId] ??= {};
@@ -407,7 +409,7 @@ class UserProvider with ChangeNotifier {
         'interval': ankiResult['interval'],
         'easeFactor': ankiResult['easeFactor'],
         'consecutiveCorrect': ankiResult['consecutiveCorrect'],
-        'nextReviewDate': nextReviewDate.toIso8601String(),
+        'nextReviewDate': nextReviewDate?.toIso8601String(),
         'mistakeCount': ankiResult['mistakeCount'],
         'lastAnswered': now.toIso8601String(),
         'selectedOptionIndex': selectedOptionIndex,
@@ -415,8 +417,11 @@ class UserProvider with ChangeNotifier {
       };
 
       await _saveQuizData();
-      //notifyListeners();
-      _logger.i('User quiz data updated successfully');
+      notifyListeners();
+
+      _logger.i('사용자 퀴즈 데이터 업데이트 성공');
+      _logger.d(
+          'Updated quiz data: ${_quizData[subjectId]![quizTypeId]![quizId]}');
     } catch (e) {
       _logger.e('Error updating user quiz data: $e');
       rethrow;
@@ -585,23 +590,22 @@ class UserProvider with ChangeNotifier {
     _logger.i(
         'Marking quiz for review: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId');
 
-    if (_user == null) {
-      _logger.w('Attempted to mark quiz for review for null user');
-      return;
-    }
-
     try {
+      final now = DateTime.now();
+      final nextReviewDate =
+          now.add(const Duration(minutes: 10)); // 10분 후로 설정 (테스트용)
+
       _quizData[subjectId] ??= {};
       _quizData[subjectId]![quizTypeId] ??= {};
       _quizData[subjectId]![quizTypeId]![quizId] ??= {};
-      _quizData[subjectId]![quizTypeId]![quizId]!['markedForReview'] =
-          true; // 복습카드를 명시적으로 눌러야 복습이 시작됨
-      _quizData[subjectId]![quizTypeId]![quizId]!['markedForReviewAt'] =
-          DateTime.now().toIso8601String();
+      _quizData[subjectId]![quizTypeId]![quizId]!['nextReviewDate'] =
+          nextReviewDate.toIso8601String();
 
       await _saveQuizData();
       notifyListeners();
       _logger.i('Quiz marked for review successfully');
+      _logger.d(
+          'Updated quiz data: ${_quizData[subjectId]![quizTypeId]![quizId]}');
     } catch (e) {
       _logger.e('Error marking quiz for review: $e');
       rethrow;

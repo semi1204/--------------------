@@ -128,6 +128,17 @@ class _QuizPageCardState extends State<QuizPageCard> {
   Widget build(BuildContext context) {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
+        final nextReviewDate = userProvider.getNextReviewDate(
+          widget.subjectId,
+          widget.quizTypeId,
+          widget.quiz.id,
+        );
+        final isInReviewList =
+            nextReviewDate != null && nextReviewDate.isAfter(DateTime.now());
+
+        _logger.d(
+            'QuizPageCard build: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList');
+
         return Card(
           margin: const EdgeInsets.all(8.0),
           child: Padding(
@@ -266,6 +277,17 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
   Widget build(BuildContext context) {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
+        final nextReviewDate = userProvider.getNextReviewDate(
+          widget.subjectId,
+          widget.quizTypeId,
+          widget.quiz.id,
+        );
+        final isInReviewList =
+            nextReviewDate != null && nextReviewDate.isAfter(DateTime.now());
+
+        _logger.d(
+            'ReviewPageCard build: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList');
+
         return Card(
           margin: const EdgeInsets.all(8.0),
           child: Padding(

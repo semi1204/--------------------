@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
+import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/markdown_widgets.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
 import 'package:provider/provider.dart';
@@ -27,9 +28,9 @@ class QuizExplanation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
-    final nextReviewDate = // getNextReviewDate에서 퀴즈에 대한 데이터 불러옴
+    final nextReviewDate =
         userProvider.getNextReviewDate(subjectId, quizTypeId, quizId);
-    final isInReviewList = // 다음 복습 날짜가 현재 날짜보다 이후라면 복습 목록에 있음
+    final isInReviewList =
         nextReviewDate != null && nextReviewDate.isAfter(DateTime.now());
 
     logger.d(
@@ -66,13 +67,14 @@ class QuizExplanation extends StatelessWidget {
           alignment: Alignment.centerRight,
           child: ElevatedButton.icon(
             icon: Icon(
-              isInReviewList ? Icons.check_circle : Icons.refresh,
-              color: isInReviewList ? Colors.green : null,
-            ), // 복습목록에 있다면 체크 아이콘, 아니면 새로고침 아이콘
-            label: Text(isInReviewList ? '복습 목록에 있음' : '다시 복습할래요!'),
-            onPressed: isInReviewList ? null : () => _markForReview(context),
+              isInReviewList ? Icons.remove_circle : Icons.add_circle,
+              color: isInReviewList ? Colors.red : Colors.green,
+            ),
+            label: Text(isInReviewList ? '복습 목록에서 제거' : '복습 목록에 추가'),
+            onPressed: () => _toggleReviewStatus(context, isInReviewList),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isInReviewList ? Colors.grey[300] : null,
+              backgroundColor:
+                  isInReviewList ? Colors.red[100] : Colors.green[100],
             ),
           ),
         ),
@@ -80,39 +82,36 @@ class QuizExplanation extends StatelessWidget {
     );
   }
 
-  void _markForReview(BuildContext context) {
+  void _toggleReviewStatus(BuildContext context, bool isInReviewList) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
     logger.d(
-        'Marking quiz for review: quizId=$quizId, subjectId=$subjectId, quizTypeId=$quizTypeId');
+        'Toggling review status: quizId=$quizId, currentStatus=$isInReviewList');
 
-    userProvider.markQuizForReview(subjectId, quizTypeId, quizId);
+    if (isInReviewList) {
+      // TODO : 둘 다 updateUserQuizData로 사용할 수 있는지 확인
+      userProvider.updateUserQuizData(
+        subjectId,
+        quizTypeId,
+        quizId,
+        false,
+        removeFromReview: true,
+      );
+      logger.d('퀴즈 복습 목록에서 제거됨: quizId=$quizId');
+    } else {
+      userProvider.markQuizForReview(subjectId, quizTypeId, quizId);
+      logger.d('퀴즈 복습 목록에 추가됨: quizId=$quizId');
+    }
 
-    logger.d('Quiz marked for review: quizId=$quizId');
-
-    final reviewTimeString = userProvider.getNextReviewTimeString(
-      subjectId,
-      quizTypeId,
-      quizId,
-    );
-
-    logger.d('Next review time: $reviewTimeString');
+    final reviewTimeString =
+        userProvider.getNextReviewTimeString(subjectId, quizTypeId, quizId);
+    logger.d('다음 복습 시간: $reviewTimeString');
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $reviewTimeString 후',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color.fromARGB(255, 106, 105, 106),
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+      CommonSnackBar(
+        message: isInReviewList
+            ? '복습 목록에서 제거되었습니다.'
+            : '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $reviewTimeString 후',
       ),
     );
   }

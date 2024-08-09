@@ -116,7 +116,7 @@ class QuizService {
       encodeData: (data) => json.encode(data), // 맵을 JSON 문자열로 인코딩
     );
 
-    _logger.i('사용��� 퀴즈 데이터 로드 완료: ${userData.runtimeType}');
+    _logger.i('사용 퀴즈 데이터 로드 완료: ${userData.runtimeType}');
     return userData; // 가져온 사용자 퀴즈 데이터 반환
   }
 
@@ -429,7 +429,7 @@ class QuizService {
     _logger.i('Memory cache refreshed successfully');
   }
 
-  // 새로 추가: 특정 주제의 ���즈 타입 및 퀴즈 새로고침 메서드
+  // 새로 추가: 특정 주제의 즈 타입 및 퀴즈 새로고침 메서드
   Future<void> refreshSubjectData(String subjectId) async {
     _logger.i('Refreshing data for subject: $subjectId');
     _cachedQuizTypes.remove(subjectId);
@@ -551,6 +551,7 @@ class QuizService {
         'quizData': userData,
       }, SetOptions(merge: true));
       _logger.i('User data synced successfully with Firestore');
+      _logger.d('Synced user data: $userData');
     } catch (e) {
       _logger.e('Error syncing user data: $e');
       rethrow;

@@ -52,7 +52,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       _quizzesForReview = allQuizzes.where((quiz) {
         // 다음 복습 날짜가 현재 날짜보다 이전인 퀴즈만 가져옴
         final nextReviewDate = _userProvider.getNextReviewDate(
-          // TODO: 복습할 퀴즈를 가져오는 대해서 getQuizzesForReview 메소드 사용해야하면서 추가적으로 필터링을 해야함
           _selectedSubjectId!,
           quiz.typeId,
           quiz.id,
@@ -86,117 +85,94 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('복습 퀴즈')),
       body: Column(
         children: [
           SubjectDropdown(
             selectedSubjectId: _selectedSubjectId,
-            onSubjectSelected: (String? newValue) {
-              setState(() {
-                _selectedSubjectId = newValue;
-              });
-              if (newValue != null) {
-                _loadQuizzesForReview();
-              }
-            },
+            onSubjectSelected: _handleSubjectChange,
           ),
           Expanded(
-            child: _selectedSubjectId == null
-                ? const Center(child: Text('과목을 선택해주세요'))
-                : RefreshIndicator(
-                    onRefresh: _refreshQuizzes,
-                    child: _buildQuizList(),
-                  ),
+            child: Consumer<UserProvider>(
+              builder: (context, userProvider, _) {
+                if (_quizzesForReview.isEmpty) {
+                  return _buildEmptyState();
+                }
+                return ListView.builder(
+                  itemCount: _quizzesForReview.length,
+                  itemBuilder: (context, index) {
+                    final quiz = _quizzesForReview[index];
+                    _logger.d('Building ReviewPageCard for quiz: ${quiz.id}');
+                    return ReviewPageCard(
+                      key: ValueKey(quiz.id),
+                      quiz: quiz,
+                      isAdmin: userProvider.isAdmin,
+                      questionNumber: index + 1,
+                      onAnswerSelected: (answerIndex) =>
+                          _handleAnswerSelected(quiz, answerIndex),
+                      onDeleteReview: () => _deleteReview(quiz),
+                      subjectId: _selectedSubjectId!,
+                      quizTypeId: quiz.typeId,
+                      nextReviewDate: userProvider
+                              .getNextReviewDate(
+                                _selectedSubjectId!,
+                                quiz.typeId,
+                                quiz.id,
+                              )
+                              ?.toIso8601String() ??
+                          DateTime.now().toIso8601String(),
+                      buildFeedbackButtons: () => _buildFeedbackButtons(),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _refreshQuizzes() async {
-    _logger.i('Manually refreshing quiz list');
-    setState(() {
-      _isLoading = true;
-    });
-    await _loadQuizzesForReview();
-    setState(() {
-      _isLoading = false;
-    });
+  Widget _buildEmptyState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.celebration,
+              size: 80, color: Color.fromARGB(255, 255, 153, 0)),
+          SizedBox(height: 20),
+          Text('와! 모든 퀴즈를 완료했어요! 🎉',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 10),
+          Text('잠시 후에 다시 확인해보세요!'),
+        ],
+      ),
+    );
   }
 
-  Widget _buildQuizList() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+  Future<void> _handleAnswerSelected(Quiz quiz, int answerIndex) async {
+    _logger.i('Answer selected for quiz ${quiz.id}: $answerIndex');
+    final startTime = DateTime.now();
+    final isCorrect = quiz.correctOptionIndex == answerIndex;
+    final endTime = DateTime.now();
+    final answerTime = endTime.difference(startTime);
 
-    if (_quizzesForReview.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.celebration,
-                size: 80, color: Color.fromARGB(255, 255, 153, 0)),
-            SizedBox(height: 20),
-            Text(
-              '와! 모든 퀴즈를 완료했어요! 🎉',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text('잠시 후에 다시 확인해보세요!'),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: _quizzesForReview.length,
-      itemBuilder: (context, index) {
-        final quiz = _quizzesForReview[index];
-        final nextReviewTime = _userProvider.getNextReviewTimeString(
-          _selectedSubjectId!,
-          quiz.typeId,
-          quiz.id,
-        );
-
-        return ReviewPageCard(
-          key: ValueKey(quiz.id),
-          quiz: quiz,
-          isAdmin: _userProvider.isAdmin,
-          questionNumber: index + 1,
-          onAnswerSelected: (answerIndex) async {
-            final startTime = DateTime.now();
-            final isCorrect = quiz.correctOptionIndex == answerIndex;
-            final endTime = DateTime.now();
-            final answerTime = endTime.difference(startTime);
-
-            await _userProvider.updateUserQuizData(
-              _selectedSubjectId!,
-              quiz.typeId,
-              quiz.id,
-              isCorrect,
-              answerTime: answerTime,
-              selectedOptionIndex: answerIndex,
-            );
-
-            setState(() {
-              _currentQuizIndex = index;
-              _showFeedbackButtons = true;
-            });
-          },
-          onDeleteReview: () => _deleteReview(quiz),
-          subjectId: _selectedSubjectId!,
-          quizTypeId: quiz.typeId,
-          nextReviewDate: _userProvider
-                  .getNextReviewDate(
-                    _selectedSubjectId!, // 동적으로 변하는 값임
-                    quiz.typeId,
-                    quiz.id,
-                  )
-                  ?.toIso8601String() ??
-              DateTime.now().toIso8601String(),
-          buildFeedbackButtons: () => _buildFeedbackButtons(),
-        );
-      },
+    await _userProvider.updateUserQuizData(
+      _selectedSubjectId!,
+      quiz.typeId,
+      quiz.id,
+      isCorrect,
+      answerTime: answerTime,
+      selectedOptionIndex: answerIndex,
     );
+
+    setState(() {
+      _currentQuizIndex = _quizzesForReview.indexOf(quiz);
+      _showFeedbackButtons = true;
+    });
+
+    _logger
+        .d('Quiz data updated. isCorrect: $isCorrect, answerTime: $answerTime');
   }
 
   Widget _buildFeedbackButtons() {
@@ -260,14 +236,26 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     }
   }
 
+  Future<void> _refreshQuizzes() async {
+    _logger.i('Manually refreshing quiz list');
+    setState(() {
+      _isLoading = true;
+    });
+    await _loadQuizzesForReview();
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
   Future<void> _deleteReview(Quiz quiz) async {
     _logger.i('Deleting review for quiz: ${quiz.id}');
     try {
-      await _userProvider.deleteUserQuizData(
-        _userProvider.user!.uid,
+      await _userProvider.updateUserQuizData(
         _selectedSubjectId!,
         quiz.typeId,
         quiz.id,
+        false,
+        removeFromReview: true,
       );
       setState(() {
         _quizzesForReview.removeWhere((q) => q.id == quiz.id);
@@ -276,17 +264,23 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Review deleted successfully')),
+          const SnackBar(content: Text('복습 목록에서 제거되었습니다.')),
         );
       }
     } catch (e) {
       _logger.e('Error deleting review: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Failed to delete review. Please try again.')),
+          const SnackBar(content: Text('복습 삭제 중 오류가 발생했습니다. 다시 시도해주세요.')),
         );
       }
     }
+  }
+
+  void _handleSubjectChange(String? newSubjectId) {
+    setState(() {
+      _selectedSubjectId = newSubjectId;
+    });
+    _loadQuizzesForReview();
   }
 }

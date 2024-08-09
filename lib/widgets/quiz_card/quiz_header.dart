@@ -21,6 +21,22 @@ class QuizHeader extends StatelessWidget {
     required this.logger,
   });
 
+  Future<void> _resetQuiz(BuildContext context) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    logger.i('Resetting quiz: ${quiz.id}');
+
+    await userProvider.resetUserAnswers(
+      subjectId,
+      quizTypeId,
+      quizId: quiz.id,
+    );
+
+    // Trigger UI update
+    onResetQuiz();
+
+    logger.i('Quiz reset completed');
+  }
+
   // 수정시 주의사항:
   // 문제의 가장 상단엔, keyword, accuracy, reset button이 Row로 표시되어야 합니다.
   @override
@@ -75,7 +91,7 @@ class QuizHeader extends StatelessWidget {
                 );
 
                 if (confirmed == true) {
-                  onResetQuiz();
+                  await _resetQuiz(context);
                 }
               },
               tooltip: 'Reset Quiz',

@@ -96,21 +96,6 @@ class _QuizPageState extends State<QuizPage> {
     return 0; // 모든 퀴즈가 미답변 상태일 경우
   }
 
-  Future<void> _resetQuiz(String quizId) async {
-    _logger.i('Resetting quiz: $quizId');
-    await _userProvider.resetUserAnswers(
-      widget.subjectId,
-      widget.quizTypeId,
-      quizId: quizId,
-    );
-    setState(() {
-      _selectedAnswers[quizId] = null;
-      // 추가: QuizExplanation 위젯 리빌드를 위한 더미 상태 변수 업데이트
-      _rebuildExplanation = !_rebuildExplanation;
-    });
-    _logger.i('Quiz reset completed');
-  }
-
 // 수정 시 주의 사항
 // 1. QuizCard 위젯에서 User의 기존 선택지는 항상 표시되어있어야함.
 // 2. User는 초기화 버튼으로만 선택지를 초기화할 수 있어야함.
@@ -158,7 +143,7 @@ class _QuizPageState extends State<QuizPage> {
                             'Answer selected for quiz: ${quiz.id}, answer: $answerIndex');
                         setState(() {
                           _selectedAnswers[quiz.id] =
-                              answerIndex; // 수정: 선택된 답변 업데이트
+                              answerIndex; // 선택된 답변 업데이트
                         });
                         userProvider.updateUserQuizData(
                           widget.subjectId,
@@ -168,7 +153,12 @@ class _QuizPageState extends State<QuizPage> {
                           selectedOptionIndex: answerIndex,
                         );
                       },
-                      onResetQuiz: () => _resetQuiz(quiz.id),
+                      onResetQuiz: () {
+                        setState(() {
+                          _selectedAnswers[quiz.id] = null;
+                          _rebuildExplanation = !_rebuildExplanation;
+                        });
+                      },
                       subjectId: widget.subjectId,
                       quizTypeId: widget.quizTypeId,
                       selectedOptionIndex: selectedAnswer, // 수정: 저장된 답변 사용

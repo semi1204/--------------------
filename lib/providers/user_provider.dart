@@ -289,12 +289,16 @@ class UserProvider with ChangeNotifier {
       _logger.i('퀴즈 데이터 초기화: $quizId');
     } else {
       // 해당 과목과 퀴즈 유형의 모든 데이터 초기화
+      final typeData = _quizData[subjectId]?[quizTypeId];
+      _logger.d('Current type data before reset: $typeData');
       _quizData[subjectId]?[quizTypeId]?.clear();
       _logger.i('모든 퀴즈 데이터 초기화: 과목 $subjectId, 퀴즈 유형 $quizTypeId');
     }
+
     await _saveQuizData();
     notifyListeners();
     _logger.i('User answers reset successfully');
+    _logger.d('Updated quiz data: ${_quizData[subjectId]?[quizTypeId]}');
   }
 
   // 사용자 퀴즈 데이터 업데이트

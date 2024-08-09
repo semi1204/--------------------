@@ -90,7 +90,7 @@ class ReviewPageCard extends BaseQuizCard {
 // 퀴즈 페이지 카드
 class _QuizPageCardState extends State<QuizPageCard> {
   late final Logger _logger;
-  late final UserProvider _userProvider;
+  late final UserProvider userProvider;
   DateTime? _startTime;
   int? _selectedOptionIndex;
   bool _hasAnswered = false;
@@ -99,7 +99,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
   void initState() {
     super.initState();
     _logger = Provider.of<Logger>(context, listen: false);
-    _userProvider = Provider.of<UserProvider>(context, listen: false);
+    userProvider = Provider.of<UserProvider>(context, listen: false);
     _startTime = DateTime.now();
     _loadUserAnswer();
 
@@ -139,7 +139,14 @@ class _QuizPageCardState extends State<QuizPageCard> {
                   quiz: widget.quiz,
                   subjectId: widget.subjectId,
                   quizTypeId: widget.quizTypeId,
-                  onResetQuiz: _resetQuiz,
+                  onResetQuiz: () {
+                    setState(() {
+                      _selectedOptionIndex = null;
+                      _hasAnswered = false;
+                      _startTime = DateTime.now();
+                    });
+                    widget.onResetQuiz?.call();
+                  },
                   logger: _logger,
                 ),
                 const SizedBox(height: 16),
@@ -181,25 +188,6 @@ class _QuizPageCardState extends State<QuizPageCard> {
         );
       },
     );
-  }
-
-  // 퀴즈 페이지 카드에서 퀴즈 리셋
-  void _resetQuiz() {
-    _logger.i('Resetting quiz: quizId=${widget.quiz.id}');
-
-    setState(() {
-      _selectedOptionIndex = null;
-      _hasAnswered = false;
-      _startTime = DateTime.now();
-    });
-    _userProvider.resetUserAnswers(widget.subjectId, widget.quizTypeId,
-        quizId: widget.quiz.id);
-
-    Future.delayed(const Duration(milliseconds: 100), () {
-      setState(() {});
-    });
-    _logger.d(
-        'Quiz reset state: selectedOptionIndex=$_selectedOptionIndex, hasAnswered=$_hasAnswered');
   }
 
   //

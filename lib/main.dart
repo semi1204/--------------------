@@ -9,6 +9,13 @@ import 'package:logger/logger.dart';
 import 'firebase_options.dart';
 import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
 
+const Color primaryColor = Color(0xFF4A90E2); // 밝은 파란색
+const Color secondaryColor = Color(0xFF50E3C2); // 민트색
+
+// 다크 모드를 위한 회색 톤의 색상 정의
+const Color darkModeBackground = Color(0xFF303030); // 어두운 회색
+const Color darkModeSurface = Color(0xFF424242); // 조금 더 밝은 회색
+
 final logger = Logger();
 
 void main() async {
@@ -42,13 +49,20 @@ class MyApp extends StatelessWidget {
           theme: themeProvider.isDarkMode
               ? ThemeData.dark().copyWith(
                   colorScheme: const ColorScheme.dark(
-                    primary: Color.fromARGB(255, 84, 119, 148),
+                    primary: primaryColor,
+                    secondary: secondaryColor,
+                    surface: darkModeSurface,
+                    // 필요에 따라 다른 색상들도 조정
                   ),
+                  scaffoldBackgroundColor: darkModeBackground,
+                  cardColor: darkModeSurface,
+                  // 다른 위젯들의 색상도 필요에 따라 조정
                 )
               : ThemeData(
                   colorScheme: ColorScheme.fromSeed(
-                    seedColor: const Color.fromARGB(255, 84, 119, 148),
-                  ),
+                    seedColor: primaryColor,
+                    brightness: Brightness.light,
+                  ).copyWith(secondary: secondaryColor),
                   useMaterial3: true,
                 ),
           home: const AuthWrapper(),

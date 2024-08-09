@@ -34,46 +34,30 @@ class QuizService {
   Future<List<Quiz>> getQuizzesForReview(String userId, String subjectId,
       String quizTypeId, UserProvider userProvider) async {
     _logger.i(
-        'getQuizzesForReview 시작: userId=$userId, subjectId=$subjectId, quizTypeId=$quizTypeId');
+        'getQuizzesForReview start: userId=$userId, subjectId=$subjectId, quizTypeId=$quizTypeId');
 
     try {
-      final userData = userProvider.quizData;
-      _logger.d('사용자 데이터 타입: ${userData.runtimeType}');
-
-      final now = DateTime.now();
-      // deletedQuizzes를 사용하지 않고 대신 userData에서 확인
-      _logger.d('퀴즈 데이터 확인 시작');
-
       final quizzes = await getQuizzes(subjectId, quizTypeId);
-      _logger.d('퀴즈 타입 $quizTypeId에 대해 ${quizzes.length}개의 퀴즈 가져옴');
+      _logger.d('Fetched ${quizzes.length} quizzes for quiz type $quizTypeId');
 
       List<Quiz> quizzesForReview = [];
 
       for (var quiz in quizzes) {
-        final quizData = userData[subjectId]?[quizTypeId]?[quiz.id];
-        if (quizData != null && quizData.isNotEmpty) {
-          final accuracy = quizData['accuracy'] ?? 0.0;
-          final nextReviewDate = quizData['nextReviewDate'] != null
-              ? DateTime.parse(quizData['nextReviewDate'])
-              : now;
-
-          if (accuracy < 1.0 && now.isAfter(nextReviewDate)) {
-            _logger.d('복습 목록에 추가된 퀴즈: ${quiz.id}');
-            quizzesForReview.add(quiz);
-          } else {
-            _logger.d('복습 목록에 추가되지 않은 퀴즈: ${quiz.id}');
-          }
+        if (userProvider.isQuizEligibleForReview(
+            subjectId, quizTypeId, quiz.id)) {
+          _logger.d('Quiz ${quiz.id} is eligible for review');
+          quizzesForReview.add(quiz);
         } else {
-          _logger.d('퀴즈 ${quiz.id}에 대한 데이터가 없음. 복습 목록에 추가하지 않음.');
+          _logger.d('Quiz ${quiz.id} is not eligible for review');
         }
       }
 
-      // 실수 횟수에 따라 틀린 퀴즈를 정렬 (내림차순)
+      // Sort quizzes by mistake count (descending order)
       quizzesForReview.sort((a, b) {
         final aMistakeCount =
-            userData[subjectId]?[quizTypeId]?[a.id]?['mistakeCount'] ?? 0;
+            userProvider.getQuizMistakeCount(subjectId, quizTypeId, a.id);
         final bMistakeCount =
-            userData[subjectId]?[quizTypeId]?[b.id]?['mistakeCount'] ?? 0;
+            userProvider.getQuizMistakeCount(subjectId, quizTypeId, b.id);
         return bMistakeCount.compareTo(aMistakeCount);
       });
 

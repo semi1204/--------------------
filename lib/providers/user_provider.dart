@@ -38,11 +38,11 @@ class UserProvider with ChangeNotifier {
   }
 
   Future<void> setUser(User? user) async {
+    _logger.i('Setting user: ${user?.email ?? 'No user'}');
     if (_user?.uid != user?.uid) {
       _user = user;
-      _logger.i('User state changed: ${user?.email ?? 'No user'}');
       if (user != null) {
-        await loadUserData(); // 사용자 변경 시 데이터 로드
+        await loadUserData();
       } else {
         _quizData = {};
         _deletedQuizzes.clear();
@@ -284,9 +284,11 @@ class UserProvider with ChangeNotifier {
   Future<void> resetUserAnswers(String subjectId, String quizTypeId,
       {String? quizId}) async {
     if (quizId != null) {
-      // Reset specific quiz item
+      // 특정 퀴즈 아이디가 제공되었는지 확인
       if (_quizData[subjectId]?[quizTypeId]?[quizId] != null) {
+        // 해당 과목과 유형 퀴즈에 대한 데이터 존재 여부 확인
         _quizData[subjectId]![quizTypeId]![quizId] = {
+          // 해당 퀴즈의 데이터를 새로운 객체로 초기화
           'nextReviewDate': DateTime.now().toIso8601String(),
           // Reset other fields as needed
           'correct': 0,
@@ -296,14 +298,19 @@ class UserProvider with ChangeNotifier {
           'easeFactor': AnkiAlgorithm.defaultEaseFactor,
           'consecutiveCorrect': 0,
           'mistakeCount': 0,
+          'markedForReview': false, // 복습리스트에서 제거하는 로직
+          'selectedOptionIndex': null,
         };
       }
       _logger.i('퀴즈 데이터 초기화: $quizId');
     } else {
       // Reset all quizzes for the subject and quiz type
       if (_quizData[subjectId]?[quizTypeId] != null) {
+        // 특정 과목과 유형에 대한 데이터가 존재 여부 확인
         for (var quizId in _quizData[subjectId]![quizTypeId]!.keys) {
+          // 해당 과목과 유형에 속한 퀴즈에 대해 반복
           _quizData[subjectId]![quizTypeId]![quizId] = {
+            // 각 퀴즈 ID에 대한 데이터 초기화
             'nextReviewDate': DateTime.now().toIso8601String(),
             // Reset other fields as needed
             'correct': 0,
@@ -313,6 +320,7 @@ class UserProvider with ChangeNotifier {
             'easeFactor': AnkiAlgorithm.defaultEaseFactor,
             'consecutiveCorrect': 0,
             'mistakeCount': 0,
+            'markedForReview': false, // 복습리스트에서 제거하는 로직
           };
         }
       }
@@ -332,9 +340,10 @@ class UserProvider with ChangeNotifier {
     String quizTypeId,
     String quizId,
     bool isCorrect, {
-    Duration? answerTime,
-    int? selectedOptionIndex,
-    bool isUnderstandingImproved = false,
+    // 정답여부
+    Duration? answerTime, // 답변 시간
+    int? selectedOptionIndex, // 선택한 옵션 인덱스
+    bool isUnderstandingImproved = false, // 이해도 향상 여부
   }) async {
     // 로그에 업데이트 정보 기록
     _logger.i(
@@ -347,15 +356,17 @@ class UserProvider with ChangeNotifier {
     }
 
     try {
-      final quizData = _quizData[subjectId]?[quizTypeId]?[quizId] ?? {};
-
+      final quizData =
+          _quizData[subjectId]?[quizTypeId]?[quizId] ?? {}; // 퀴즈데이터 가져오기,
+      // 없으면 빈 객체를 반환 : 기본값을 가져옴
       int correct = quizData['correct'] ?? 0;
       int total = quizData['total'] ?? 0;
-      int consecutiveCorrect = quizData['consecutiveCorrect'] ?? 0;
-      int interval = quizData['interval'] ?? AnkiAlgorithm.initialInterval;
+      int consecutiveCorrect = quizData['consecutiveCorrect'] ?? 0; // 연속 정답 개수
+      int interval =
+          quizData['interval'] ?? AnkiAlgorithm.initialInterval; // 복습 간격
       double easeFactor =
-          quizData['easeFactor'] ?? AnkiAlgorithm.defaultEaseFactor;
-      int mistakeCount = quizData['mistakeCount'] ?? 0;
+          quizData['easeFactor'] ?? AnkiAlgorithm.defaultEaseFactor; // 쉬움 인수
+      int mistakeCount = quizData['mistakeCount'] ?? 0; // 실수 횟수
 
       total++;
       if (isCorrect) {
@@ -366,11 +377,13 @@ class UserProvider with ChangeNotifier {
 
       int? qualityOfRecall;
       if (answerTime != null) {
-        qualityOfRecall =
+        // 답변 시간이 주어진 경우
+        qualityOfRecall = // 기억 품질 평가수행(anki 알고리즘)
             AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect);
       }
 
       final ankiResult = AnkiAlgorithm.calculateNextReview(
+        // 다음 복습일정 함수 호출
         interval: interval,
         easeFactor: easeFactor,
         consecutiveCorrect: consecutiveCorrect,
@@ -380,6 +393,7 @@ class UserProvider with ChangeNotifier {
         isUnderstandingImproved: isUnderstandingImproved,
       );
 
+      // 학습데이터 업데이트하고 저장
       final now = DateTime.now();
       final nextReviewDate =
           now.add(Duration(days: ankiResult['interval'] as int));
@@ -397,6 +411,7 @@ class UserProvider with ChangeNotifier {
         'mistakeCount': ankiResult['mistakeCount'],
         'lastAnswered': now.toIso8601String(),
         'selectedOptionIndex': selectedOptionIndex,
+        'isUnderstandingImproved': isUnderstandingImproved,
       };
 
       await _saveQuizData();
@@ -470,9 +485,13 @@ class UserProvider with ChangeNotifier {
     }
 
     try {
-      return DateTime.parse(nextReviewDateString);
+      final nextReviewDate = DateTime.parse(nextReviewDateString);
+      // Ensure the next review date is not in the past
+      return nextReviewDate.isAfter(DateTime.now())
+          ? nextReviewDate
+          : DateTime.now();
     } catch (e) {
-      _logger.e('$quizId의 다음 복습 날짜 파싱 중 오류 발생: $e');
+      _logger.e('다음 복습 날짜 계산 오류: $quizId: $e');
       return null;
     }
   }
@@ -512,6 +531,22 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+  // Modify the isQuizEligibleForReview method
+  bool isQuizEligibleForReview(
+      String subjectId, String quizTypeId, String quizId) {
+    final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
+    if (quizData == null) return false;
+
+    // Check if the quiz is explicitly marked for review
+    if (quizData['markedForReview'] == true) {
+      final nextReviewDate =
+          DateTime.parse(quizData['nextReviewDate'] as String);
+      return DateTime.now().isAfter(nextReviewDate);
+    }
+
+    return false;
+  }
+
   // Add this method for offline support
   Future<void> syncOfflineData() async {
     _logger.i('Syncing offline data');
@@ -547,29 +582,29 @@ class UserProvider with ChangeNotifier {
 
   Future<void> markQuizForReview(
       String subjectId, String quizTypeId, String quizId) async {
-    _logger.i('Marking quiz for review: $quizId');
+    _logger.i(
+        'Marking quiz for review: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId');
+
     if (_user == null) {
       _logger.w('Attempted to mark quiz for review for null user');
       return;
     }
 
     try {
-      final quizData = _quizData[subjectId]?[quizTypeId]?[quizId] ?? {};
-      quizData['markedForReview'] = true;
-      quizData['markedForReviewAt'] = DateTime.now().toIso8601String();
-
-      // Update local state
       _quizData[subjectId] ??= {};
       _quizData[subjectId]![quizTypeId] ??= {};
-      _quizData[subjectId]![quizTypeId]![quizId] = quizData;
+      _quizData[subjectId]![quizTypeId]![quizId] ??= {};
+      _quizData[subjectId]![quizTypeId]![quizId]!['markedForReview'] =
+          true; // 복습카드를 명시적으로 눌러야 복습이 시작됨
+      _quizData[subjectId]![quizTypeId]![quizId]!['markedForReviewAt'] =
+          DateTime.now().toIso8601String();
 
-      // Update SharedPreferences
       await _saveQuizData();
-
-      _logger.i('Quiz marked for review successfully');
       notifyListeners();
+      _logger.i('Quiz marked for review successfully');
     } catch (e) {
       _logger.e('Error marking quiz for review: $e');
+      rethrow;
     }
   }
 }

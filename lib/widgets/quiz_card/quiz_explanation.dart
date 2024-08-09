@@ -86,14 +86,7 @@ class QuizExplanation extends StatelessWidget {
     logger.d(
         'Marking quiz for review: quizId=$quizId, subjectId=$subjectId, quizTypeId=$quizTypeId');
 
-    // 기존의 updateUserQuizData 메서드를 사용하여 복습 목록에 추가
-    userProvider.updateUserQuizData(
-      subjectId,
-      quizTypeId,
-      quizId,
-      false, // isCorrect를 false로 설정하여 복습이 필요함을 나타냄
-      isUnderstandingImproved: false, // 이해도버튼이 나타나지 않음
-    );
+    userProvider.markQuizForReview(subjectId, quizTypeId, quizId);
 
     logger.d('Quiz marked for review: quizId=$quizId');
 

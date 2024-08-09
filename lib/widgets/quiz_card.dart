@@ -190,7 +190,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
     );
   }
 
-  //
+  // 퀴즈카드의 옵션을 선택했을 때 실행되는 함수
   void _selectOption(int index, UserProvider userProvider) {
     _logger.i('Selecting option $index for quiz ${widget.quiz.id}');
     if (_selectedOptionIndex == null) {
@@ -203,6 +203,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
       final answerTime = endTime.difference(_startTime!);
       final isCorrect = index == widget.quiz.correctOptionIndex;
 
+      //데이터를 updateUserQuizData에 전달
       userProvider.updateUserQuizData(
         widget.subjectId,
         widget.quizTypeId,
@@ -322,6 +323,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
     );
   }
 
+  // 리뷰페이지의 옵션을 선택했을 때 실행되는 함수
   void _selectOption(int index, UserProvider userProvider) {
     _logger.i('Selecting option $index for quiz ${widget.quiz.id}');
     setState(() {

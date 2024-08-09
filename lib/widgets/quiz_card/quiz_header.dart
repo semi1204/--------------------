@@ -25,25 +25,43 @@ class QuizHeader extends StatelessWidget {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     logger.i('Resetting quiz: ${quiz.id}');
 
+    // 사용자의 답변을 리셋함
     await userProvider.resetUserAnswers(
       subjectId,
       quizTypeId,
       quizId: quiz.id,
     );
 
-    // Trigger UI update
+    // 사용자의 퀴즈데이터를 업데이트함
+    final updatedData = userProvider.updateUserQuizData(
+      subjectId,
+      quizTypeId,
+      quiz.id,
+      false, // isCorrect 파라미터, 리셋 시에는 false로 설정
+      selectedOptionIndex: null, // 선택된 옵션 초기화
+    );
+
+    // ----리셋 후 퀴즈 데이터 상태 확인---// <= 삭제하지 마세요
+    logger.d('업데이트 후, 퀴즈 데이타: $updatedData');
+
+    // UI 업데이트를 위한 콜백 호출
     onResetQuiz();
 
-    // Force rebuild of QuizExplanation
+    // 현재 컨텍스트가 유효한지 확인
     if (context.mounted) {
-      Provider.of<UserProvider>(context, listen: false);
+      // SnackBar를 통해 사용자에게 초기화 완료 알림
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('퀴즈가 초기화되었습니다.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
 
     logger.i('Quiz reset completed');
   }
 
-  // 수정시 주의사항:
-  // 문제의 가장 상단엔, keyword, accuracy, reset button이 Row로 표시되어야 합니다.
+  // 문제의 가장 상단엔, keyword, accuracy, reset button이 Row로 표시
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -75,36 +93,37 @@ class QuizHeader extends StatelessWidget {
             const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.refresh, size: 20),
-              onPressed: () async {
-                final confirmed = await showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('퀴즈 초기화'),
-                    content: const Text(
-                        '이 퀴즈의 모든 데이터를 초기화하시겠습니까? \n이 작업은 되돌릴 수 없습니다.'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('취소'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: const Text('초기화'),
-                      ),
-                    ],
-                  ),
-                );
-
-                if (confirmed == true) {
-                  await _resetQuiz(context);
-                }
-              },
+              onPressed: () => _showResetConfirmationDialog(context),
               tooltip: 'Reset Quiz',
             ),
           ],
         ),
       ],
     );
+  }
+
+  Future<void> _showResetConfirmationDialog(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('퀴즈 초기화'),
+        content: const Text('이 퀴즈의 모든 데이터를 초기화하시겠습니까? \n이 작업은 되돌릴 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('초기화'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _resetQuiz(context);
+    }
   }
 
   String _getExamInfo() {

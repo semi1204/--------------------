@@ -34,6 +34,11 @@ class QuizHeader extends StatelessWidget {
     // Trigger UI update
     onResetQuiz();
 
+    // Force rebuild of QuizExplanation
+    if (context.mounted) {
+      Provider.of<UserProvider>(context, listen: false);
+    }
+
     logger.i('Quiz reset completed');
   }
 

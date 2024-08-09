@@ -280,18 +280,42 @@ class UserProvider with ChangeNotifier {
     _logger.i('Cached quiz data cleared');
   }
 
-  // 유지해야하는 기능: 사용자 답변 초기화 시 모든 저장소에서 삭제
+  // 유지해야하는 기능: 기존 구조를 유지하면서 초기화
   Future<void> resetUserAnswers(String subjectId, String quizTypeId,
       {String? quizId}) async {
     if (quizId != null) {
-      // 특정 퀴즈 항목 전체 삭제
-      _quizData[subjectId]?[quizTypeId]?.remove(quizId);
+      // Reset specific quiz item
+      if (_quizData[subjectId]?[quizTypeId]?[quizId] != null) {
+        _quizData[subjectId]![quizTypeId]![quizId] = {
+          'nextReviewDate': DateTime.now().toIso8601String(),
+          // Reset other fields as needed
+          'correct': 0,
+          'total': 0,
+          'accuracy': 0.0,
+          'interval': AnkiAlgorithm.initialInterval,
+          'easeFactor': AnkiAlgorithm.defaultEaseFactor,
+          'consecutiveCorrect': 0,
+          'mistakeCount': 0,
+        };
+      }
       _logger.i('퀴즈 데이터 초기화: $quizId');
     } else {
-      // 해당 과목과 퀴즈 유형의 모든 데이터 초기화
-      final typeData = _quizData[subjectId]?[quizTypeId];
-      _logger.d('Current type data before reset: $typeData');
-      _quizData[subjectId]?[quizTypeId]?.clear();
+      // Reset all quizzes for the subject and quiz type
+      if (_quizData[subjectId]?[quizTypeId] != null) {
+        for (var quizId in _quizData[subjectId]![quizTypeId]!.keys) {
+          _quizData[subjectId]![quizTypeId]![quizId] = {
+            'nextReviewDate': DateTime.now().toIso8601String(),
+            // Reset other fields as needed
+            'correct': 0,
+            'total': 0,
+            'accuracy': 0.0,
+            'interval': AnkiAlgorithm.initialInterval,
+            'easeFactor': AnkiAlgorithm.defaultEaseFactor,
+            'consecutiveCorrect': 0,
+            'mistakeCount': 0,
+          };
+        }
+      }
       _logger.i('모든 퀴즈 데이터 초기화: 과목 $subjectId, 퀴즈 유형 $quizTypeId');
     }
 

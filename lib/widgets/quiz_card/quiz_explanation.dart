@@ -27,13 +27,13 @@ class QuizExplanation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
-    final nextReviewDate =
+    final nextReviewDate = // getNextReviewDate에서 퀴즈에 대한 데이터 불러옴
         userProvider.getNextReviewDate(subjectId, quizTypeId, quizId);
-    final isInReviewList =
+    final isInReviewList = // 다음 복습 날짜가 현재 날짜보다 이후라면 복습 목록에 있음
         nextReviewDate != null && nextReviewDate.isAfter(DateTime.now());
 
     logger.d(
-        'QuizExplanation build: quizId=$quizId, isInReviewList=$isInReviewList, nextReviewDate=$nextReviewDate');
+        'QuizExplanation build: quizId=$quizId, nextReviewDate=$nextReviewDate, isInReviewList=$isInReviewList');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

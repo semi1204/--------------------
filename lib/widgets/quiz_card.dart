@@ -370,7 +370,6 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
         isCorrect,
         answerTime: answerTime,
         selectedOptionIndex: index,
-        markForReview: true,
       );
 
       widget.onAnswerSelected(index);

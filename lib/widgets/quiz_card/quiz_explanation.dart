@@ -38,6 +38,7 @@ class QuizExplanation extends StatelessWidget {
         'QuizExplanation build: quizId=$quizId, nextReviewDate=$nextReviewDate, isInReviewList=$isInReviewList');
 
     return Column(
+      // --------- TODO : provider에서 복습목록 여부 판단 후 UI 재빌드 필요함. ---------//
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (keywords.isNotEmpty) ...[
@@ -65,6 +66,7 @@ class QuizExplanation extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Align(
+          // TODO : 버튼이 유동적으로 바뀌지 않음. 수정필요.
           alignment: Alignment.centerRight,
           child: ElevatedButton.icon(
             icon: Icon(
@@ -84,9 +86,9 @@ class QuizExplanation extends StatelessWidget {
     );
   }
 
-  // --------- TODO : 복습목록 추가 시 markForReview => updateUserQuizData 호출로 변경 ---------//
+  // --------- DONE : updateUserQuizData 호출로 변경 ---------//
   void _toggleReviewStatus(BuildContext context, UserProvider userProvider,
-      Logger logger, bool isInReviewList) {
+      Logger logger, bool markForReview) {
     logger.i('Toggling review status for quiz: $quizId');
 
     userProvider.updateUserQuizData(
@@ -94,11 +96,11 @@ class QuizExplanation extends StatelessWidget {
       quizTypeId,
       quizId,
       true, // isCorrect doesn't matter for review toggling
-      markForReview: !isInReviewList,
+      toggleReviewStatus: !markForReview,
     );
     logger.d('퀴즈 복습 목록에서 제거됨: quizId=$quizId');
 
-    // --------- TODO : getNextReviewTimeString의 시간 데이터 값 추적 확인 ---------//
+    // --------- TODO : getNextReviewTimeString의 시간 데이터 값 추적 확인필요 : 복습시간이 anki 알고리즘을 사용하고 있는지 확인 필요. //
     final reviewTimeString =
         userProvider.getNextReviewTimeString(subjectId, quizTypeId, quizId);
 
@@ -106,7 +108,7 @@ class QuizExplanation extends StatelessWidget {
 
     ScaffoldMessenger.of(context).showSnackBar(
       CommonSnackBar(
-        message: isInReviewList
+        message: markForReview
             ? '복습 목록에서 제거되었습니다.'
             : '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $reviewTimeString 후',
       ),

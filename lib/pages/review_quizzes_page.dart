@@ -98,7 +98,8 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                       questionNumber: index + 1,
                       onAnswerSelected: (answerIndex) =>
                           _handleAnswerSelected(quiz, answerIndex),
-                      onDeleteReview: () => _deleteReview(quiz),
+                      onDeleteReview: () => _deleteReview(
+                          quiz), // --------- TODO : 복습 목록에서 제거하는 버튼, Explanation 페이지의 복습목록 제거 버튼으로 대체해야 함. ---------//
                       subjectId: _selectedSubjectId!,
                       quizTypeId: quiz.typeId,
                       nextReviewDate: userProvider
@@ -228,6 +229,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     });
   }
 
+// ------TODO : 복습 목록에서 제거하는 버튼, Explanation 페이지의 복습목록 제거 버튼으로 대체해야 함. ---------//
   Future<void> _deleteReview(Quiz quiz) async {
     _logger.i('Deleting review for quiz: ${quiz.id}');
     try {
@@ -236,7 +238,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
         quiz.typeId,
         quiz.id,
         false,
-        markForReview: false,
+        toggleReviewStatus: false,
       );
       setState(() {
         _quizzesForReview.removeWhere((q) => q.id == quiz.id);

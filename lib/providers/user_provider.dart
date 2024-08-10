@@ -140,7 +140,7 @@ class UserProvider with ChangeNotifier {
   // <<수정 시 주의 사항>>
   // 1. 사용자가 선택한 답은 무조건 기억해야 함.
   // 2. 기억한 답은 초기화 버튼을 누르기 전까지 유지되어야 함.
-  // 유지해야하는 기능 : 사용자 데이터 로드 시 캐시 -> 기 내부 저장소 -> Firestore 순으로 데이터 로드
+  // 유지해야하는 기능 : 사용자 데이터 로드 시 캐시 -> 기기 내부 저장소
   Future<void> loadUserData() async {
     if (_user == null) {
       _logger.w('Attempted to load quiz data for null user');
@@ -337,7 +337,7 @@ class UserProvider with ChangeNotifier {
   // 사용자 퀴즈 데이터 업데이트
   // 사용자의 퀴즈 데이터를 업데이트하는 비동기 메서드
   // --------- TODO : 복습로직에 적용되는지 확인 ---------//
-  // ---- TODO : reviewCard가 MarkForReview 변수를 확인하고, 복습로직에 적용 ---------//
+  // ---- TODO : reviewCard가 toggleReviewStatus 변수를 확인하고, 복습로직에 적용 ---------//
   // --------- TODO : 데이터를 덮어쓸 때 이전 데이터를 고려 후, (복습로직에)삭제하고 덮어쓸 수 있는 아이디어 필요(서버 호출비용 절감목적) ---------//
   Future<void> updateUserQuizData(
     String subjectId,
@@ -347,10 +347,10 @@ class UserProvider with ChangeNotifier {
     Duration? answerTime, // 답변 시간
     int? selectedOptionIndex, // 선택한 옵션 인덱스
     bool isUnderstandingImproved = false, // 이해도 향상 여부
-    bool markForReview = false, // 복습 목록에 추가/제거 여부
+    bool? toggleReviewStatus,
   }) async {
     _logger.i(
-        'Updating quiz data: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect, markForReview=$markForReview');
+        'Updating quiz data: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect, toggleReviewStatus=$toggleReviewStatus');
 
     // 현재 사용자가 없으면 경고 로그를 남기고 종료
     if (_user == null) {
@@ -371,59 +371,86 @@ class UserProvider with ChangeNotifier {
           quizData['easeFactor'] ?? AnkiAlgorithm.defaultEaseFactor; // 쉬움 인수
       int mistakeCount = quizData['mistakeCount'] ?? 0; // 실수 횟수
 
-      if (!markForReview) {
-        total++;
-        if (isCorrect) {
-          correct++;
-          consecutiveCorrect++;
-        } else {
-          mistakeCount++;
-          consecutiveCorrect = 0;
+      if (toggleReviewStatus != null) {
+        // 복습상태를 변경하는 로직
+        // Handle review status toggling
+        final markForReview = toggleReviewStatus;
+        final ankiResult = AnkiAlgorithm.calculateNextReview(
+          interval: interval,
+          easeFactor: easeFactor,
+          consecutiveCorrect: consecutiveCorrect,
+          isCorrect: isCorrect,
+          qualityOfRecall: null,
+          mistakeCount: mistakeCount,
+          isUnderstandingImproved: isUnderstandingImproved,
+          markForReview: markForReview,
+        );
+
+        final nextReviewDate = markForReview
+            ? DateTime.now().add(Duration(days: ankiResult['interval'] as int))
+            : null;
+
+        _quizData[subjectId] ??= {};
+        _quizData[subjectId]![quizTypeId] ??= {};
+        _quizData[subjectId]![quizTypeId]![quizId] ??= {};
+        _quizData[subjectId]![quizTypeId]![quizId]!['markedForReview'] =
+            markForReview;
+        _quizData[subjectId]![quizTypeId]![quizId]!['nextReviewDate'] =
+            nextReviewDate?.toIso8601String();
+      } else {
+        // Update quiz data as before
+        if (!quizData['markedForReview']) {
+          total++;
+          if (isCorrect) {
+            correct++;
+            consecutiveCorrect++;
+          } else {
+            mistakeCount++;
+            consecutiveCorrect = 0;
+          }
         }
+
+        int? qualityOfRecall;
+        if (answerTime != null) {
+          // 답변 시간이 주어진 경우
+          qualityOfRecall = // 기억 품질 평가수행(anki 알고리즘)
+              AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect);
+        }
+
+        final ankiResult = AnkiAlgorithm.calculateNextReview(
+          interval: interval,
+          easeFactor: easeFactor,
+          consecutiveCorrect: consecutiveCorrect,
+          isCorrect: isCorrect,
+          qualityOfRecall: qualityOfRecall,
+          mistakeCount: mistakeCount,
+          isUnderstandingImproved: isUnderstandingImproved,
+          markForReview: false,
+        );
+
+        // 학습데이터 업데이트하고 저장
+        final now = DateTime.now();
+        final nextReviewDate =
+            now.add(Duration(days: ankiResult['interval'] as int));
+
+        _quizData[subjectId] ??= {};
+        _quizData[subjectId]![quizTypeId] ??= {};
+        _quizData[subjectId]![quizTypeId]![quizId] = {
+          'correct': correct,
+          'total': total,
+          'accuracy':
+              total > 0 ? correct / total : 0.0, // 퀴즈 횟수 시도가 있을 경우에만 정확도 계산
+          'interval': ankiResult['interval'],
+          'easeFactor': ankiResult['easeFactor'],
+          'consecutiveCorrect': ankiResult['consecutiveCorrect'],
+          'nextReviewDate': nextReviewDate.toIso8601String(),
+          'mistakeCount': ankiResult['mistakeCount'],
+          'lastAnswered': now.toIso8601String(),
+          'selectedOptionIndex': selectedOptionIndex,
+          'isUnderstandingImproved': isUnderstandingImproved,
+          'markedForReview': quizData['markedForReview'] ?? false,
+        };
       }
-
-      int? qualityOfRecall;
-      if (answerTime != null) {
-        // 답변 시간이 주어진 경우
-        qualityOfRecall = // 기억 품질 평가수행(anki 알고리즘)
-            AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect);
-      }
-
-      final ankiResult = AnkiAlgorithm.calculateNextReview(
-        interval: interval,
-        easeFactor: easeFactor,
-        consecutiveCorrect: consecutiveCorrect,
-        isCorrect: isCorrect,
-        qualityOfRecall: qualityOfRecall,
-        mistakeCount: mistakeCount,
-        isUnderstandingImproved: isUnderstandingImproved,
-        markForReview: markForReview,
-      );
-
-      // 학습데이터 업데이트하고 저장
-      final now = DateTime.now();
-      final nextReviewDate = markForReview
-          //-- TODO : 검토로직은 anki 알고리즘에서 가져오는 것으로 변경해야 함. ---------//
-          ? now.add(const Duration(minutes: 30))
-          : now.add(Duration(days: ankiResult['interval'] as int));
-
-      _quizData[subjectId] ??= {};
-      _quizData[subjectId]![quizTypeId] ??= {};
-      _quizData[subjectId]![quizTypeId]![quizId] = {
-        'correct': correct,
-        'total': total,
-        'accuracy':
-            total > 0 ? correct / total : 0.0, // 퀴즈 횟수 시도가 있을 경우에만 정확도 계산
-        'interval': ankiResult['interval'],
-        'easeFactor': ankiResult['easeFactor'],
-        'consecutiveCorrect': ankiResult['consecutiveCorrect'],
-        'nextReviewDate': nextReviewDate.toIso8601String(),
-        'mistakeCount': ankiResult['mistakeCount'],
-        'lastAnswered': now.toIso8601String(),
-        'selectedOptionIndex': selectedOptionIndex,
-        'isUnderstandingImproved': isUnderstandingImproved,
-        'markedForReview': markForReview,
-      };
 
       await _saveQuizData();
       notifyListeners();
@@ -484,6 +511,7 @@ class UserProvider with ChangeNotifier {
   }
 
   // 다음 복습 날짜를 가져오는 메서드
+  // --------- TODO : 복습 시간이 너무 먼 문제가 발생하고 있음. ---------//
   DateTime? getNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
     final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
@@ -588,32 +616,4 @@ class UserProvider with ChangeNotifier {
       _logger.e('Error syncing offline data: $e');
     }
   }
-
-  // --------- TODO : 기능을 updateUserQuizData로 이동 ---------//
-  // Future<void> markQuizForReview(
-  //     String subjectId, String quizTypeId, String quizId) async {
-  //   _logger.i(
-  //       'Marking quiz for review: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId');
-
-  //   try {
-  //     final now = DateTime.now();
-  //     final nextReviewDate =
-  //         now.add(const Duration(minutes: 10)); // 10분 후로 설정 (테스트용)
-
-  //     _quizData[subjectId] ??= {};
-  //     _quizData[subjectId]![quizTypeId] ??= {};
-  //     _quizData[subjectId]![quizTypeId]![quizId] ??= {};
-  //     _quizData[subjectId]![quizTypeId]![quizId]!['nextReviewDate'] =
-  //         nextReviewDate.toIso8601String();
-
-  //     await _saveQuizData();
-  //     notifyListeners();
-  //     _logger.i('Quiz marked for review successfully');
-  //     _logger.d(
-  //         'Updated quiz data: ${_quizData[subjectId]![quizTypeId]![quizId]}');
-  //   } catch (e) {
-  //     _logger.e('Error marking quiz for review: $e');
-  //     rethrow;
-  //   }
-  // }
 }

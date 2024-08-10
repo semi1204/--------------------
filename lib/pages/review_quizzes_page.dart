@@ -6,7 +6,6 @@ import '../models/quiz.dart';
 import '../providers/user_provider.dart';
 import '../widgets/quiz_card.dart';
 import 'package:logger/logger.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class ReviewQuizzesPage extends StatefulWidget {
   const ReviewQuizzesPage({super.key});
@@ -32,10 +31,10 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     _userProvider = Provider.of<UserProvider>(context, listen: false);
     _logger = Provider.of<Logger>(context, listen: false);
     _logger.i('ReviewQuizzesPage initialized');
-    _logLocalData();
     _loadQuizzesForReview();
   }
 
+  // --------- TODO : 복습 카드 : getQuizzesForReview에서 데이터를 불러오는지, 복습 카드에서 데이터를 불러오는지 확인, 데이터 충돌이 발생하고 있음. ---------//
   Future<void> _loadQuizzesForReview() async {
     if (_selectedSubjectId == null) return;
 
@@ -44,20 +43,19 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     });
 
     try {
-      // 모든 퀴즈를 가져옴
-      final allQuizzes = await _quizService.getQuizzes(_selectedSubjectId!, '');
-      final now = DateTime.now();
+      final userId = _userProvider.user?.uid;
+      if (userId == null) {
+        _logger.w('User ID is null, cannot load quizzes for review');
+        return;
+      }
 
-      // 복습할 퀴즈 필터링 시작
-      _quizzesForReview = allQuizzes.where((quiz) {
-        // 다음 복습 날짜가 현재 날짜보다 이전인 퀴즈만 가져옴
-        final nextReviewDate = _userProvider.getNextReviewDate(
-          _selectedSubjectId!,
-          quiz.typeId,
-          quiz.id,
-        );
-        return nextReviewDate != null && nextReviewDate.isBefore(now);
-      }).toList();
+      // 복습할 퀴즈 목록 가져오기 from quiz_service.getQuizzesForReview
+      _quizzesForReview = await _quizService.getQuizzesForReview(
+        userId,
+        _selectedSubjectId!,
+        '', // 복습은 과목 단위로 이루어짐
+        _userProvider,
+      );
 
       _logger.i('Loaded ${_quizzesForReview.length} quizzes for review');
     } catch (e) {
@@ -66,19 +64,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       setState(() {
         _isLoading = false;
       });
-    }
-  }
-
-  Future<void> _logLocalData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = _userProvider.user?.uid;
-    if (userId != null) {
-      final localData = prefs.getString('user_quiz_data_$userId');
-      if (localData != null) {
-        _logger.d('로컬 저장소의 퀴즈 데이터: $localData');
-      } else {
-        _logger.d('로컬 저장소에 저장된 퀴즈 데이터가 없습니다.');
-      }
     }
   }
 
@@ -95,6 +80,9 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
           Expanded(
             child: Consumer<UserProvider>(
               builder: (context, userProvider, _) {
+                if (_isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
                 if (_quizzesForReview.isEmpty) {
                   return _buildEmptyState();
                 }
@@ -152,17 +140,13 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
 
   Future<void> _handleAnswerSelected(Quiz quiz, int answerIndex) async {
     _logger.i('Answer selected for quiz ${quiz.id}: $answerIndex');
-    final startTime = DateTime.now();
     final isCorrect = quiz.correctOptionIndex == answerIndex;
-    final endTime = DateTime.now();
-    final answerTime = endTime.difference(startTime);
 
     await _userProvider.updateUserQuizData(
       _selectedSubjectId!,
       quiz.typeId,
       quiz.id,
       isCorrect,
-      answerTime: answerTime,
       selectedOptionIndex: answerIndex,
     );
 
@@ -171,8 +155,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       _showFeedbackButtons = true;
     });
 
-    _logger
-        .d('Quiz data updated. isCorrect: $isCorrect, answerTime: $answerTime');
+    _logger.d('Quiz data updated. isCorrect: $isCorrect');
   }
 
   Widget _buildFeedbackButtons() {
@@ -229,9 +212,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
 
         await _refreshQuizzes();
       } else {
-        // 사용자 답변이 없는 경우 처리
         _logger.w('사용자 답변이 없습니다. 퀴즈 ID: ${quiz.id}');
-        // 적절한 오류 처리 또는 사용자에게 알림
       }
     }
   }
@@ -255,7 +236,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
         quiz.typeId,
         quiz.id,
         false,
-        removeFromReview: true,
+        markForReview: false,
       );
       setState(() {
         _quizzesForReview.removeWhere((q) => q.id == quiz.id);

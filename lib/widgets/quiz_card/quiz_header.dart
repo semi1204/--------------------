@@ -41,7 +41,7 @@ class QuizHeader extends StatelessWidget {
       selectedOptionIndex: null, // 선택된 옵션 초기화
     );
 
-    // ----리셋 후 퀴즈 데이터 상태 확인---// <= 삭제하지 마세요
+    // ----리셋 후 퀴즈 데이터 상태 확인---// <= 로그를 삭제하지마세요
     logger.d('업데이트 후, 퀴즈 데이타: $updatedData');
 
     // UI 업데이트를 위한 콜백 호출
@@ -102,6 +102,7 @@ class QuizHeader extends StatelessWidget {
     );
   }
 
+  // --------- TODO : 퀴즈 초기화 버튼 클릭 시 데이터 이동확인 ---------//
   Future<void> _showResetConfirmationDialog(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,

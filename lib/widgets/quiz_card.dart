@@ -128,6 +128,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
   Widget build(BuildContext context) {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
+        // ---- TODO : quizCard에서는 복습 버튼을 눌러야 복습을 시작함. 복습계산을 하지않음. 무조건 지우지말고, 이 변수 존재이유를 확인해야함 ---------//
         final nextReviewDate = userProvider.getNextReviewDate(
           widget.subjectId,
           widget.quizTypeId,
@@ -260,11 +261,13 @@ class _QuizPageCardState extends State<QuizPageCard> {
 }
 
 // 복습 페이지 카드
+// TODO : MarkForReview가 된 퀴즈는 복습카드로 넘어가고, 복습페이지에서 보이기 시작하는지 확인 ---------//
 class _ReviewPageCardState extends State<ReviewPageCard> {
   late final Logger _logger;
   late final UserProvider _userProvider;
   int? _selectedOptionIndex;
   bool _hasAnswered = false;
+  DateTime? _startTime;
 
   @override
   void initState() {
@@ -277,6 +280,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
   Widget build(BuildContext context) {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
+        // -- TODO : 복습카드의 데이터를 quiz_service. getQuizzesForReview에서 가져오는지 확인 ---------//
         final nextReviewDate = userProvider.getNextReviewDate(
           widget.subjectId,
           widget.quizTypeId,
@@ -313,9 +317,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                   selectedOptionIndex: _selectedOptionIndex,
                   hasAnswered: _hasAnswered,
                   isQuizPage: false,
-                  onSelectOption: (index) {
-                    _selectOption(index, userProvider);
-                  },
+                  onSelectOption: (index) => _selectOption(index, userProvider),
                   logger: _logger,
                 ),
                 if (_hasAnswered) ...[
@@ -337,6 +339,11 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                     onEdit: widget.onEdit,
                     onDelete: widget.onDelete,
                   ),
+                // TODO : reviewpage에서 _deleteReview 메서드 호출되는지, 어떻게 데이터 구조를 일치시키는지 확인, 중복되는 부부은 삭제---------//
+                ElevatedButton(
+                  onPressed: widget.onDeleteReview,
+                  child: const Text('Remove from Review'),
+                ),
               ],
             ),
           ),
@@ -345,29 +352,35 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
     );
   }
 
-  // 리뷰페이지의 옵션을 선택했을 때 실행되는 함수
   void _selectOption(int index, UserProvider userProvider) {
-    _logger.i('Selecting option $index for quiz ${widget.quiz.id}');
-    setState(() {
-      _selectedOptionIndex = index;
-      _hasAnswered = true;
-    });
+    if (_selectedOptionIndex == null) {
+      setState(() {
+        _selectedOptionIndex = index;
+        _hasAnswered = true;
+      });
 
-    final isCorrect = index == widget.quiz.correctOptionIndex;
+      final endTime = DateTime.now();
+      final answerTime = endTime.difference(_startTime!);
+      final isCorrect = index == widget.quiz.correctOptionIndex;
 
-    userProvider.updateUserQuizData(
-      widget.subjectId,
-      widget.quizTypeId,
-      widget.quiz.id,
-      isCorrect,
-      selectedOptionIndex: index,
-    );
+      userProvider.updateUserQuizData(
+        widget.subjectId,
+        widget.quizTypeId,
+        widget.quiz.id,
+        isCorrect,
+        answerTime: answerTime,
+        selectedOptionIndex: index,
+        markForReview: true,
+      );
 
-    widget.onAnswerSelected(index);
+      widget.onAnswerSelected(index);
 
-    _showAnswerSnackBar(isCorrect);
+      _showAnswerSnackBar(isCorrect);
 
-    _logger.i('User selected option $index. Correct: $isCorrect.');
+      _logger.i('User selected option $index. Correct: $isCorrect.');
+    } else {
+      _logger.i('Option already selected. Ignoring new selection.');
+    }
   }
 
   void _showAnswerSnackBar(bool isCorrect) {

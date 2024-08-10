@@ -28,6 +28,7 @@ class QuizExplanation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
+    final logger = Provider.of<Logger>(context, listen: false);
     final nextReviewDate =
         userProvider.getNextReviewDate(subjectId, quizTypeId, quizId);
     final isInReviewList =
@@ -71,7 +72,8 @@ class QuizExplanation extends StatelessWidget {
               color: isInReviewList ? Colors.red : Colors.green,
             ),
             label: Text(isInReviewList ? '복습 목록에서 제거' : '복습 목록에 추가'),
-            onPressed: () => _toggleReviewStatus(context, isInReviewList),
+            onPressed: () => _toggleReviewStatus(
+                context, userProvider, logger, isInReviewList),
             style: ElevatedButton.styleFrom(
               backgroundColor:
                   isInReviewList ? Colors.red[100] : Colors.green[100],
@@ -82,29 +84,24 @@ class QuizExplanation extends StatelessWidget {
     );
   }
 
-  void _toggleReviewStatus(BuildContext context, bool isInReviewList) {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
+  // --------- TODO : 복습목록 추가 시 markForReview => updateUserQuizData 호출로 변경 ---------//
+  void _toggleReviewStatus(BuildContext context, UserProvider userProvider,
+      Logger logger, bool isInReviewList) {
+    logger.i('Toggling review status for quiz: $quizId');
 
-    logger.d(
-        'Toggling review status: quizId=$quizId, currentStatus=$isInReviewList');
+    userProvider.updateUserQuizData(
+      subjectId,
+      quizTypeId,
+      quizId,
+      true, // isCorrect doesn't matter for review toggling
+      markForReview: !isInReviewList,
+    );
+    logger.d('퀴즈 복습 목록에서 제거됨: quizId=$quizId');
 
-    if (isInReviewList) {
-      // TODO : 둘 다 updateUserQuizData로 사용할 수 있는지 확인
-      userProvider.updateUserQuizData(
-        subjectId,
-        quizTypeId,
-        quizId,
-        false,
-        removeFromReview: true,
-      );
-      logger.d('퀴즈 복습 목록에서 제거됨: quizId=$quizId');
-    } else {
-      userProvider.markQuizForReview(subjectId, quizTypeId, quizId);
-      logger.d('퀴즈 복습 목록에 추가됨: quizId=$quizId');
-    }
-
+    // --------- TODO : getNextReviewTimeString의 시간 데이터 값 추적 확인 ---------//
     final reviewTimeString =
         userProvider.getNextReviewTimeString(subjectId, quizTypeId, quizId);
+
     logger.d('다음 복습 시간: $reviewTimeString');
 
     ScaffoldMessenger.of(context).showSnackBar(

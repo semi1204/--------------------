@@ -31,6 +31,8 @@ class QuizService {
   final Map<String, Map<String, Map<String, List<Quiz>>>> _cachedQuizzes =
       {}; // 캐시된 주제 데이터를 저장하는 맵
 
+  // 복습카드의 퀴즈 데이터 가져오는 함수
+  // --------- TODO : 가장 업데이트 된 데이터가 복습로직에 적용되는지 확인 ---------//
   Future<List<Quiz>> getQuizzesForReview(String userId, String subjectId,
       String quizTypeId, UserProvider userProvider) async {
     _logger.i(
@@ -40,19 +42,16 @@ class QuizService {
       final quizzes = await getQuizzes(subjectId, quizTypeId);
       _logger.d('Fetched ${quizzes.length} quizzes for quiz type $quizTypeId');
 
-      List<Quiz> quizzesForReview = [];
-
-      for (var quiz in quizzes) {
-        if (userProvider.isQuizEligibleForReview(
-            subjectId, quizTypeId, quiz.id)) {
-          _logger.d('Quiz ${quiz.id} is eligible for review');
-          quizzesForReview.add(quiz);
-        } else {
-          _logger.d('Quiz ${quiz.id} is not eligible for review');
-        }
-      }
+      final now = DateTime.now();
+      List<Quiz> quizzesForReview = quizzes.where((quiz) {
+        // -----TODO : getNextReviewDate 가 가장 최신 데이터를 가져오는지 확인 ---------//
+        final nextReviewDate =
+            userProvider.getNextReviewDate(subjectId, quizTypeId, quiz.id);
+        return nextReviewDate != null && nextReviewDate.isBefore(now);
+      }).toList();
 
       // Sort quizzes by mistake count (descending order)
+      // -----TODO : anki 알고리즘에서 가져오는 가장 시급하게 복습이 필요한 퀴즈를 정렬하는 로직으로 변경해야 ---------//
       quizzesForReview.sort((a, b) {
         final aMistakeCount =
             userProvider.getQuizMistakeCount(subjectId, quizTypeId, a.id);

@@ -17,9 +17,21 @@ class AnkiAlgorithm {
     int? qualityOfRecall,
     int? mistakeCount,
     bool isUnderstandingImproved = false,
+    required bool markForReview, // 복습 목록에 추가/제거 여부
   }) {
     easeFactor ??= defaultEaseFactor;
     _logger.i('복습 계산 시작: interval=$interval, easeFactor=$easeFactor, ...');
+
+    if (markForReview) {
+      //
+      // 복습목록에 추가되면 초기값을 불러옴
+      return {
+        'interval': 0,
+        'easeFactor': easeFactor,
+        'consecutiveCorrect': consecutiveCorrect,
+        'mistakeCount': mistakeCount,
+      };
+    }
 
     return isCorrect
         ? _handleCorrectAnswer(interval, easeFactor, consecutiveCorrect,

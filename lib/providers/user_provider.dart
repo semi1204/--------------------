@@ -281,6 +281,7 @@ class UserProvider with ChangeNotifier {
   }
 
   // 유지해야하는 기능: 기존 구조를 유지하면서 초기화
+  // --------- TODO : 초기화 된 데이터가 복습카드에 적용되는지 확인 ---------//
   Future<void> resetUserAnswers(String subjectId, String quizTypeId,
       {String? quizId}) async {
     if (quizId != null) {
@@ -335,20 +336,21 @@ class UserProvider with ChangeNotifier {
 
   // 사용자 퀴즈 데이터 업데이트
   // 사용자의 퀴즈 데이터를 업데이트하는 비동기 메서드
+  // --------- TODO : 복습로직에 적용되는지 확인 ---------//
+  // ---- TODO : reviewCard가 MarkForReview 변수를 확인하고, 복습로직에 적용 ---------//
+  // --------- TODO : 데이터를 덮어쓸 때 이전 데이터를 고려 후, (복습로직에)삭제하고 덮어쓸 수 있는 아이디어 필요(서버 호출비용 절감목적) ---------//
   Future<void> updateUserQuizData(
     String subjectId,
     String quizTypeId,
     String quizId,
     bool isCorrect, {
-    // 정답여부
     Duration? answerTime, // 답변 시간
     int? selectedOptionIndex, // 선택한 옵션 인덱스
     bool isUnderstandingImproved = false, // 이해도 향상 여부
-    bool removeFromReview = false, // 복습 목록에서 제거
+    bool markForReview = false, // 복습 목록에 추가/제거 여부
   }) async {
-    // 로그에 업데이트 정보 기록
     _logger.i(
-        '업데이트 된 데이터: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect, removeFromReview=$removeFromReview');
+        'Updating quiz data: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, isCorrect=$isCorrect, markForReview=$markForReview');
 
     // 현재 사용자가 없으면 경고 로그를 남기고 종료
     if (_user == null) {
@@ -369,11 +371,15 @@ class UserProvider with ChangeNotifier {
           quizData['easeFactor'] ?? AnkiAlgorithm.defaultEaseFactor; // 쉬움 인수
       int mistakeCount = quizData['mistakeCount'] ?? 0; // 실수 횟수
 
-      total++;
-      if (isCorrect) {
-        correct++;
-      } else {
-        mistakeCount++;
+      if (!markForReview) {
+        total++;
+        if (isCorrect) {
+          correct++;
+          consecutiveCorrect++;
+        } else {
+          mistakeCount++;
+          consecutiveCorrect = 0;
+        }
       }
 
       int? qualityOfRecall;
@@ -384,7 +390,6 @@ class UserProvider with ChangeNotifier {
       }
 
       final ankiResult = AnkiAlgorithm.calculateNextReview(
-        // 다음 복습일정 함수 호출
         interval: interval,
         easeFactor: easeFactor,
         consecutiveCorrect: consecutiveCorrect,
@@ -392,12 +397,14 @@ class UserProvider with ChangeNotifier {
         qualityOfRecall: qualityOfRecall,
         mistakeCount: mistakeCount,
         isUnderstandingImproved: isUnderstandingImproved,
+        markForReview: markForReview,
       );
 
       // 학습데이터 업데이트하고 저장
       final now = DateTime.now();
-      final nextReviewDate = removeFromReview
-          ? null // 복습 목록에서 제거하는 경우 nextReviewDate를 null로 설정
+      final nextReviewDate = markForReview
+          //-- TODO : 검토로직은 anki 알고리즘에서 가져오는 것으로 변경해야 함. ---------//
+          ? now.add(const Duration(minutes: 30))
           : now.add(Duration(days: ankiResult['interval'] as int));
 
       _quizData[subjectId] ??= {};
@@ -405,25 +412,26 @@ class UserProvider with ChangeNotifier {
       _quizData[subjectId]![quizTypeId]![quizId] = {
         'correct': correct,
         'total': total,
-        'accuracy': correct / total,
+        'accuracy':
+            total > 0 ? correct / total : 0.0, // 퀴즈 횟수 시도가 있을 경우에만 정확도 계산
         'interval': ankiResult['interval'],
         'easeFactor': ankiResult['easeFactor'],
         'consecutiveCorrect': ankiResult['consecutiveCorrect'],
-        'nextReviewDate': nextReviewDate?.toIso8601String(),
+        'nextReviewDate': nextReviewDate.toIso8601String(),
         'mistakeCount': ankiResult['mistakeCount'],
         'lastAnswered': now.toIso8601String(),
         'selectedOptionIndex': selectedOptionIndex,
         'isUnderstandingImproved': isUnderstandingImproved,
+        'markedForReview': markForReview,
       };
 
       await _saveQuizData();
       notifyListeners();
 
       _logger.i('사용자 퀴즈 데이터 업데이트 성공');
-      _logger.d(
-          'Updated quiz data: ${_quizData[subjectId]![quizTypeId]![quizId]}');
+      _logger.d('업데이트 된 퀴즈 데이터: ${_quizData[subjectId]![quizTypeId]![quizId]}');
     } catch (e) {
-      _logger.e('Error updating user quiz data: $e');
+      _logger.e('사용자 퀴즈 데이터 업데이트 실패: $e');
       rethrow;
     }
   }
@@ -436,6 +444,7 @@ class UserProvider with ChangeNotifier {
   }
 
   // 사용자의 데이터를 Firebase에 동기화하는 메소드
+  // --------- TODO : 가장 최신의 퀴즈 데이터를 덮어쓰고, 서버로 데이터 전송하는지 확인 ---------//
   Future<void> syncUserData() async {
     if (_user == null || !_needsSync) {
       _logger.w('No need to sync user data');
@@ -502,6 +511,7 @@ class UserProvider with ChangeNotifier {
   }
 
   // 다음 복습 시간을 표시하는 메서드
+  // --------- TODO : updateUserQuizData에 완전히 업데이트 된 정보가 출력되는지 확인 ---------//
   String getNextReviewTimeString(
       String subjectId, String quizTypeId, String quizId) {
     final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
@@ -536,20 +546,14 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  // Modify the isQuizEligibleForReview method
+  // Update isQuizEligibleForReview method
   bool isQuizEligibleForReview(
       String subjectId, String quizTypeId, String quizId) {
     final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
     if (quizData == null) return false;
 
-    // Check if the quiz is explicitly marked for review
-    if (quizData['markedForReview'] == true) {
-      final nextReviewDate =
-          DateTime.parse(quizData['nextReviewDate'] as String);
-      return DateTime.now().isAfter(nextReviewDate);
-    }
-
-    return false;
+    final nextReviewDate = getNextReviewDate(subjectId, quizTypeId, quizId);
+    return nextReviewDate != null && nextReviewDate.isBefore(DateTime.now());
   }
 
   // Add this method for offline support
@@ -585,30 +589,31 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  Future<void> markQuizForReview(
-      String subjectId, String quizTypeId, String quizId) async {
-    _logger.i(
-        'Marking quiz for review: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId');
+  // --------- TODO : 기능을 updateUserQuizData로 이동 ---------//
+  // Future<void> markQuizForReview(
+  //     String subjectId, String quizTypeId, String quizId) async {
+  //   _logger.i(
+  //       'Marking quiz for review: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId');
 
-    try {
-      final now = DateTime.now();
-      final nextReviewDate =
-          now.add(const Duration(minutes: 10)); // 10분 후로 설정 (테스트용)
+  //   try {
+  //     final now = DateTime.now();
+  //     final nextReviewDate =
+  //         now.add(const Duration(minutes: 10)); // 10분 후로 설정 (테스트용)
 
-      _quizData[subjectId] ??= {};
-      _quizData[subjectId]![quizTypeId] ??= {};
-      _quizData[subjectId]![quizTypeId]![quizId] ??= {};
-      _quizData[subjectId]![quizTypeId]![quizId]!['nextReviewDate'] =
-          nextReviewDate.toIso8601String();
+  //     _quizData[subjectId] ??= {};
+  //     _quizData[subjectId]![quizTypeId] ??= {};
+  //     _quizData[subjectId]![quizTypeId]![quizId] ??= {};
+  //     _quizData[subjectId]![quizTypeId]![quizId]!['nextReviewDate'] =
+  //         nextReviewDate.toIso8601String();
 
-      await _saveQuizData();
-      notifyListeners();
-      _logger.i('Quiz marked for review successfully');
-      _logger.d(
-          'Updated quiz data: ${_quizData[subjectId]![quizTypeId]![quizId]}');
-    } catch (e) {
-      _logger.e('Error marking quiz for review: $e');
-      rethrow;
-    }
-  }
+  //     await _saveQuizData();
+  //     notifyListeners();
+  //     _logger.i('Quiz marked for review successfully');
+  //     _logger.d(
+  //         'Updated quiz data: ${_quizData[subjectId]![quizTypeId]![quizId]}');
+  //   } catch (e) {
+  //     _logger.e('Error marking quiz for review: $e');
+  //     rethrow;
+  //   }
+  // }
 }

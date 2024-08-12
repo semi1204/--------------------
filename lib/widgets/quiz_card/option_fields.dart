@@ -17,7 +17,7 @@ class OptionFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    logger.i('Building option fields');
+    logger.i('옵션 필드 빌드');
     return Column(
       children: List.generate(controllers.length, (index) {
         return Padding(
@@ -32,7 +32,7 @@ class OptionFields extends StatelessWidget {
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   logger.w('Option ${index + 1} is empty');
-                  return 'Please enter an option';
+                  return '옵션을 입력해주세요';
                 }
                 return null;
               },

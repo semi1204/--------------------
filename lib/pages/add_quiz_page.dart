@@ -47,7 +47,7 @@ class _AddQuizPageState extends State<AddQuizPage> {
     super.initState();
     _logger = Provider.of<Logger>(context, listen: false);
     _quizService = Provider.of<QuizService>(context, listen: false);
-    _logger.i('AddQuizPage initialized');
+    _logger.i('AddQuizPage 초기화 완료');
   }
 
   @override
@@ -61,13 +61,13 @@ class _AddQuizPageState extends State<AddQuizPage> {
       controller.dispose();
     }
     _yearController.dispose(); // year field
-    _logger.i('AddQuizPage disposed');
+    _logger.i('AddQuizPage 해제 완료');
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    _logger.i('Building AddQuizPage with Markdown support');
+    _logger.i('AddQuizPage 빌드 완료');
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Quiz'),
@@ -78,7 +78,7 @@ class _AddQuizPageState extends State<AddQuizPage> {
               setState(() {
                 _isPreviewMode = value;
               });
-              _logger.i('Preview mode changed to: $_isPreviewMode');
+              _logger.i('미리보기 모드 변경: $_isPreviewMode');
             },
           ),
         ],
@@ -99,7 +99,7 @@ class _AddQuizPageState extends State<AddQuizPage> {
                     _selectedSubjectId = newValue;
                     _selectedTypeId = null;
                   });
-                  _logger.i('Selected subject changed to: $newValue');
+                  _logger.i('선택된 과목 변경: $newValue');
                 },
                 onAddPressed: () => _showAddDialog(isSubject: true),
               ),
@@ -114,7 +114,7 @@ class _AddQuizPageState extends State<AddQuizPage> {
                     setState(() {
                       _selectedTypeId = newValue;
                     });
-                    _logger.i('Selected quiz type changed to: $newValue');
+                    _logger.i('선택된 퀴즈 유형 변경: $newValue');
                   },
                   onAddPressed: () => _showAddDialog(isSubject: false),
                 ),
@@ -215,8 +215,8 @@ class _AddQuizPageState extends State<AddQuizPage> {
   }
 
   Future<void> _showAddDialog({required bool isSubject}) async {
-    final String itemType = isSubject ? 'Subject' : 'Quiz Type';
-    _logger.i('Showing add $itemType dialog');
+    final String itemType = isSubject ? '과목' : '퀴즈 유형';
+    _logger.i('추가 $itemType 대화 상자 표시');
 
     final result = await showDialog<String>(
       context: context,
@@ -226,22 +226,21 @@ class _AddQuizPageState extends State<AddQuizPage> {
     if (result != null && result.isNotEmpty) {
       if (isSubject) {
         await _quizService.addSubject(result);
-        _logger.i('New subject added: $result');
+        _logger.i('새 과목 추가: $result');
       } else if (_selectedSubjectId != null) {
         await _quizService.addQuizTypeToSubject(_selectedSubjectId!, result);
-        _logger
-            .i('New quiz type added: $result to subject: $_selectedSubjectId');
+        _logger.i('새 퀴즈 유형 추가: $result to subject: $_selectedSubjectId');
       } else {
-        _logger.w('Attempted to add quiz type without selecting subject');
+        _logger.w('과목을 선택하지 않고 퀴즈 유형을 추가하려고 함');
       }
       setState(() {}); // Refresh the dropdowns
     } else {
-      _logger.w('Attempted to add $itemType with empty name');
+      _logger.w('빈 이름으로 $itemType 추가 시도');
     }
   }
 
   Future<void> _submitQuiz() async {
-    _logger.i('Attempting to submit quiz with image');
+    _logger.i('퀴즈 제출 시도');
     if (_formKey.currentState!.validate()) {
       try {
         String? imageUrl;
@@ -268,29 +267,28 @@ class _AddQuizPageState extends State<AddQuizPage> {
         );
         await _quizService.addQuiz(
             _selectedSubjectId!, _selectedTypeId!, newQuiz);
-        _logger.i('New quiz added successfully with image: $imageUrl');
+        _logger.i('새 퀴즈 추가 성공: $imageUrl');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Quiz added successfully')),
+            const SnackBar(content: Text('퀴즈 추가 성공')),
           );
           _resetForm();
         }
       } catch (e) {
-        _logger.e('Error adding quiz with image: $e');
+        _logger.e('퀴즈 추가 실패: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Failed to add quiz. Please try again.')),
+            const SnackBar(content: Text('퀴즈 추가 실패. 다시 시도해주세요.')),
           );
         }
       }
     } else {
-      _logger.w('Form validation failed');
+      _logger.w('폼 검증 실패');
     }
   }
 
   void _resetForm() {
-    _logger.i('Resetting form');
+    _logger.i('폼 초기화');
     _formKey.currentState!.reset();
     _questionController.clear();
     for (var controller in _optionControllers) {
@@ -310,6 +308,6 @@ class _AddQuizPageState extends State<AddQuizPage> {
       _yearController.clear();
       _examType = 'CPA';
     });
-    _logger.i('Form reset completed');
+    _logger.i('폼 초기화 완료');
   }
 }

@@ -19,20 +19,20 @@ class SubjectPage extends StatelessWidget {
       future: quizService.getSubjects(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          _logger.d('Waiting for subjects data');
+          _logger.d('과목 데이터 대기 중');
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          _logger.e('Error loading subjects: ${snapshot.error}');
+          _logger.e('과목 데이터 로드 실패: ${snapshot.error}');
           return Center(child: Text('Error: ${snapshot.error}'));
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          _logger.w('No subjects available');
-          return const Center(child: Text('No subjects available'));
+          _logger.w('과목 없음');
+          return const Center(child: Text('과목 없음'));
         }
 
         final subjects = snapshot.data!;
-        _logger.i('Loaded ${subjects.length} subjects');
+        _logger.i('과목 ${subjects.length}개 로드 완료');
 
         return ListView.builder(
           itemCount: subjects.length,
@@ -44,7 +44,7 @@ class SubjectPage extends StatelessWidget {
               child: ListTile(
                 title: Text(subject.name),
                 onTap: () {
-                  _logger.i('Tapped on subject: ${subject.name}');
+                  _logger.i('과목 ${subject.name} 클릭');
                   Navigator.push(
                     context,
                     MaterialPageRoute(

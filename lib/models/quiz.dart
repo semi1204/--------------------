@@ -27,14 +27,14 @@ class Quiz {
     this.year, // year parameter
     this.examType, // examType parameter
   }) {
-    _logger.d('Quiz object created with Markdown support');
+    _logger.d('퀴즈 객체 생성');
   }
 
   Map<String, dynamic> toJson() => toFirestore();
 
   factory Quiz.fromFirestore(DocumentSnapshot doc, Logger logger) {
     final data = doc.data() as Map<String, dynamic>;
-    logger.d('Creating Quiz from Firestore data with image support: $data');
+    logger.d('Firestore 데이터에서 퀴즈 생성: $data');
 
     // imageUrl 처리 로직 개선
     String? imageUrl = data['imageUrl'];
@@ -42,7 +42,7 @@ class Quiz {
       imageUrl =
           'https://firebasestorage.googleapis.com/v0/b/nursingquizapp6.appspot.com/o/$imageUrl?alt=media';
     }
-    logger.d('Processed imageUrl: $imageUrl');
+    logger.d('이미지 URL 처리 완료: $imageUrl');
 
     return Quiz(
       id: doc.id,
@@ -90,7 +90,7 @@ class Quiz {
   }
 
   Map<String, dynamic> toFirestore() {
-    _logger.d('Converting Quiz to Firestore data with Markdown support');
+    _logger.d('퀴즈 데이터를 Firestore에 변환');
     return {
       'id': id,
       'question': question,

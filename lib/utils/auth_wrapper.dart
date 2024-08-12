@@ -11,7 +11,7 @@ class AuthWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final logger = context.read<Logger>();
-    logger.i('Building AuthWrapper');
+    logger.i('로그인 확인 중');
     final userProvider = Provider.of<UserProvider>(context);
 
     // 주의 : 반드시 FutureBuilder를 사용해야 합니다.
@@ -24,10 +24,10 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.data == true) {
-          logger.i('User is logged in, loading DraggablePage');
+          logger.i('유저${userProvider.user!.email}의 로그인 성공, DraggablePage 로드');
           return const DraggablePage();
         } else {
-          logger.i('User is not logged in, showing LoginPage');
+          logger.i('유저${userProvider.user!.email}의 로그인 실패, LoginPage 표시');
           return const LoginPage();
         }
       },

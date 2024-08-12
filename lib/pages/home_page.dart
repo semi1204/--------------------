@@ -8,13 +8,13 @@ import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
 
 class DraggablePage extends StatefulWidget {
-  const DraggablePage({Key? key}) : super(key: key);
+  const DraggablePage({super.key});
 
   @override
-  _DraggablePageState createState() => _DraggablePageState();
+  DraggablePageState createState() => DraggablePageState();
 }
 
-class _DraggablePageState extends State<DraggablePage> {
+class DraggablePageState extends State<DraggablePage> {
   int _selectedIndex = 0;
   late final Logger _logger;
 
@@ -22,9 +22,9 @@ class _DraggablePageState extends State<DraggablePage> {
   void initState() {
     super.initState();
     _logger = Provider.of<Logger>(context, listen: false);
-    _logger.i('DraggablePage initialized');
+    _logger.i('DraggablePage 초기화');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _logger.i('DraggablePage built');
+      _logger.i('DraggablePage 빌드');
     });
   }
 
@@ -33,13 +33,13 @@ class _DraggablePageState extends State<DraggablePage> {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         _logger.i(
-            'Building DraggablePage. User logged in: ${userProvider.user != null}. Is admin: ${userProvider.isAdmin}');
+            'DraggablePage 빌드. 로그인 여부: ${userProvider.user != null}. 관리자 여부: ${userProvider.isAdmin}');
 
         final List<Widget> _pages = [
-          SubjectPage(key: const PageStorageKey('subject')),
-          const ReviewQuizzesPage(key: PageStorageKey('review')),
+          SubjectPage(key: const PageStorageKey('과목')),
+          const ReviewQuizzesPage(key: PageStorageKey('복습')),
           if (userProvider.isAdmin)
-            const AddQuizPage(key: PageStorageKey('add_quiz')),
+            const AddQuizPage(key: PageStorageKey('퀴즈 추가')),
         ];
 
         return Scaffold(
@@ -57,16 +57,16 @@ class _DraggablePageState extends State<DraggablePage> {
               setState(() {
                 _selectedIndex = index;
               });
-              _logger.i('User navigated to page index: $index');
+              _logger.i('유저가 페이지 인덱스 $index로 이동');
             },
             items: [
               const BottomNavigationBarItem(
-                  icon: Icon(Icons.home), label: 'Home'),
+                  icon: Icon(Icons.home), label: '과목'),
               const BottomNavigationBarItem(
-                  icon: Icon(Icons.error_outline), label: 'Review'),
+                  icon: Icon(Icons.error_outline), label: '복습'),
               if (userProvider.isAdmin)
                 const BottomNavigationBarItem(
-                    icon: Icon(Icons.add), label: 'Add Quiz'),
+                    icon: Icon(Icons.add), label: '퀴즈 추가'),
             ],
           ),
         );

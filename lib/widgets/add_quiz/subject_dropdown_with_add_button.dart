@@ -28,18 +28,18 @@ class SubjectDropdownWithAddButton extends StatelessWidget {
             future: quizService.getSubjects(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                logger.i('Waiting for subjects data');
+                logger.i('과목 데이터 대기 중');
                 return const CircularProgressIndicator();
               }
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                logger.w('No subjects available');
-                return const Text('No subjects available');
+                logger.w('과목 사용 불가');
+                return const Text('과목 사용 불가');
               }
-              logger.i('Subjects loaded. Count: ${snapshot.data!.length}');
+              logger.i('과목 로드 완료. 개수: ${snapshot.data!.length}');
               return DropdownButtonFormField<String>(
                 value: selectedSubjectId,
                 decoration: const InputDecoration(
-                  labelText: 'Select Subject',
+                  labelText: '과목 선택',
                   border: OutlineInputBorder(),
                 ),
                 items: snapshot.data!.map((Subject subject) {
@@ -49,8 +49,7 @@ class SubjectDropdownWithAddButton extends StatelessWidget {
                   );
                 }).toList(),
                 onChanged: onChanged,
-                validator: (value) =>
-                    value == null ? 'Please select a subject' : null,
+                validator: (value) => value == null ? '과목을 선택해주세요' : null,
               );
             },
           ),

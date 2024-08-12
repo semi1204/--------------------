@@ -138,7 +138,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
             nextReviewDate != null && nextReviewDate.isAfter(DateTime.now());
 
         _logger.d(
-            'QuizPageCard build: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList');
+            '퀴즈 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList');
 
         return Card(
           margin: const EdgeInsets.all(8.0),
@@ -204,7 +204,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
 
   // 퀴즈카드의 옵션을 선택했을 때 실행되는 함수
   void _selectOption(int index, UserProvider userProvider) {
-    _logger.i('Selecting option $index for quiz ${widget.quiz.id}');
+    _logger.i('퀴즈 페이지 카드: 옵션 $index 선택: quizId=${widget.quiz.id}');
     if (_selectedOptionIndex == null) {
       setState(() {
         _selectedOptionIndex = index;
@@ -229,9 +229,9 @@ class _QuizPageCardState extends State<QuizPageCard> {
 
       _showAnswerSnackBar(isCorrect);
 
-      _logger.i('User selected option $index. Correct: $isCorrect.');
+      _logger.i('퀴즈 페이지 카드: 유저가 옵션 $index 선택. 정답: $isCorrect.');
     } else {
-      _logger.i('Option already selected. Ignoring new selection.');
+      _logger.i('퀴즈 페이지 카드: 옵션이 이미 선택되었습니다. 새로운 선택을 무시합니다.');
     }
   }
 
@@ -290,7 +290,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
             nextReviewDate != null && nextReviewDate.isAfter(DateTime.now());
 
         _logger.d(
-            'ReviewPageCard build: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList');
+            '복습 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList');
 
         return Card(
           margin: const EdgeInsets.all(8.0),
@@ -339,11 +339,9 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                     onEdit: widget.onEdit,
                     onDelete: widget.onDelete,
                   ),
-                // TODO : reviewpage에서 _deleteReview 메서드 호출되는지, 어떻게 데이터 구조를 일치시키는지 확인, 중복되는 부부은 삭제---------//
-                ElevatedButton(
-                  onPressed: widget.onDeleteReview,
-                  child: const Text('Remove from Review'),
-                ),
+                // Fixed : reviewpage에서 _deleteReview 메서드 호출되는지, 어떻게 데이터 구조를 일치시키는지 확인, 중복되는 부부은 삭제---------//
+                // Removed the onDeleteReview callback and the _deleteReview method
+                // Updated the UI to use the functionality from the Explanation page to remove the quiz from the review list
               ],
             ),
           ),
@@ -376,9 +374,9 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
 
       _showAnswerSnackBar(isCorrect);
 
-      _logger.i('User selected option $index. Correct: $isCorrect.');
+      _logger.i('복습 페이지 카드: 유저가 옵션 $index 선택. 정답: $isCorrect.');
     } else {
-      _logger.i('Option already selected. Ignoring new selection.');
+      _logger.i('복습 페이지 카드: 옵션이 이미 선택되었습니다. 새로운 선택을 무시합니다.');
     }
   }
 

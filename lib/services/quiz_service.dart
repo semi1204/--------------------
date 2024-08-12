@@ -36,11 +36,11 @@ class QuizService {
   Future<List<Quiz>> getQuizzesForReview(String userId, String subjectId,
       String quizTypeId, UserProvider userProvider) async {
     _logger.i(
-        'getQuizzesForReview start: userId=$userId, subjectId=$subjectId, quizTypeId=$quizTypeId');
+        'getQuizzesForReview 메소드 시작: userId=$userId, subjectId=$subjectId, quizTypeId=$quizTypeId');
 
     try {
       final quizzes = await getQuizzes(subjectId, quizTypeId);
-      _logger.d('Fetched ${quizzes.length} quizzes for quiz type $quizTypeId');
+      _logger.d('퀴즈 타입 $quizTypeId에 대한 퀴즈를 가져왔습니다: ${quizzes.length}');
 
       final now = DateTime.now();
       List<Quiz> quizzesForReview = quizzes.where((quiz) {
@@ -60,10 +60,10 @@ class QuizService {
         return bMistakeCount.compareTo(aMistakeCount);
       });
 
-      _logger.i('Fetched ${quizzesForReview.length} quizzes for review');
+      _logger.i('복습 퀴즈를 가져왔습니다: ${quizzesForReview.length}');
       return quizzesForReview;
     } catch (e) {
-      _logger.e('Error fetching quizzes for review: $e');
+      _logger.e('복습 퀴즈를 가져오는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
@@ -75,7 +75,7 @@ class QuizService {
     required T Function(String) parseData,
     required String Function(T) encodeData,
   }) async {
-    _logger.d('Attempting to get data with cache for key: $key');
+    _logger.d('캐시에서 데이터를 가져오는 중입니다: $key');
     final prefs = await SharedPreferences.getInstance();
     final cachedData = prefs.getString(key);
     final cacheTimestamp = prefs.getInt('${key}_timestamp');
@@ -83,7 +83,7 @@ class QuizService {
     if (cachedData != null && cacheTimestamp != null) {
       final now = DateTime.now().millisecondsSinceEpoch;
       if (now - cacheTimestamp < _cacheExpiration.inMilliseconds) {
-        _logger.d('Data fetched from cache for key: $key');
+        _logger.d('캐시된 데이터를 사용합니다: $key');
         return parseData(cachedData);
       }
     }
@@ -93,11 +93,13 @@ class QuizService {
     await prefs.setString(key, jsonData);
     await prefs.setInt(
         '${key}_timestamp', DateTime.now().millisecondsSinceEpoch);
-    _logger.d('Data fetched from Firestore and cached for key: $key');
+    _logger.d('Firestore에서 데이터를 가져와 캐시에 저장합니다: $key');
     return data;
   }
 
   // 사용자의 퀴즈 데이터를 가져오는 함수
+  // --------- TODO : updateUserQuizData 에서 정보를 받아와야함 ---------//
+  // --------- TODO : firestore에서 데이터를 가져오는 로직은  ---------//
   Future<Map<String, dynamic>> getUserQuizData(String userId) async {
     _logger.i('getUserQuizData 시작: userId=$userId');
 
@@ -121,10 +123,10 @@ class QuizService {
 
   // Future를 반환하도록 변경하여 일관성 유지
   Future<List<Subject>> getSubjects() async {
-    _logger.i('Fetching subjects');
+    _logger.i('과목을 가져오는 중입니다');
     const key = _subjectsKey;
     if (_cachedSubjects.containsKey(key)) {
-      _logger.d('Subjects fetched from memory cache');
+      _logger.d('메모리 캐시에서 과목을 가져왔습니다');
       return _cachedSubjects[key]!;
     }
 
@@ -132,7 +134,7 @@ class QuizService {
       final subjects = await _getDataWithCache<List<Subject>>(
         key: key,
         fetchFromFirestore: () async {
-          _logger.d('Fetching subjects from Firestore');
+          _logger.d('Firestore에서 과목을 가져오는 중입니다');
           final snapshot = await _firestore.collection('subjects').get();
           return snapshot.docs
               .map((doc) => Subject.fromFirestore(doc))
@@ -146,21 +148,21 @@ class QuizService {
       );
 
       _cachedSubjects[key] = subjects;
-      _logger.i('Fetched ${subjects.length} subjects');
+      _logger.i('과목을 가져왔습니다: ${subjects.length}');
       return subjects;
     } catch (e) {
-      _logger.e('Error fetching subjects: $e');
+      _logger.e('과목을 가져오는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
 
   // 수정: Stream 대신 Future를 반환하록 변경
   Future<List<QuizType>> getQuizTypes(String subjectId) async {
-    _logger.i('Fetching quiz types for subject: $subjectId');
+    _logger.i('과목 $subjectId에 대한 퀴즈 타입을 가져오는 중입니다');
     final key = '${_quizTypesKey}_$subjectId';
     if (_cachedQuizTypes.containsKey(subjectId) &&
         _cachedQuizTypes[subjectId]!.containsKey(key)) {
-      _logger.d('Quiz types fetched from memory cache for subject: $subjectId');
+      _logger.d('메모리 캐시에서 퀴즈 타입을 가져왔습니다: $subjectId');
       return _cachedQuizTypes[subjectId]![key]!;
     }
 
@@ -185,32 +187,40 @@ class QuizService {
       );
 
       _cachedQuizTypes[subjectId] = {key: quizTypes};
-      _logger
-          .i('Fetched ${quizTypes.length} quiz types for subject: $subjectId');
+      _logger.i('과목 $subjectId에 대한 퀴즈 타입을 가져왔습니다: ${quizTypes.length}');
       return quizTypes;
     } catch (e) {
-      _logger.e('Error fetching quiz types: $e');
+      _logger.e('과목 $subjectId에 대한 퀴즈 타입을 가져오는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
 
   // 수정: Stream 대신 Future를 반환하도록 변경
+  // --------- TODO : 모든 과목을 한번에 가져올지 고민해봐야함. ---------//
+  // --------- TODO : 퀴즈 데이터를 가져오는 로직을 로컬데이터를 가져오는 로직을 추가해야함 ---------//
+  // Quizpage에서 퀴즈 데이터를 가져오는 함수
   Future<List<Quiz>> getQuizzes(String subjectId, String quizTypeId) async {
-    _logger
-        .i('Fetching quizzes for subject: $subjectId, quizType: $quizTypeId');
+    // 퀴즈를 가져오는 중임을 로그로 기록
+    _logger.i('과목 $subjectId에 대한 퀴즈를 가져오는 중입니다: $quizTypeId');
+
+    // 캐시 키 생성
     final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
+
+    // 캐시에서 퀴즈가 존재하는지 확인
     if (_cachedQuizzes.containsKey(subjectId) &&
         _cachedQuizzes[subjectId]!.containsKey(quizTypeId) &&
         _cachedQuizzes[subjectId]![quizTypeId]!.containsKey(key)) {
-      _logger.d(
-          'Quizzes fetched from memory cache for subject: $subjectId, quizType: $quizTypeId');
+      // 캐시에서 퀴즈를 가져왔음을 로그로 기록
+      _logger.d('메모리 캐시에서 퀴즈를 가져왔습니다: $subjectId, $quizTypeId');
       return _cachedQuizzes[subjectId]![quizTypeId]![key]!;
     }
 
     try {
+      // 캐시 또는 Firestore에서 퀴즈 데이터를 가져옴
       final quizzes = await _getDataWithCache<List<Quiz>>(
         key: key,
         fetchFromFirestore: () async {
+          // Firestore에서 퀴즈 데이터를 가져옴
           final snapshot = await _firestore
               .collection('subjects')
               .doc(subjectId)
@@ -218,25 +228,30 @@ class QuizService {
               .doc(quizTypeId)
               .collection('quizzes')
               .get();
+          // Firestore 문서를 Quiz 객체로 변환하여 리스트로 반환
           return snapshot.docs
               .map((doc) => Quiz.fromFirestore(doc, _logger))
               .toList();
         },
+        // 캐시된 데이터 파싱 방법 정의
         parseData: (data) => (json.decode(data) as List)
             .map((item) => Quiz.fromJson(item as Map<String, dynamic>))
             .toList(),
+        // 퀴즈 데이터를 JSON으로 인코딩
         encodeData: (quizzes) =>
             json.encode(quizzes.map((q) => q.toJson()).toList()),
       );
 
+      // 캐시에 퀴즈 데이터 저장
       _cachedQuizzes[subjectId] = {
         quizTypeId: {key: quizzes}
       };
-      _logger.i(
-          'Fetched ${quizzes.length} quizzes for subject: $subjectId, quizType: $quizTypeId');
+      // 퀴즈 가져오기 성공 로그 기록
+      _logger.i('과목 $subjectId에 대한 퀴즈를 가져왔습니다: $quizTypeId, ${quizzes.length}');
       return quizzes;
     } catch (e) {
-      _logger.e('Error fetching quizzes: $e');
+      // 오류 발생 시 로그 기록
+      _logger.e('과목 $subjectId에 대한 퀴즈를 가져오는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
@@ -260,9 +275,9 @@ class QuizService {
       _cachedQuizTypes[subjectId]![key] ??= [];
       _cachedQuizTypes[subjectId]![key]!.add(quizTypeData);
 
-      _logger.i('Quiz type added successfully to subject: $subjectId');
+      _logger.i('과목 $subjectId에 퀴즈 타입을 추가했습니다');
     } catch (e) {
-      _logger.e('Error adding quiz type to subject: $e');
+      _logger.e('과목 $subjectId에 퀴즈 타입을 추가하는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
@@ -276,15 +291,15 @@ class QuizService {
       _cachedSubjects[_subjectsKey] ??= [];
       _cachedSubjects[_subjectsKey]!.add(newSubject);
 
-      _logger.i('Subject added successfully: ${newSubject.name}');
+      _logger.i('과목을 추가했습니다: ${newSubject.name}');
     } catch (e) {
-      _logger.e('Error adding subject: $e');
+      _logger.e('과목을 추가하는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
 
   Future<void> addQuiz(String subjectId, String quizTypeId, Quiz quiz) async {
-    _logger.i('Adding new quiz to subject: $subjectId, quizType: $quizTypeId');
+    _logger.i('과목 $subjectId에 퀴즈를 추가하는 중입니다: $quizTypeId');
     try {
       final quizData = quiz.toFirestore();
 
@@ -306,7 +321,7 @@ class QuizService {
           .collection('quizzes')
           .add(quizData);
 
-      _logger.i('Quiz added successfully with ID: ${docRef.id}');
+      _logger.i('과목 $subjectId에 퀴즈를 추가했습니다: ${docRef.id}');
 
       final updatedQuiz = Quiz(
         id: docRef.id,
@@ -330,7 +345,7 @@ class QuizService {
       // 캐시 데이터를 SharedPreferences에 저장
       await _updateSharedPreferences(subjectId, quizTypeId);
     } catch (e) {
-      _logger.e('Error adding quiz: $e');
+      _logger.e('과목 $subjectId에 퀴즈를 추가하는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
@@ -357,12 +372,12 @@ class QuizService {
         }
       }
 
-      _logger.i('Quiz updated successfully with ID: ${quiz.id}');
+      _logger.i('과목 $subjectId에 퀴즈를 업데이트했습니다: ${quiz.id}');
 
       // 캐시 데이터를 SharedPreferences에 저장
       await _updateSharedPreferences(subjectId, quizTypeId);
     } catch (e) {
-      _logger.e('Error updating quiz: $e');
+      _logger.e('과목 $subjectId에 퀴즈를 업데이트하는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
@@ -384,12 +399,12 @@ class QuizService {
       _cachedQuizzes[subjectId]?[quizTypeId]?[key]
           ?.removeWhere((q) => q.id == quizId);
 
-      _logger.i('Quiz deleted successfully: $quizId');
+      _logger.i('과목 $subjectId에 퀴즈를 삭제했습니다: $quizId');
 
       // 캐시 데이터를 SharedPreferences에 저장
       await _updateSharedPreferences(subjectId, quizTypeId);
     } catch (e) {
-      _logger.e('Error deleting quiz: $e');
+      _logger.e('과목 $subjectId에 퀴즈를 삭제하는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
@@ -412,7 +427,7 @@ class QuizService {
 
   // 새로 추가: 메모리 캐시 새로고침 메서드
   Future<void> refreshCache() async {
-    _logger.i('Refreshing memory cache');
+    _logger.i('메모리 캐시를 새로고침하는 중입니다');
     _cachedSubjects.clear();
     _cachedQuizTypes.clear();
     _cachedQuizzes.clear();
@@ -425,12 +440,12 @@ class QuizService {
         await getQuizzes(subject.id, quizType.id);
       }
     }
-    _logger.i('Memory cache refreshed successfully');
+    _logger.i('메모리 캐시를 새로고침했습니다');
   }
 
   // 새로 추가: 특정 주제의 즈 타입 및 퀴즈 새로고침 메서드
   Future<void> refreshSubjectData(String subjectId) async {
-    _logger.i('Refreshing data for subject: $subjectId');
+    _logger.i('과목 $subjectId에 대한 데이터를 새로고침하는 중입니다');
     _cachedQuizTypes.remove(subjectId);
     _cachedQuizzes.remove(subjectId);
 
@@ -438,22 +453,19 @@ class QuizService {
     for (final quizType in quizTypes) {
       await getQuizzes(subjectId, quizType.id);
     }
-    _logger.i('Data refreshed for subject: $subjectId');
+    _logger.i('과목 $subjectId에 대한 데이터를 새로고침했습니다');
   }
 
   // New method to generate performance analytics
   Future<Map<String, dynamic>> generatePerformanceAnalytics(
       String userId, String subjectId) async {
-    _logger.i(
-        'Generating performance analytics for user: $userId, subject: $subjectId');
+    _logger.i('사용자 $userId에 대한 성능 분석을 생성하는 중입니다: 과목 $subjectId');
     try {
       final userData = await getUserQuizData(userId); // 사용자 퀴즈 데이터 가져오기
       final subjectData = userData[subjectId];
 
       if (subjectData == null) {
-        return {
-          'error': 'No data available for this subject'
-        }; // 주제 데이터가 없을 경우 오류 반환
+        return {'error': '이 과목에 대한 데이터가 없습니다'}; // 주제 데이터가 없을 경우 오류 반환
       }
 
       int totalQuizzes = 0;
@@ -514,15 +526,14 @@ class QuizService {
         'recentPerformance': recentPerformance, // 최근 성능
       };
     } catch (e) {
-      _logger.e('Error generating performance analytics: $e');
-      return {'error': 'Failed to generate performance analytics'};
+      _logger.e('사용자 $userId에 대한 성능 분석을 생성하는 중 오류가 발생했습니다: $e');
+      return {'error': '성능 분석을 생성하는 중 오류가 발생했습니다'};
     }
   }
 
   Future<List<Quiz>> getQuizzesByIds(
       String subjectId, String quizTypeId, List<String> quizIds) async {
-    _logger.i(
-        'Fetching quizzes by IDs for subject: $subjectId, quizType: $quizTypeId');
+    _logger.i('과목 $subjectId에 대한 퀴즈를 가져오는 중입니다: $quizTypeId');
     try {
       final quizzes = await _firestore
           .collection('subjects')
@@ -537,22 +548,22 @@ class QuizService {
           .map((doc) => Quiz.fromFirestore(doc, _logger))
           .toList();
     } catch (e) {
-      _logger.e('Error fetching quizzes by IDs: $e');
+      _logger.e('과목 $subjectId에 대한 퀴즈를 가져오는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
 
   Future<void> syncUserData(
       String userId, Map<String, dynamic> userData) async {
-    _logger.i('Syncing user data for user: $userId');
+    _logger.i('사용자 $userId에 대한 데이터를 동기화하는 중입니다');
     try {
       await FirebaseFirestore.instance.collection('users').doc(userId).set({
         'quizData': userData,
       }, SetOptions(merge: true));
-      _logger.i('User data synced successfully with Firestore');
-      _logger.d('Synced user data: $userData');
+      _logger.i('사용자 $userId에 대한 데이터를 동기화했습니다');
+      _logger.d('동기화된 사용자 데이터: $userData');
     } catch (e) {
-      _logger.e('Error syncing user data: $e');
+      _logger.e('사용자 $userId에 대한 데이터를 동기화하는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }

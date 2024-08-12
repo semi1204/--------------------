@@ -29,16 +29,16 @@ class UserProvider with ChangeNotifier {
 
   bool get isAdmin {
     if (_user == null) {
-      _logger.i('User is null, not admin');
+      _logger.i('유저가 없습니다, 관리자가 아닙니다');
       return false;
     }
     bool adminStatus = _user!.email == ADMIN_EMAIL;
-    _logger.i('Checking admin status for ${_user!.email}: $adminStatus');
+    _logger.i('유저 ${_user!.email}의 관리자 상태 확인: $adminStatus');
     return adminStatus;
   }
 
   Future<void> setUser(User? user) async {
-    _logger.i('Setting user: ${user?.email ?? 'No user'}');
+    _logger.i('유저 이메일: ${user?.email ?? 'No user'}');
     if (_user?.uid != user?.uid) {
       _user = user;
       if (user != null) {
@@ -57,15 +57,15 @@ class UserProvider with ChangeNotifier {
       final currentUser = _auth.currentUser;
       if (currentUser != null) {
         await setUser(currentUser);
-        _logger.i('User is logged in: ${currentUser.email}');
+        _logger.i('유저의 로그인 상태 확인 성공: ${currentUser.email}');
         return true;
       } else {
         await setUser(null);
-        _logger.i('User is not logged in');
+        _logger.i('유저의 로그인 상태 확인 실패');
         return false;
       }
     } catch (e) {
-      _logger.e('Error checking login status: $e');
+      _logger.e('유저의 로그인 상태 확인 실패: $e');
       return false;
     }
   }
@@ -78,7 +78,7 @@ class UserProvider with ChangeNotifier {
         email: email,
         password: password,
       );
-      _logger.i('User ${userCredential.user?.email} signed in with email');
+      _logger.i('유저 ${userCredential.user?.email}가 이메일로 로그인 성공');
 
       // 로그인 성공 시 토큰 저장
       final String? token = await userCredential.user?.getIdToken();
@@ -89,10 +89,10 @@ class UserProvider with ChangeNotifier {
 
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
-      _logger.e('Firebase Auth Error during sign in: ${e.code} - ${e.message}');
+      _logger.e('유저의 로그인 실패: ${e.code} - ${e.message}');
       rethrow;
     } catch (e) {
-      _logger.e('Error signing in with email: $e');
+      _logger.e('유저의 로그인 실패: $e');
       rethrow;
     }
   }
@@ -105,19 +105,19 @@ class UserProvider with ChangeNotifier {
       ]);
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('user_token');
-      _logger.i('User signed out');
+      _logger.i('유저의 로그아웃 성공');
       _quizData.clear();
       _deletedQuizzes.clear();
       notifyListeners();
     } catch (e) {
-      _logger.e('Error during sign out: $e');
+      _logger.e('유저의 로그아웃 실패: $e');
     }
   }
 
   Future<void> deleteUserQuizData(
       String userId, String subjectId, String quizTypeId, String quizId) async {
     _logger.i(
-        'Deleting user quiz data for user: $userId, subject: $subjectId, quizType: $quizTypeId, quiz: $quizId');
+        '유저${_user!.uid}의 퀴즈데이터 삭제: subject: $subjectId, quizType: $quizTypeId, quiz: $quizId');
     try {
       // Update local state
       _quizData[subjectId]?[quizTypeId]?.remove(quizId);
@@ -130,9 +130,9 @@ class UserProvider with ChangeNotifier {
           'deleted_quizzes_$userId', _deletedQuizzes.toList());
 
       notifyListeners();
-      _logger.i('User quiz data deleted successfully');
+      _logger.i('유저의 퀴즈데이터 삭제 성공');
     } catch (e) {
-      _logger.e('Error deleting user quiz data: $e');
+      _logger.e('유저의 퀴즈데이터 삭제 실패: $e');
       rethrow;
     }
   }
@@ -141,29 +141,30 @@ class UserProvider with ChangeNotifier {
   // 1. 사용자가 선택한 답은 무조건 기억해야 함.
   // 2. 기억한 답은 초기화 버튼을 누르기 전까지 유지되어야 함.
   // 유지해야하는 기능 : 사용자 데이터 로드 시 캐시 -> 기기 내부 저장소
+  // --------- TODO : updateUserQuizData 메서드 호출과 차이점 파악 후 updateUserQuizData 메서드 호출로 변경가능한지 확인 ---------//
   Future<void> loadUserData() async {
     if (_user == null) {
-      _logger.w('Attempted to load quiz data for null user');
+      _logger.w('유저의 퀴즈데이터 로드 실패: 유저가 없습니다');
       _quizData = {};
       return;
     }
 
     try {
-      _logger.i('Loading user data for ${_user!.email}');
+      _logger.i('유저${_user!.email}의 퀴즈데이터 로드 시작');
       final prefs = await SharedPreferences.getInstance();
 
       // 1. 캐시에서 데이터 로드 시도
       final cachedData = prefs.getString('user_quiz_data_${_user!.uid}');
       if (cachedData != null) {
         try {
-          _quizData = json.decode(cachedData)
-              as Map<String, Map<String, Map<String, Map<String, dynamic>>>>;
-          _logger.i('User data loaded from cache');
+          final decodedData = json.decode(cachedData) as Map<String, dynamic>;
+          _quizData = _convertToNestedMap(decodedData);
+          _logger.i('유저${_user!.email}의 퀴즈데이터가 캐시에서 로드되었습니다');
           _loadDeletedQuizzes(prefs);
           notifyListeners();
           return;
         } catch (e) {
-          _logger.w('Failed to parse cached data: $e');
+          _logger.w('유저${_user!.email}의 퀴즈데이터 로드 실패: 캐시에서 데이터 파싱 실패: $e');
         }
       }
 
@@ -171,28 +172,56 @@ class UserProvider with ChangeNotifier {
       final localData = await _loadLocalData();
       if (localData != null) {
         _quizData = localData;
-        _logger.i('User data loaded from local storage');
+        _logger.i('유저${_user!.email}의 퀴즈데이터가 로컬 저장소에서 로드되었습니다');
         _loadDeletedQuizzes(prefs);
         notifyListeners();
         return;
       }
 
-      _logger.w('No local data found, initializing empty quiz data');
-      _quizData = {};
+      _logger.w('로컬 데이터를 찾을 수 없습니다, 빈 퀴즈데이터를 초기화합니다');
+      _quizData = {}; // 둘 다 없으면 빈 _quizData를 초기화
       _loadDeletedQuizzes(prefs);
       notifyListeners();
     } catch (e) {
-      _logger.e('Error loading user data: $e');
+      _logger.e('유저${_user!.email}의 퀴즈데이터 로드 실패: $e');
       _quizData = {};
       notifyListeners();
     }
   }
 
+  // 새로운 헬퍼 메서드 추가
+  Map<String, Map<String, Map<String, Map<String, dynamic>>>>
+      _convertToNestedMap(Map<String, dynamic> data) {
+    return data.map((key, value) {
+      if (value is Map<String, dynamic>) {
+        return MapEntry(
+          key,
+          value.map((subKey, subValue) {
+            if (subValue is Map<String, dynamic>) {
+              return MapEntry(
+                subKey,
+                subValue.map((subSubKey, subSubValue) {
+                  if (subSubValue is Map<String, dynamic>) {
+                    return MapEntry(subSubKey, subSubValue);
+                  }
+                  return MapEntry(subSubKey, <String, dynamic>{});
+                }),
+              );
+            }
+            return MapEntry(subKey, <String, Map<String, dynamic>>{});
+          }),
+        );
+      }
+      return MapEntry(key, <String, Map<String, Map<String, dynamic>>>{});
+    });
+  }
+
+  // TODO : 각 유저의 삭제된 데이터가 필요한지 확인해봐야함
   void _loadDeletedQuizzes(SharedPreferences prefs) {
     final deletedQuizzesList =
         prefs.getStringList('deleted_quizzes_${_user!.uid}') ?? [];
     _deletedQuizzes = Set.from(deletedQuizzesList);
-    _logger.d('Loaded ${_deletedQuizzes.length} deleted quizzes');
+    _logger.d('유저${_user!.email}의 삭제된 퀴즈 로드 성공: ${_deletedQuizzes.length}개');
   }
 
   // 기기 내부 저장소에서 데이터 드
@@ -202,11 +231,39 @@ class UserProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final localData = prefs.getString('user_quiz_data_${_user!.uid}');
       if (localData != null) {
-        return Map<String, Map<String, Map<String, Map<String, dynamic>>>>.from(
-            json.decode(localData));
+        final decodedData = json.decode(localData);
+        _logger.d('유저${_user!.email}의 로컬 퀴즈데이터 디코딩 성공');
+
+        if (decodedData is Map<String, dynamic>) {
+          return decodedData.map((key, value) {
+            if (value is Map<String, dynamic>) {
+              return MapEntry(
+                key,
+                value.map((subKey, subValue) {
+                  if (subValue is Map<String, dynamic>) {
+                    return MapEntry(
+                      subKey,
+                      subValue.map((subSubKey, subSubValue) {
+                        if (subSubValue is Map<String, dynamic>) {
+                          return MapEntry(subSubKey, subSubValue);
+                        }
+                        return MapEntry(subSubKey, <String, dynamic>{});
+                      }),
+                    );
+                  }
+                  return MapEntry(subKey, <String, Map<String, dynamic>>{});
+                }),
+              );
+            }
+            return MapEntry(key, <String, Map<String, Map<String, dynamic>>>{});
+          });
+        } else {
+          _logger.w('유저의 퀴즈데이터 로드 실패: 디코딩된 데이터가 Map<String, dynamic>이 아님');
+          return null;
+        }
       }
     } catch (e) {
-      _logger.e('Error loading local data: $e');
+      _logger.e('유저의 퀴즈데이터 로드 실패: $e');
     }
     return null;
   }
@@ -245,26 +302,25 @@ class UserProvider with ChangeNotifier {
 
         // 1. 캐시에 저장
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            'user_quiz_data_${_user!.uid}', json.encode(_quizData));
+        await prefs.setString('유저${_user!.uid}의 퀴즈데이터', json.encode(_quizData));
 
         // 2. 기기 내부 저장소에 저장
         await prefs.setString(
-            'user_quiz_data_local_${_user!.uid}', json.encode(_quizData));
+            '유저${_user!.uid}의 로컬 퀴즈데이터', json.encode(_quizData));
 
-        _logger.i('Quiz data saved successfully to local storage');
+        _logger.i('유저${_user!.uid}의 퀴즈데이터가 로컬 저장소에 성공적으로 저장되었습니다');
       } catch (e) {
-        _logger.e('Error saving quiz data: $e');
+        _logger.e('유저${_user!.uid}의 퀴즈데이터 저장 실패: $e');
       }
     } else {
-      _logger.w('Attempted to save quiz data for null user');
+      _logger.w('유저${_user!.uid}의 퀴즈데이터 저장 실패: 유저가 없습니다');
     }
   }
 
   Future<void> clearCachedQuizData(
       {String? subjectId, String? quizTypeId, String? quizId}) async {
     _logger.i(
-        'Clearing cached quiz data${quizId != null ? " for quiz: $quizId" : ""}');
+        '유저${_user!.uid}의 퀴즈데이터 캐시 삭제${quizId != null ? " for quiz: $quizId" : ""}');
     if (quizId != null && quizTypeId != null && subjectId != null) {
       _quizData[subjectId]?[quizTypeId]?.remove(quizId);
     } else if (quizTypeId != null && subjectId != null) {
@@ -330,8 +386,8 @@ class UserProvider with ChangeNotifier {
 
     await _saveQuizData();
     notifyListeners();
-    _logger.i('User answers reset successfully');
-    _logger.d('Updated quiz data: ${_quizData[subjectId]?[quizTypeId]}');
+    _logger.i('유저${_user!.uid}의 퀴즈데이터 초기화 성공');
+    _logger.d('유저${_user!.uid}의 퀴즈데이터: ${_quizData[subjectId]?[quizTypeId]}');
   }
 
   // 사용자 퀴즈 데이터 업데이트
@@ -474,28 +530,29 @@ class UserProvider with ChangeNotifier {
   // --------- TODO : 가장 최신의 퀴즈 데이터를 덮어쓰고, 서버로 데이터 전송하는지 확인 ---------//
   Future<void> syncUserData() async {
     if (_user == null || !_needsSync) {
-      _logger.w('No need to sync user data');
+      _logger.w('유저${_user!.uid}의 데이터 동기화 필요 없음');
       return;
     }
 
-    _logger.i('Syncing user data with Firebase');
+    _logger.i('유저${_user!.uid}의 데이터를 Firebase에 동기화');
     try {
+      // TODO : FirebaseStore이 아니라, firebasedatabase로 변경해야함.
       await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set({
         'quizData': _quizData,
       }, SetOptions(merge: true));
       _needsSync = false;
-      _logger.i('사용자 데이터가 Firebase와 성공적으로 동기화되었습니다');
+      _logger.i('��저${_user!.uid}의 데이터가 Firebase와 성공적으로 동기화되었습니다');
 
       // 로컬 저장소 업데이트
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
           'user_quiz_data_${_user!.uid}', json.encode(_quizData));
-      _logger.i('로컬 저장소의 사용자 데이터가 업데이트되었습니다');
+      _logger.i('유저${_user!.uid}의 퀴즈데이터가 로컬 저장소에 업데이트되었습니다');
 
       notifyListeners();
-      _logger.i('User data synced successfully with Firebase');
+      _logger.i('유저${_user!.uid}의 데이터가 Firebase와 성공적으로 동기화되었습니다');
     } catch (e) {
-      _logger.e('Error syncing user data with Firebase: $e');
+      _logger.e('유저${_user!.uid}의 데이터 동기화 실패: $e');
     }
   }
 
@@ -506,21 +563,23 @@ class UserProvider with ChangeNotifier {
         _quizData[subjectId]?[quizTypeId]?[quizId]?['accuracy'] as double? ??
             0.0;
     _logger.i(
-        'Getting quiz accuracy: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, accuracy=$accuracy');
+        '유저${_user!.uid}의 퀴즈 정확도: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, accuracy=$accuracy');
     return accuracy;
   }
 
   // 다음 복습 날짜를 가져오는 메서드
-  // --------- TODO : 복습 시간이 너무 먼 문제가 발생하고 있음. ---------//
+  // --------- TODO : 퀴즈 데이터를 불러오지 못하는 문제가 발생하고 있음. ---------//
+  // --------- TODO : getNextReviewTimeString 메서드랑 합칠 수 있는지 봐야 함 ---------//
   DateTime? getNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
+    // _quizData에서 퀴즈 데이터를 가져옴
     final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
     if (quizData == null || quizData.isEmpty) {
-      _logger.w('$quizId에 대한 퀴즈 데이터를 찾을 수 없습니다. null을 반환합니다.');
+      _logger.w('$quizId에 대한 퀴즈 데��터를 찾을 수 없습니다. null을 반환합니다.');
       return null;
     }
 
-    final nextReviewDateString = quizData['nextReviewDate'];
+    final nextReviewDateString = quizData['nextReviewDate'] as String?;
     if (nextReviewDateString == null) {
       _logger.w('$quizId에 대한 다음 복습 날짜를 찾을 수 없습니다. null을 반환합니다.');
       return null;
@@ -542,6 +601,7 @@ class UserProvider with ChangeNotifier {
   // --------- TODO : updateUserQuizData에 완전히 업데이트 된 정보가 출력되는지 확인 ---------//
   String getNextReviewTimeString(
       String subjectId, String quizTypeId, String quizId) {
+    // _quizData에서 퀴즈데이터를 가지고 옴
     final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
     if (quizData == null) {
       _logger.w('No quiz data found for $quizId. Returning "지금"');
@@ -553,7 +613,10 @@ class UserProvider with ChangeNotifier {
     final now = DateTime.now();
     final difference = nextReviewDate?.difference(now) ?? Duration.zero;
 
-    _logger.i('Calculating next review time for quiz: $quizId');
+    _logger.i('다음 복습을 계산 중인 퀴즈 : $quizId');
+    _logger.d('다음 복습 날짜: $nextReviewDate');
+    _logger.d('현재 날짜: $now');
+    _logger.d('차이: $difference');
 
     if (kDebugMode) {
       if (difference.inMinutes > 0) {
@@ -586,7 +649,7 @@ class UserProvider with ChangeNotifier {
 
   // Add this method for offline support
   Future<void> syncOfflineData() async {
-    _logger.i('Syncing offline data');
+    _logger.i('오프라인 데이터 동기화');
     try {
       final prefs = await SharedPreferences.getInstance();
       final offlineData = prefs.getString('offline_quiz_data');
@@ -610,10 +673,14 @@ class UserProvider with ChangeNotifier {
           }
         }
         await prefs.remove('offline_quiz_data');
-        _logger.i('Offline data synced successfully');
+        _logger.i('오프라인 데이터 동기화 성공');
       }
     } catch (e) {
-      _logger.e('Error syncing offline data: $e');
+      _logger.e('오프라인 데이터 동기화 실패: $e');
     }
+  }
+
+  void logQuizData() {
+    _logger.d('지금의 _quizData: $_quizData');
   }
 }

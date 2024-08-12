@@ -34,7 +34,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     _loadQuizzesForReview();
   }
 
-  // --------- TODO : 복습 카드 : getQuizzesForReview에서 데이터를 불러오는지, 복습 카드에서 데이터를 불러오는지 확인, 데이터 충돌이 발생하고 있음. ---------//
   Future<void> _loadQuizzesForReview() async {
     if (_selectedSubjectId == null) return;
 
@@ -70,7 +69,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('복습 퀴즈')),
       body: Column(
         children: [
           SubjectDropdown(
@@ -98,8 +96,8 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                       questionNumber: index + 1,
                       onAnswerSelected: (answerIndex) =>
                           _handleAnswerSelected(quiz, answerIndex),
-                      onDeleteReview: () => _deleteReview(
-                          quiz), // --------- TODO : 복습 목록에서 제거하는 버튼, Explanation 페이지의 복습목록 제거 버튼으로 대체해야 함. ---------//
+                      // onDeleteReview: () => _deleteReview(
+                      //     quiz), // --------- TODO : 복습 목록에서 제거하는 버튼, Explanation 페이지의 복습목록 제거 버튼으로 대체해야 함. ---------//
                       subjectId: _selectedSubjectId!,
                       quizTypeId: quiz.typeId,
                       nextReviewDate: userProvider
@@ -230,35 +228,35 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   }
 
 // ------TODO : 복습 목록에서 제거하는 버튼, Explanation 페이지의 복습목록 제거 버튼으로 대체해야 함. ---------//
-  Future<void> _deleteReview(Quiz quiz) async {
-    _logger.i('Deleting review for quiz: ${quiz.id}');
-    try {
-      await _userProvider.updateUserQuizData(
-        _selectedSubjectId!,
-        quiz.typeId,
-        quiz.id,
-        false,
-        toggleReviewStatus: false,
-      );
-      setState(() {
-        _quizzesForReview.removeWhere((q) => q.id == quiz.id);
-      });
-      _logger.i('Review deleted successfully');
+  // Future<void> _deleteReview(Quiz quiz) async {
+  //   _logger.i('Deleting review for quiz: ${quiz.id}');
+  //   try {
+  //     await _userProvider.updateUserQuizData(
+  //       _selectedSubjectId!,
+  //       quiz.typeId,
+  //       quiz.id,
+  //       false,
+  //       toggleReviewStatus: false,
+  //     );
+  //     setState(() {
+  //       _quizzesForReview.removeWhere((q) => q.id == quiz.id);
+  //     });
+  //     _logger.i('Review deleted successfully');
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('복습 목록에서 제거되었습니다.')),
-        );
-      }
-    } catch (e) {
-      _logger.e('Error deleting review: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('복습 삭제 중 오류가 발생했습니다. 다시 시도해주세요.')),
-        );
-      }
-    }
-  }
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('복습 목록에서 제거되었습니다.')),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     _logger.e('Error deleting review: $e');
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('복습 삭제 중 오류가 발생했습니다. 다시 시도해주세요.')),
+  //       );
+  //     }
+  //   }
+  // }
 
   void _handleSubjectChange(String? newSubjectId) {
     setState(() {

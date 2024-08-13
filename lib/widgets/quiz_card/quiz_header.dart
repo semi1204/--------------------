@@ -25,24 +25,12 @@ class QuizHeader extends StatelessWidget {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     logger.i('Resetting quiz: ${quiz.id}');
 
-    // 사용자의 답변을 리셋함
+    // 사용자의 퀴즈정보를 리셋함
     await userProvider.resetUserAnswers(
       subjectId,
       quizTypeId,
       quizId: quiz.id,
     );
-
-    // 사용자의 퀴즈데이터를 업데이트함
-    final updatedData = userProvider.updateUserQuizData(
-      subjectId,
-      quizTypeId,
-      quiz.id,
-      false, // isCorrect 파라미터, 리셋 시에는 false로 설정
-      selectedOptionIndex: null, // 선택된 옵션 초기화
-    );
-
-    // ----리셋 후 퀴즈 데이터 상태 확인---// <= 로그를 삭제하지마세요
-    logger.d('업데이트 후, 퀴즈 데이타: $updatedData');
 
     // UI 업데이트를 위한 콜백 호출
     onResetQuiz();
@@ -57,8 +45,6 @@ class QuizHeader extends StatelessWidget {
         ),
       );
     }
-
-    logger.i('Quiz reset completed');
   }
 
   // 문제의 가장 상단엔, keyword, accuracy, reset button이 Row로 표시
@@ -86,7 +72,7 @@ class QuizHeader extends StatelessWidget {
                   quizTypeId,
                   quiz.id,
                 );
-                logger.d('Quiz accuracy: $accuracy');
+                logger.d('퀴즈 정답률: $accuracy');
                 return AccuracyDisplay(accuracy: accuracy);
               },
             ),

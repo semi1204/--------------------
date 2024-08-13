@@ -22,7 +22,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   List<Quiz> _quizzesForReview = [];
   bool _isLoading = false;
   int? _currentQuizIndex;
-  bool _showFeedbackButtons = false;
 
   @override
   void initState() {
@@ -30,7 +29,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     _quizService = Provider.of<QuizService>(context, listen: false);
     _userProvider = Provider.of<UserProvider>(context, listen: false);
     _logger = Provider.of<Logger>(context, listen: false);
-    _logger.i('ReviewQuizzesPage initialized');
+    _logger.i('복습 페이지 초기화 완료');
     _loadQuizzesForReview();
   }
 
@@ -44,21 +43,19 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     try {
       final userId = _userProvider.user?.uid;
       if (userId == null) {
-        _logger.w('User ID is null, cannot load quizzes for review');
+        _logger.w('사용자 ID가 없습니다. 복습 카드를 로드할 수 없음');
         return;
       }
 
-      // 복습할 퀴즈 목록 가져오기 from quiz_service.getQuizzesForReview
       _quizzesForReview = await _quizService.getQuizzesForReview(
         userId,
         _selectedSubjectId!,
         '', // 복습은 과목 단위로 이루어짐
-        _userProvider,
       );
 
-      _logger.i('Loaded ${_quizzesForReview.length} quizzes for review');
+      _logger.i('복습 카드 ${_quizzesForReview.length}개 로드 완료');
     } catch (e) {
-      _logger.e('Error loading quizzes for review: $e');
+      _logger.e('퀴즈 복습 데이터를 불러올 수 없음: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -88,7 +85,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                   itemCount: _quizzesForReview.length,
                   itemBuilder: (context, index) {
                     final quiz = _quizzesForReview[index];
-                    _logger.d('Building ReviewPageCard for quiz: ${quiz.id}');
+                    _logger.d('복습 페이지 카드 빌드: quizId=${quiz.id}');
                     return ReviewPageCard(
                       key: ValueKey(quiz.id),
                       quiz: quiz,
@@ -96,8 +93,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                       questionNumber: index + 1,
                       onAnswerSelected: (answerIndex) =>
                           _handleAnswerSelected(quiz, answerIndex),
-                      // onDeleteReview: () => _deleteReview(
-                      //     quiz), // --------- TODO : 복습 목록에서 제거하는 버튼, Explanation 페이지의 복습목록 제거 버튼으로 대체해야 함. ---------//
                       subjectId: _selectedSubjectId!,
                       quizTypeId: quiz.typeId,
                       nextReviewDate: userProvider
@@ -108,7 +103,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                               )
                               ?.toIso8601String() ??
                           DateTime.now().toIso8601String(),
-                      buildFeedbackButtons: () => _buildFeedbackButtons(),
+                      buildFeedbackButtons: _buildFeedbackButtons,
                     );
                   },
                 );
@@ -138,7 +133,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   }
 
   Future<void> _handleAnswerSelected(Quiz quiz, int answerIndex) async {
-    _logger.i('Answer selected for quiz ${quiz.id}: $answerIndex');
+    _logger.i('복습 페이지 답변 선택: quizId=${quiz.id}, answerIndex=$answerIndex');
     final isCorrect = quiz.correctOptionIndex == answerIndex;
 
     await _userProvider.updateUserQuizData(
@@ -151,10 +146,9 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
 
     setState(() {
       _currentQuizIndex = _quizzesForReview.indexOf(quiz);
-      _showFeedbackButtons = true;
     });
 
-    _logger.d('Quiz data updated. isCorrect: $isCorrect');
+    _logger.d('복습 페이지 답변 업데이트: isCorrect=$isCorrect');
   }
 
   Widget _buildFeedbackButtons() {
@@ -186,11 +180,9 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   void _giveFeedback(bool isUnderstandingImproved) async {
     if (_currentQuizIndex != null) {
       final quiz = _quizzesForReview[_currentQuizIndex!];
-      final userAnswer = _userProvider.getUserAnswer(
-        _selectedSubjectId!,
-        quiz.typeId,
-        quiz.id,
-      );
+      final userData = _userProvider.getUserQuizData();
+      final userAnswer = userData[_selectedSubjectId]?[quiz.typeId]?[quiz.id]
+          ?['selectedOptionIndex'] as int?;
 
       if (userAnswer != null) {
         final isCorrect = quiz.correctOptionIndex == userAnswer;
@@ -205,7 +197,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
         );
 
         setState(() {
-          _showFeedbackButtons = false;
           _currentQuizIndex = null;
         });
 
@@ -217,7 +208,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   }
 
   Future<void> _refreshQuizzes() async {
-    _logger.i('Manually refreshing quiz list');
+    _logger.i('복습 페이지 수동 새로고침');
     setState(() {
       _isLoading = true;
     });
@@ -226,37 +217,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       _isLoading = false;
     });
   }
-
-// ------TODO : 복습 목록에서 제거하는 버튼, Explanation 페이지의 복습목록 제거 버튼으로 대체해야 함. ---------//
-  // Future<void> _deleteReview(Quiz quiz) async {
-  //   _logger.i('Deleting review for quiz: ${quiz.id}');
-  //   try {
-  //     await _userProvider.updateUserQuizData(
-  //       _selectedSubjectId!,
-  //       quiz.typeId,
-  //       quiz.id,
-  //       false,
-  //       toggleReviewStatus: false,
-  //     );
-  //     setState(() {
-  //       _quizzesForReview.removeWhere((q) => q.id == quiz.id);
-  //     });
-  //     _logger.i('Review deleted successfully');
-
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(content: Text('복습 목록에서 제거되었습니다.')),
-  //       );
-  //     }
-  //   } catch (e) {
-  //     _logger.e('Error deleting review: $e');
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(content: Text('복습 삭제 중 오류가 발생했습니다. 다시 시도해주세요.')),
-  //       );
-  //     }
-  //   }
-  // }
 
   void _handleSubjectChange(String? newSubjectId) {
     setState(() {

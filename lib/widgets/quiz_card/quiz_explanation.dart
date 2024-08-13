@@ -115,7 +115,7 @@ class _QuizExplanationState extends State<QuizExplanation> {
     logger.d('퀴즈 복습 목록에서 제거됨: quizId=${widget.quizId}');
 
     // --------- TODO : getNextReviewTimeString의 시간 데이터 값 추적 확인필요 : 복습시간이 anki 알고리즘을 사용하고 있는지 확인 필요. //
-    final reviewTimeString = userProvider.getNextReviewTimeString(
+    final reviewTimeString = userProvider.formatNextReviewDate(
         widget.subjectId, widget.quizTypeId, widget.quizId);
 
     logger.d('다음 복습 시간: $reviewTimeString');

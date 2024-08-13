@@ -76,20 +76,23 @@ class _QuizPageState extends State<QuizPage> {
 
   // 추가: 저장된 사용자 답변 로드 메서드
   void _loadSavedAnswers() {
+    final userData = _userProvider.getUserQuizData();
     for (var quiz in _quizzes) {
-      _selectedAnswers[quiz.id] = _userProvider.getUserAnswer(
-        widget.subjectId,
-        widget.quizTypeId,
-        quiz.id,
-      );
+      final quizData = userData[widget.subjectId]?[widget.quizTypeId]?[quiz.id];
+      if (quizData != null && quizData is Map<String, dynamic>) {
+        _selectedAnswers[quiz.id] = quizData['selectedOptionIndex'] as int?;
+      }
     }
   }
 
   int _findLastAnsweredQuizIndex() {
+    final userData = _userProvider.getUserQuizData();
     for (int i = _quizzes.length - 1; i >= 0; i--) {
-      if (_userProvider.getUserAnswer(
-              widget.subjectId, widget.quizTypeId, _quizzes[i].id) !=
-          null) {
+      final quizData =
+          userData[widget.subjectId]?[widget.quizTypeId]?[_quizzes[i].id];
+      if (quizData != null &&
+          quizData is Map<String, dynamic> &&
+          quizData['selectedOptionIndex'] != null) {
         return i + 1; // 마지막으로 답변한 퀴즈의 다음 인덱스 반환
       }
     }

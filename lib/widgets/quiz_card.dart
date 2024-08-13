@@ -386,7 +386,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
         ? const Color.fromARGB(255, 144, 223, 146)
         : const Color.fromARGB(255, 218, 141, 135);
 
-    final reviewTimeString = _userProvider.getNextReviewTimeString(
+    final reviewTimeString = _userProvider.formatNextReviewDate(
       widget.subjectId,
       widget.quizTypeId,
       widget.quiz.id,

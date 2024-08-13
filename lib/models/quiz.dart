@@ -1,3 +1,4 @@
+// quiz.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:logger/logger.dart';
 
@@ -10,7 +11,7 @@ class Quiz {
   final String typeId;
   final List<String> keywords;
   final String? imageUrl;
-  final int? year; //year field
+  final int? year;
   final String? examType;
 
   final Logger _logger = Logger();
@@ -24,57 +25,35 @@ class Quiz {
     required this.typeId,
     this.keywords = const [],
     this.imageUrl,
-    this.year, // year parameter
-    this.examType, // examType parameter
+    this.year,
+    this.examType,
   }) {
-    _logger.d('퀴즈 객체 생성');
+    _logger.d('퀴즈 데이터가 마크다운 지원으로 생성');
   }
 
-  Map<String, dynamic> toJson() => toFirestore();
+  // 중앙 변환 메서드
+  Map<String, dynamic> _toMap() => {
+        'id': id,
+        'question': question,
+        'options': options,
+        'correctOptionIndex': correctOptionIndex,
+        'explanation': explanation,
+        'typeId': typeId,
+        'keywords': keywords,
+        'imageUrl': imageUrl,
+        'year': year,
+        'examType': examType,
+      };
 
-  factory Quiz.fromFirestore(DocumentSnapshot doc, Logger logger) {
-    final data = doc.data() as Map<String, dynamic>;
-    logger.d('Firestore 데이터에서 퀴즈 생성: $data');
-
-    // imageUrl 처리 로직 개선
-    String? imageUrl = data['imageUrl'];
+  // 중앙 파싱 메서드
+  static Quiz _fromMap(Map<String, dynamic> map, {Logger? logger}) {
+    String? imageUrl = map['imageUrl'];
     if (imageUrl != null && !imageUrl.startsWith('http')) {
       imageUrl =
           'https://firebasestorage.googleapis.com/v0/b/nursingquizapp6.appspot.com/o/$imageUrl?alt=media';
     }
-    logger.d('이미지 URL 처리 완료: $imageUrl');
+    logger?.d('이미지 URL 처리 완료: $imageUrl');
 
-    return Quiz(
-      id: doc.id,
-      question: data['question'] ?? '',
-      options: List<String>.from(data['options'] ?? []),
-      correctOptionIndex: data['correctOptionIndex'] ?? 0,
-      explanation: data['explanation'] ?? '',
-      typeId: data['typeId'] ?? '',
-      keywords: List<String>.from(data['keywords'] ?? []),
-      imageUrl: imageUrl,
-      year: data['year'], // year field
-      examType: data['examType'], // examType field
-    );
-  }
-
-  factory Quiz.fromJson(Map<String, dynamic> json) {
-    return Quiz(
-      id: json['id'] ?? '',
-      question: json['question'] ?? '',
-      options: List<String>.from(json['options'] ?? []),
-      correctOptionIndex: json['correctOptionIndex'] ?? 0,
-      explanation: json['explanation'] ?? '',
-      typeId: json['typeId'] ?? '',
-      keywords: List<String>.from(json['keywords'] ?? []),
-      imageUrl: json['imageUrl'],
-      year: json['year'], // year field
-      examType: json['examType'], // examType field
-    );
-  }
-
-  // Add this method for caching
-  factory Quiz.fromMap(Map<String, dynamic> map) {
     return Quiz(
       id: map['id'] ?? '',
       question: map['question'] ?? '',
@@ -83,25 +62,27 @@ class Quiz {
       explanation: map['explanation'] ?? '',
       typeId: map['typeId'] ?? '',
       keywords: List<String>.from(map['keywords'] ?? []),
-      imageUrl: map['imageUrl'], // Ensure this is included in the map parsing
-      year: map['year'], // year field
-      examType: map['examType'], // examType field
+      imageUrl: imageUrl,
+      year: map['year'],
+      examType: map['examType'],
     );
   }
 
+  factory Quiz.fromFirestore(DocumentSnapshot doc, Logger logger) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    data['id'] = doc.id; // Firestore의 문서 ID를 map에 추가
+    logger.d('firestore 데이터로 퀴즈 생성: $data');
+    return _fromMap(data, logger: logger);
+  }
+
+  factory Quiz.fromJson(Map<String, dynamic> json) => _fromMap(json);
+
+  factory Quiz.fromMap(Map<String, dynamic> map) => _fromMap(map);
+
+  Map<String, dynamic> toJson() => _toMap();
+
   Map<String, dynamic> toFirestore() {
     _logger.d('퀴즈 데이터를 Firestore에 변환');
-    return {
-      'id': id,
-      'question': question,
-      'options': options,
-      'correctOptionIndex': correctOptionIndex,
-      'explanation': explanation,
-      'typeId': typeId,
-      'keywords': keywords,
-      'imageUrl': imageUrl,
-      'year': year, // year field
-      'examType': examType, // examType field
-    };
+    return _toMap();
   }
 }

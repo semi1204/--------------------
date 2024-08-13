@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
 import 'package:nursing_quiz_app_6/constants.dart';
+import 'package:nursing_quiz_app_6/models/quiz_user_data.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -15,16 +16,15 @@ class UserProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  // 사용자 퀴즈 데이터를 저장하는 맵
-  Map<String, Map<String, Map<String, Map<String, dynamic>>>> _quizData = {};
-  // 사용자가 리뷰카드 중 삭제한 퀴즈를 저장하는 집합
+  // 사용자 퀴즈데이터를 저장하는 맵
+  Map<String, Map<String, Map<String, QuizUserData>>> _quizData = {};
+  // 사용자가 삭제한 퀴즈데이터를 저장하는 셋
   Set<String> _deletedQuizzes = {};
-  // 사용자 데이터가 동기화되어야 하는지 여부
+  // 사용자 퀴즈데이터가 오프라인에서 동기화 되었는지 확인하는 변수
   bool _needsSync = false;
 
   User? get user => _user;
-  Map<String, Map<String, Map<String, Map<String, dynamic>>>> get quizData =>
-      _quizData;
+  Map<String, Map<String, Map<String, QuizUserData>>> get quizData => _quizData;
   bool get needsSync => _needsSync;
 
   bool get isAdmin {
@@ -115,9 +115,9 @@ class UserProvider with ChangeNotifier {
   }
 
   Future<void> deleteUserQuizData(
-      String userId, String subjectId, String quizTypeId, String quizId) async {
+      String subjectId, String quizTypeId, String quizId) async {
     _logger.i(
-        '유저${_user!.uid}의 퀴즈데이터 삭제: subject: $subjectId, quizType: $quizTypeId, quiz: $quizId');
+        '유저 ${_user!.uid}의 퀴즈 데이터 삭제: 주제: $subjectId, 퀴즈 타입: $quizTypeId, 퀴즈: $quizId');
     try {
       // Update local state
       _quizData[subjectId]?[quizTypeId]?.remove(quizId);
@@ -125,9 +125,10 @@ class UserProvider with ChangeNotifier {
 
       // Update SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_quiz_data_$userId', json.encode(_quizData));
+      await prefs.setString(
+          'user_quiz_data_${_user!.uid}', json.encode(_quizData));
       await prefs.setStringList(
-          'deleted_quizzes_$userId', _deletedQuizzes.toList());
+          'deleted_quizzes_${_user!.uid}', _deletedQuizzes.toList());
 
       notifyListeners();
       _logger.i('유저의 퀴즈데이터 삭제 성공');
@@ -158,13 +159,13 @@ class UserProvider with ChangeNotifier {
       if (cachedData != null) {
         try {
           final decodedData = json.decode(cachedData) as Map<String, dynamic>;
-          _quizData = _convertToNestedMap(decodedData);
-          _logger.i('유저${_user!.email}의 퀴즈데이터가 캐시에서 로드되었습니다');
+          _quizData = _convertToQuizUserDataMap(decodedData);
+          _logger.i('유저${_user!.email}의 퀴즈데이터 캐시 로드 성공');
           _loadDeletedQuizzes(prefs);
           notifyListeners();
           return;
         } catch (e) {
-          _logger.w('유저${_user!.email}의 퀴즈데이터 로드 실패: 캐시에서 데이터 파싱 실패: $e');
+          _logger.w('유저${_user!.email}의 퀴즈데이터 캐시 로드 실패: $e');
         }
       }
 
@@ -189,30 +190,21 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  // 새로운 헬퍼 메서드 추가
-  Map<String, Map<String, Map<String, Map<String, dynamic>>>>
-      _convertToNestedMap(Map<String, dynamic> data) {
-    return data.map((key, value) {
-      if (value is Map<String, dynamic>) {
-        return MapEntry(
-          key,
-          value.map((subKey, subValue) {
-            if (subValue is Map<String, dynamic>) {
-              return MapEntry(
-                subKey,
-                subValue.map((subSubKey, subSubValue) {
-                  if (subSubValue is Map<String, dynamic>) {
-                    return MapEntry(subSubKey, subSubValue);
-                  }
-                  return MapEntry(subSubKey, <String, dynamic>{});
-                }),
-              );
-            }
-            return MapEntry(subKey, <String, Map<String, dynamic>>{});
-          }),
-        );
-      }
-      return MapEntry(key, <String, Map<String, Map<String, dynamic>>>{});
+  Map<String, Map<String, Map<String, QuizUserData>>> _convertToQuizUserDataMap(
+      Map<String, dynamic> data) {
+    return data.map((subjectId, subjectData) {
+      return MapEntry(
+        subjectId,
+        (subjectData as Map<String, dynamic>).map((quizTypeId, quizTypeData) {
+          return MapEntry(
+            quizTypeId,
+            (quizTypeData as Map<String, dynamic>).map((quizId, quizData) {
+              return MapEntry(quizId,
+                  QuizUserData.fromJson(quizData as Map<String, dynamic>));
+            }),
+          );
+        }),
+      );
     });
   }
 
@@ -224,43 +216,15 @@ class UserProvider with ChangeNotifier {
     _logger.d('유저${_user!.email}의 삭제된 퀴즈 로드 성공: ${_deletedQuizzes.length}개');
   }
 
-  // 기기 내부 저장소에서 데이터 드
-  Future<Map<String, Map<String, Map<String, Map<String, dynamic>>>>?>
+  Future<Map<String, Map<String, Map<String, QuizUserData>>>?>
       _loadLocalData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final localData = prefs.getString('user_quiz_data_${_user!.uid}');
       if (localData != null) {
-        final decodedData = json.decode(localData);
-        _logger.d('유저${_user!.email}의 로컬 퀴즈데이터 디코딩 성공');
-
-        if (decodedData is Map<String, dynamic>) {
-          return decodedData.map((key, value) {
-            if (value is Map<String, dynamic>) {
-              return MapEntry(
-                key,
-                value.map((subKey, subValue) {
-                  if (subValue is Map<String, dynamic>) {
-                    return MapEntry(
-                      subKey,
-                      subValue.map((subSubKey, subSubValue) {
-                        if (subSubValue is Map<String, dynamic>) {
-                          return MapEntry(subSubKey, subSubValue);
-                        }
-                        return MapEntry(subSubKey, <String, dynamic>{});
-                      }),
-                    );
-                  }
-                  return MapEntry(subKey, <String, Map<String, dynamic>>{});
-                }),
-              );
-            }
-            return MapEntry(key, <String, Map<String, Map<String, dynamic>>>{});
-          });
-        } else {
-          _logger.w('유저의 퀴즈데이터 로드 실패: 디코딩된 데이터가 Map<String, dynamic>이 아님');
-          return null;
-        }
+        final decodedData = json.decode(localData) as Map<String, dynamic>;
+        _logger.d('유저${_user!.email}의 퀴즈데이터 로컬 데이터 디코딩 성공');
+        return _convertToQuizUserDataMap(decodedData);
       }
     } catch (e) {
       _logger.e('유저의 퀴즈데이터 로드 실패: $e');
@@ -270,8 +234,7 @@ class UserProvider with ChangeNotifier {
 
   // 유지해야하는 기능 : 사용자 답변 가져오기 (QuizPage에서만 사용)
   int? getUserAnswer(String subjectId, String quizTypeId, String quizId) {
-    return _quizData[subjectId]?[quizTypeId]?[quizId]?['selectedOptionIndex']
-        as int?;
+    return _quizData[subjectId]?[quizTypeId]?[quizId]?.selectedOptionIndex;
   }
 
   // 사용자가 선택한 답을 저장하는 메서드
@@ -282,15 +245,18 @@ class UserProvider with ChangeNotifier {
 
     _quizData[subjectId] ??= {};
     _quizData[subjectId]![quizTypeId] ??= {};
-    _quizData[subjectId]![quizTypeId]![quizId] ??= {};
-    _quizData[subjectId]![quizTypeId]![quizId]!['selectedOptionIndex'] =
+    _quizData[subjectId]![quizTypeId]![quizId] ??= QuizUserData(
+      nextReviewDate: DateTime.now(),
+      lastAnswered: DateTime.now(),
+    );
+    _quizData[subjectId]![quizTypeId]![quizId]!.selectedOptionIndex =
         answerIndex;
 
     await _saveQuizData();
     notifyListeners();
     _logger.i('User answer saved successfully');
-
-    _logger.d('Saved quiz data: ${_quizData[subjectId]?[quizTypeId]?[quizId]}');
+    _logger.d(
+        '유저${_user!.email}의 퀴즈데이터 저장 성공: ${_quizData[subjectId]?[quizTypeId]?[quizId]?.toJson()}');
   }
 
   // User마다 quizData를 저장하는 메서드
@@ -302,11 +268,11 @@ class UserProvider with ChangeNotifier {
 
         // 1. 캐시에 저장
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('유저${_user!.uid}의 퀴즈데이터', json.encode(_quizData));
-
-        // 2. 기기 내부 저장소에 저장
+        // 2. 로컬 저장소에 저장
         await prefs.setString(
-            '유저${_user!.uid}의 로컬 퀴즈데이터', json.encode(_quizData));
+            'user_quiz_data_${_user!.uid}', json.encode(_quizData));
+        await prefs.setString(
+            'user_local_quiz_data_${_user!.uid}', json.encode(_quizData));
 
         _logger.i('유저${_user!.uid}의 퀴즈데이터가 로컬 저장소에 성공적으로 저장되었습니다');
       } catch (e) {
@@ -343,45 +309,24 @@ class UserProvider with ChangeNotifier {
     if (quizId != null) {
       // 특정 퀴즈 아이디가 제공되었는지 확인
       if (_quizData[subjectId]?[quizTypeId]?[quizId] != null) {
-        // 해당 과목과 유형 퀴즈에 대한 데이터 존재 여부 확인
-        _quizData[subjectId]![quizTypeId]![quizId] = {
-          // 해당 퀴즈의 데이터를 새로운 객체로 초기화
-          'nextReviewDate': DateTime.now().toIso8601String(),
-          // Reset other fields as needed
-          'correct': 0,
-          'total': 0,
-          'accuracy': 0.0,
-          'interval': AnkiAlgorithm.initialInterval,
-          'easeFactor': AnkiAlgorithm.defaultEaseFactor,
-          'consecutiveCorrect': 0,
-          'mistakeCount': 0,
-          'markedForReview': false, // 복습리스트에서 제거하는 로직
-          'selectedOptionIndex': null,
-        };
+        _quizData[subjectId]![quizTypeId]![quizId] = QuizUserData(
+          nextReviewDate: DateTime.now(),
+          lastAnswered: DateTime.now(),
+        );
       }
       _logger.i('퀴즈 데이터 초기화: $quizId');
     } else {
-      // Reset all quizzes for the subject and quiz type
       if (_quizData[subjectId]?[quizTypeId] != null) {
         // 특정 과목과 유형에 대한 데이터가 존재 여부 확인
         for (var quizId in _quizData[subjectId]![quizTypeId]!.keys) {
-          // 해당 과목과 유형에 속한 퀴즈에 대해 반복
-          _quizData[subjectId]![quizTypeId]![quizId] = {
-            // 각 퀴즈 ID에 대한 데이터 초기화
-            'nextReviewDate': DateTime.now().toIso8601String(),
-            // Reset other fields as needed
-            'correct': 0,
-            'total': 0,
-            'accuracy': 0.0,
-            'interval': AnkiAlgorithm.initialInterval,
-            'easeFactor': AnkiAlgorithm.defaultEaseFactor,
-            'consecutiveCorrect': 0,
-            'mistakeCount': 0,
-            'markedForReview': false, // 복습리스트에서 제거하는 로직
-          };
+          _quizData[subjectId]![quizTypeId]![quizId] = QuizUserData(
+            nextReviewDate: DateTime.now(),
+            lastAnswered: DateTime.now(),
+          );
         }
       }
-      _logger.i('모든 퀴즈 데이터 초기화: 과목 $subjectId, 퀴즈 유형 $quizTypeId');
+      _logger
+          .i('유저${_user!.email}의 퀴즈데이터 초기화: 과목 $subjectId, 퀴즈 유형 $quizTypeId');
     }
 
     await _saveQuizData();
@@ -415,98 +360,74 @@ class UserProvider with ChangeNotifier {
     }
 
     try {
-      final quizData =
-          _quizData[subjectId]?[quizTypeId]?[quizId] ?? {}; // 퀴즈데이터 가져오기,
-      // 없으면 빈 객체를 반환 : 기본값을 가져옴
-      int correct = quizData['correct'] ?? 0;
-      int total = quizData['total'] ?? 0;
-      int consecutiveCorrect = quizData['consecutiveCorrect'] ?? 0; // 연속 정답 개수
-      int interval =
-          quizData['interval'] ?? AnkiAlgorithm.initialInterval; // 복습 간격
-      double easeFactor =
-          quizData['easeFactor'] ?? AnkiAlgorithm.defaultEaseFactor; // 쉬움 인수
-      int mistakeCount = quizData['mistakeCount'] ?? 0; // 실수 횟수
+      var quizData = _quizData[subjectId]?[quizTypeId]?[quizId] ??
+          QuizUserData(
+            nextReviewDate: DateTime.now(),
+            lastAnswered: DateTime.now(),
+          );
 
       if (toggleReviewStatus != null) {
-        // 복습상태를 변경하는 로직
-        // Handle review status toggling
-        final markForReview = toggleReviewStatus;
         final ankiResult = AnkiAlgorithm.calculateNextReview(
-          interval: interval,
-          easeFactor: easeFactor,
-          consecutiveCorrect: consecutiveCorrect,
+          interval: quizData.interval,
+          easeFactor: quizData.easeFactor,
+          consecutiveCorrect: quizData.consecutiveCorrect,
           isCorrect: isCorrect,
           qualityOfRecall: null,
-          mistakeCount: mistakeCount,
+          mistakeCount: quizData.mistakeCount,
           isUnderstandingImproved: isUnderstandingImproved,
-          markForReview: markForReview,
+          markForReview: toggleReviewStatus,
         );
 
-        final nextReviewDate = markForReview
+        quizData.nextReviewDate = toggleReviewStatus
             ? DateTime.now().add(Duration(days: ankiResult['interval'] as int))
-            : null;
-
-        _quizData[subjectId] ??= {};
-        _quizData[subjectId]![quizTypeId] ??= {};
-        _quizData[subjectId]![quizTypeId]![quizId] ??= {};
-        _quizData[subjectId]![quizTypeId]![quizId]!['markedForReview'] =
-            markForReview;
-        _quizData[subjectId]![quizTypeId]![quizId]!['nextReviewDate'] =
-            nextReviewDate?.toIso8601String();
+            : DateTime.now();
+        quizData.markedForReview = toggleReviewStatus;
       } else {
-        // Update quiz data as before
-        if (!quizData['markedForReview']) {
-          total++;
+        if (!quizData.markedForReview) {
+          quizData.total++;
           if (isCorrect) {
-            correct++;
-            consecutiveCorrect++;
+            quizData.correct++;
+            quizData.consecutiveCorrect++;
           } else {
-            mistakeCount++;
-            consecutiveCorrect = 0;
+            quizData.mistakeCount++;
+            quizData.consecutiveCorrect = 0;
           }
         }
 
         int? qualityOfRecall;
         if (answerTime != null) {
-          // 답변 시간이 주어진 경우
-          qualityOfRecall = // 기억 품질 평가수행(anki 알고리즘)
+          qualityOfRecall =
               AnkiAlgorithm.evaluateRecallQuality(answerTime, isCorrect);
         }
 
         final ankiResult = AnkiAlgorithm.calculateNextReview(
-          interval: interval,
-          easeFactor: easeFactor,
-          consecutiveCorrect: consecutiveCorrect,
+          interval: quizData.interval,
+          easeFactor: quizData.easeFactor,
+          consecutiveCorrect: quizData.consecutiveCorrect,
           isCorrect: isCorrect,
           qualityOfRecall: qualityOfRecall,
-          mistakeCount: mistakeCount,
+          mistakeCount: quizData.mistakeCount,
           isUnderstandingImproved: isUnderstandingImproved,
           markForReview: false,
         );
 
         // 학습데이터 업데이트하고 저장
         final now = DateTime.now();
-        final nextReviewDate =
-            now.add(Duration(days: ankiResult['interval'] as int));
-
-        _quizData[subjectId] ??= {};
-        _quizData[subjectId]![quizTypeId] ??= {};
-        _quizData[subjectId]![quizTypeId]![quizId] = {
-          'correct': correct,
-          'total': total,
-          'accuracy':
-              total > 0 ? correct / total : 0.0, // 퀴즈 횟수 시도가 있을 경우에만 정확도 계산
-          'interval': ankiResult['interval'],
-          'easeFactor': ankiResult['easeFactor'],
-          'consecutiveCorrect': ankiResult['consecutiveCorrect'],
-          'nextReviewDate': nextReviewDate.toIso8601String(),
-          'mistakeCount': ankiResult['mistakeCount'],
-          'lastAnswered': now.toIso8601String(),
-          'selectedOptionIndex': selectedOptionIndex,
-          'isUnderstandingImproved': isUnderstandingImproved,
-          'markedForReview': quizData['markedForReview'] ?? false,
-        };
+        quizData.interval = ankiResult['interval'] as int;
+        quizData.easeFactor = ankiResult['easeFactor'] as double;
+        quizData.consecutiveCorrect = ankiResult['consecutiveCorrect'] as int;
+        quizData.mistakeCount = ankiResult['mistakeCount'] as int;
+        quizData.nextReviewDate = now.add(Duration(days: quizData.interval));
+        quizData.lastAnswered = now;
+        quizData.selectedOptionIndex = selectedOptionIndex;
+        quizData.isUnderstandingImproved = isUnderstandingImproved;
+        quizData.accuracy =
+            quizData.total > 0 ? quizData.correct / quizData.total : 0.0;
       }
+
+      _quizData[subjectId] ??= {};
+      _quizData[subjectId]![quizTypeId] ??= {};
+      _quizData[subjectId]![quizTypeId]![quizId] = quizData;
 
       await _saveQuizData();
       notifyListeners();
@@ -521,9 +442,7 @@ class UserProvider with ChangeNotifier {
 
   // 특정 퀴즈의 실수 횟수를 가져오는 메소드
   int getQuizMistakeCount(String subjectId, String quizTypeId, String quizId) {
-    return _quizData[subjectId]?[quizTypeId]?[quizId]?['mistakeCount']
-            as int? ??
-        0;
+    return _quizData[subjectId]?[quizTypeId]?[quizId]?.mistakeCount ?? 0;
   }
 
   // 사용자의 데이터를 Firebase에 동기화하는 메소드
@@ -560,8 +479,7 @@ class UserProvider with ChangeNotifier {
   // 0으 나누는 상황을 방지해야 함.
   double getQuizAccuracy(String subjectId, String quizTypeId, String quizId) {
     final accuracy =
-        _quizData[subjectId]?[quizTypeId]?[quizId]?['accuracy'] as double? ??
-            0.0;
+        _quizData[subjectId]?[quizTypeId]?[quizId]?.accuracy ?? 0.0;
     _logger.i(
         '유저${_user!.uid}의 퀴즈 정확도: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, accuracy=$accuracy');
     return accuracy;
@@ -574,27 +492,15 @@ class UserProvider with ChangeNotifier {
       String subjectId, String quizTypeId, String quizId) {
     // _quizData에서 퀴즈 데이터를 가져옴
     final quizData = _quizData[subjectId]?[quizTypeId]?[quizId];
-    if (quizData == null || quizData.isEmpty) {
-      _logger.w('$quizId에 대한 퀴즈 데��터를 찾을 수 없습니다. null을 반환합니다.');
+    if (quizData == null) {
+      _logger.w('퀴즈 데이터를 찾을 수 없음: $quizId. Returning null.');
       return null;
     }
 
-    final nextReviewDateString = quizData['nextReviewDate'] as String?;
-    if (nextReviewDateString == null) {
-      _logger.w('$quizId에 대한 다음 복습 날짜를 찾을 수 없습니다. null을 반환합니다.');
-      return null;
-    }
-
-    try {
-      final nextReviewDate = DateTime.parse(nextReviewDateString);
-      // Ensure the next review date is not in the past
-      return nextReviewDate.isAfter(DateTime.now())
-          ? nextReviewDate
-          : DateTime.now();
-    } catch (e) {
-      _logger.e('다음 복습 날짜 계산 오류: $quizId: $e');
-      return null;
-    }
+    final nextReviewDate = quizData.nextReviewDate;
+    return nextReviewDate.isAfter(DateTime.now())
+        ? nextReviewDate
+        : DateTime.now();
   }
 
   // 다음 복습 시간을 표시하는 메서드
@@ -620,19 +526,19 @@ class UserProvider with ChangeNotifier {
 
     if (kDebugMode) {
       if (difference.inMinutes > 0) {
-        return '${difference.inMinutes}분';
+        return '${difference.inMinutes} 분';
       } else {
-        return '${difference.inSeconds}초';
+        return '${difference.inSeconds} 초';
       }
     } else {
       if (difference.inDays > 0) {
-        return '${difference.inDays}일';
+        return '${difference.inDays} 일';
       } else if (difference.inHours > 0) {
-        return '${difference.inHours}시간';
+        return '${difference.inHours} 시간';
       } else if (difference.inMinutes > 0) {
-        return '${difference.inMinutes}분';
+        return '${difference.inMinutes} 분';
       } else {
-        return '${difference.inSeconds}초';
+        return '${difference.inSeconds} 초';
       }
     }
   }
@@ -649,7 +555,7 @@ class UserProvider with ChangeNotifier {
 
   // Add this method for offline support
   Future<void> syncOfflineData() async {
-    _logger.i('오프라인 데이터 동기화');
+    _logger.i('오프라인 데이터 동기화 중');
     try {
       final prefs = await SharedPreferences.getInstance();
       final offlineData = prefs.getString('offline_quiz_data');
@@ -660,15 +566,12 @@ class UserProvider with ChangeNotifier {
             for (final quizId in decodedData[subjectId][quizTypeId].keys) {
               final quizData = decodedData[subjectId][quizTypeId][quizId];
               await updateUserQuizData(
-                subjectId,
-                quizTypeId,
-                quizId,
-                quizData['isCorrect'],
-                selectedOptionIndex: quizData['selectedOptionIndex'],
-                answerTime: Duration(seconds: quizData['answerTime'] ?? 0),
-                isUnderstandingImproved:
-                    quizData['isUnderstandingImproved'] ?? false,
-              );
+                  subjectId, quizTypeId, quizId, quizData['isCorrect'],
+                  selectedOptionIndex: quizData['selectedOptionIndex'],
+                  answerTime: Duration(seconds: quizData['answerTime'] ?? 0),
+                  isUnderstandingImproved:
+                      quizData['isUnderstandingImproved'] ?? false,
+                  toggleReviewStatus: quizData['toggleReviewStatus'] ?? false);
             }
           }
         }

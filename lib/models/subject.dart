@@ -6,38 +6,31 @@ class Subject {
 
   Subject({required this.id, required this.name});
 
-  factory Subject.fromFirestore(DocumentSnapshot doc) {
-    Map data = doc.data() as Map<String, dynamic>;
-    return Subject(
-      id: doc.id,
-      name: data['name'] ?? '',
-    );
-  }
-
-  // 수정: JSON 직렬화를 위한 메서드 추가
-  Map<String, dynamic> toJson() => {
+  // 중앙 변환 메서드
+  Map<String, dynamic> _toMap() => {
         'id': id,
         'name': name,
       };
 
-  // 수정: fromJson 메서드 추가
-  factory Subject.fromJson(Map<String, dynamic> json) {
-    return Subject(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-    );
-  }
-
-  // 기존 메서드는 그대로 유지
-  factory Subject.fromMap(Map<String, dynamic> map) {
+  // 중앙 파싱 메서드
+  static Subject _fromMap(Map<String, dynamic> map) {
     return Subject(
       id: map['id'] ?? '',
       name: map['name'] ?? '',
     );
   }
 
-  Map<String, dynamic> toFirestore() => {
-        'id': id,
-        'name': name,
-      };
+  factory Subject.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    data['id'] = doc.id; // Firestore의 문서 ID를 map에 추가
+    return _fromMap(data);
+  }
+
+  factory Subject.fromJson(Map<String, dynamic> json) => _fromMap(json);
+
+  factory Subject.fromMap(Map<String, dynamic> map) => _fromMap(map);
+
+  Map<String, dynamic> toJson() => _toMap();
+
+  Map<String, dynamic> toFirestore() => _toMap();
 }

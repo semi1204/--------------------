@@ -81,4 +81,6 @@ class AuthService {
     ]);
     _logger.i('User signed out');
   }
+
+  FirebaseAuth get auth => _auth;
 }

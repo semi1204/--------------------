@@ -4,17 +4,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
 import 'package:nursing_quiz_app_6/constants.dart';
 import 'package:nursing_quiz_app_6/models/quiz_user_data.dart';
+import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 class UserProvider with ChangeNotifier {
   User? _user;
   final Logger _logger = Logger();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final AuthService _authService = AuthService(); // Use AuthService
 
   // 사용자 퀴즈데이터를 저장하는 맵
   Map<String, Map<String, Map<String, QuizUserData>>> _quizData = {};
@@ -54,7 +53,7 @@ class UserProvider with ChangeNotifier {
   // Firebase의 currentUser를 사용하여 로그인 상태 확인
   Future<bool> isUserLoggedIn() async {
     try {
-      final currentUser = _auth.currentUser;
+      final currentUser = _authService.auth.currentUser;
       if (currentUser != null) {
         await setUser(currentUser);
         _logger.i('유저의 로그인 상태 확인 성공: ${currentUser.email}');
@@ -72,46 +71,21 @@ class UserProvider with ChangeNotifier {
 
   Future<User?> signInWithEmailAndPassword(
       String email, String password) async {
-    try {
-      final UserCredential userCredential =
-          await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      _logger.i('유저 ${userCredential.user?.email}가 이메일로 로그인 성공');
-
-      // 로그인 성공 시 토큰 저장
-      final String? token = await userCredential.user?.getIdToken();
-      if (token != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_token', token);
-      }
-
-      return userCredential.user;
-    } on FirebaseAuthException catch (e) {
-      _logger.e('유저의 로그인 실패: ${e.code} - ${e.message}');
-      rethrow;
-    } catch (e) {
-      _logger.e('유저의 로그인 실패: $e');
-      rethrow;
+    final user = await _authService.signInWithEmailAndPassword(email, password);
+    if (user != null) {
+      await setUser(user);
     }
+    return user;
   }
 
   Future<void> signOut() async {
-    try {
-      await Future.wait([
-        _auth.signOut(),
-        _googleSignIn.signOut(),
-      ]);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('user_token');
-      _logger.i('유저의 로그아웃 성공');
-      _quizData.clear();
-      _deletedQuizzes.clear();
-      notifyListeners();
-    } catch (e) {
-      _logger.e('유저의 로그아웃 실패: $e');
-    }
+    await _authService.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_token');
+    _logger.i('유저의 로그아웃 성공');
+    _quizData.clear();
+    _deletedQuizzes.clear();
+    notifyListeners();
   }
 
   Future<void> deleteUserQuizData(
@@ -460,7 +434,7 @@ class UserProvider with ChangeNotifier {
         'quizData': _quizData,
       }, SetOptions(merge: true));
       _needsSync = false;
-      _logger.i('��저${_user!.uid}의 데이터가 Firebase와 성공적으로 동기화되었습니다');
+      _logger.i('저${_user!.uid}의 데이터가 Firebase와 성공적으로 동기화되었습니다');
 
       // 로컬 저장소 업데이트
       final prefs = await SharedPreferences.getInstance();

@@ -7,7 +7,7 @@ class QuizUserData {
   int interval;
   double easeFactor;
   int consecutiveCorrect;
-  DateTime nextReviewDate;
+  DateTime? nextReviewDate; // nullable로 변경
   int mistakeCount;
   DateTime lastAnswered;
   int? selectedOptionIndex;
@@ -21,9 +21,9 @@ class QuizUserData {
     this.interval = AnkiAlgorithm.initialInterval,
     this.easeFactor = AnkiAlgorithm.defaultEaseFactor,
     this.consecutiveCorrect = 0,
-    required this.nextReviewDate,
-    this.mistakeCount = 0,
     required this.lastAnswered,
+    this.nextReviewDate,
+    this.mistakeCount = 0,
     this.selectedOptionIndex,
     this.isUnderstandingImproved = false,
     this.markedForReview = false,
@@ -36,7 +36,7 @@ class QuizUserData {
         'interval': interval,
         'easeFactor': easeFactor,
         'consecutiveCorrect': consecutiveCorrect,
-        'nextReviewDate': nextReviewDate.toIso8601String(),
+        'nextReviewDate': nextReviewDate?.toIso8601String(),
         'mistakeCount': mistakeCount,
         'lastAnswered': lastAnswered.toIso8601String(),
         'selectedOptionIndex': selectedOptionIndex,
@@ -51,8 +51,9 @@ class QuizUserData {
         interval: json['interval'] ?? AnkiAlgorithm.initialInterval,
         easeFactor: json['easeFactor'] ?? AnkiAlgorithm.defaultEaseFactor,
         consecutiveCorrect: json['consecutiveCorrect'] ?? 0,
-        nextReviewDate: DateTime.parse(
-            json['nextReviewDate'] ?? DateTime.now().toIso8601String()),
+        nextReviewDate: json['nextReviewDate'] != null
+            ? DateTime.parse(json['nextReviewDate'])
+            : null,
         mistakeCount: json['mistakeCount'] ?? 0,
         lastAnswered: DateTime.parse(
             json['lastAnswered'] ?? DateTime.now().toIso8601String()),

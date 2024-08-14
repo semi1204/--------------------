@@ -134,11 +134,14 @@ class _QuizPageCardState extends State<QuizPageCard> {
           widget.quizTypeId,
           widget.quiz.id,
         );
-        final isInReviewList =
-            nextReviewDate != null && nextReviewDate.isAfter(DateTime.now());
+        final quizData = userProvider.getUserQuizData()[widget.subjectId]
+            ?[widget.quizTypeId]?[widget.quiz.id];
+        final isInReviewList = nextReviewDate != null &&
+            (nextReviewDate.isBefore(DateTime.now()) ||
+                quizData?['markedForReview'] == true);
 
         _logger.d(
-            '퀴즈 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList');
+            '퀴즈 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList, nextReviewDate=$nextReviewDate, markedForReview=${quizData?['markedForReview']}');
 
         return Card(
           margin: const EdgeInsets.all(8.0),
@@ -260,8 +263,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
   }
 }
 
-// 복습 페이지 카드
-// TODO : MarkForReview가 된 퀴즈는 복습카드로 넘어가고, 복습페이지에서 보이기 시작하는지 확인 ---------//
+// --------- TODO : 복습버튼을 누르면서, quizpagecard ui는 그대로 두고, 동일한 quizid의 데이터를 공유하는 reviewcard를 써야함 ---------//
 class _ReviewPageCardState extends State<ReviewPageCard> {
   late final Logger _logger;
   late final UserProvider _userProvider;
@@ -280,17 +282,19 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
   Widget build(BuildContext context) {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
-        // -- TODO : 복습카드의 데이터를 quiz_service. getQuizzesForReview에서 가져오는지 확인 ---------//
         final nextReviewDate = userProvider.getNextReviewDate(
           widget.subjectId,
           widget.quizTypeId,
           widget.quiz.id,
         );
-        final isInReviewList =
-            nextReviewDate != null && nextReviewDate.isAfter(DateTime.now());
+        final quizData = userProvider.getUserQuizData()[widget.subjectId]
+            ?[widget.quizTypeId]?[widget.quiz.id];
+        final isInReviewList = nextReviewDate != null &&
+            (nextReviewDate.isBefore(DateTime.now()) ||
+                quizData?['markedForReview'] == true);
 
         _logger.d(
-            '복습 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList');
+            '복습 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList, nextReviewDate=$nextReviewDate, markedForReview=${quizData?['markedForReview']}');
 
         return Card(
           margin: const EdgeInsets.all(8.0),
@@ -339,9 +343,6 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                     onEdit: widget.onEdit,
                     onDelete: widget.onDelete,
                   ),
-                // Fixed : reviewpage에서 _deleteReview 메서드 호출되는지, 어떻게 데이터 구조를 일치시키는지 확인, 중복되는 부부은 삭제---------//
-                // Removed the onDeleteReview callback and the _deleteReview method
-                // Updated the UI to use the functionality from the Explanation page to remove the quiz from the review list
               ],
             ),
           ),

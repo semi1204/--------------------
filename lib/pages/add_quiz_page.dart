@@ -90,11 +90,9 @@ class _AddQuizPageState extends State<AddQuizPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SubjectDropdownWithAddButton(
-                quizService: _quizService,
-                logger: _logger,
+              UnifiedSubjectDropdown(
                 selectedSubjectId: _selectedSubjectId,
-                onChanged: (String? newValue) {
+                onSubjectSelected: (String? newValue) {
                   setState(() {
                     _selectedSubjectId = newValue;
                     _selectedTypeId = null;
@@ -102,6 +100,8 @@ class _AddQuizPageState extends State<AddQuizPage> {
                   _logger.i('선택된 과목 변경: $newValue');
                 },
                 onAddPressed: () => _showAddDialog(isSubject: true),
+                showAddButton: true,
+                useFormField: true,
               ),
               const SizedBox(height: 16),
               if (_selectedSubjectId != null)

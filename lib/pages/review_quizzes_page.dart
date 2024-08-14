@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nursing_quiz_app_6/widgets/review_quiz/subject_dropdown.dart';
+import 'package:nursing_quiz_app_6/widgets/add_quiz/subject_dropdown_with_add_button.dart';
 import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
 import '../models/quiz.dart';
@@ -8,7 +8,14 @@ import '../widgets/quiz_card.dart';
 import 'package:logger/logger.dart';
 
 class ReviewQuizzesPage extends StatefulWidget {
-  const ReviewQuizzesPage({super.key});
+  final String? initialSubjectId;
+  final String? initialQuizId;
+
+  const ReviewQuizzesPage({
+    super.key,
+    this.initialSubjectId,
+    this.initialQuizId,
+  });
 
   @override
   State<ReviewQuizzesPage> createState() => _ReviewQuizzesPageState();
@@ -29,12 +36,19 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     _quizService = Provider.of<QuizService>(context, listen: false);
     _userProvider = Provider.of<UserProvider>(context, listen: false);
     _logger = Provider.of<Logger>(context, listen: false);
+    _selectedSubjectId = widget.initialSubjectId;
     _logger.i('복습 페이지 초기화 완료');
-    _loadQuizzesForReview();
+
+    if (_selectedSubjectId != null) {
+      _loadQuizzesForReview();
+    }
   }
 
   Future<void> _loadQuizzesForReview() async {
-    if (_selectedSubjectId == null) return;
+    if (_selectedSubjectId == null || _selectedSubjectId!.isEmpty) {
+      _logger.w('선택된 과목이 없습니다.');
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -47,13 +61,16 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
         return;
       }
 
+      _logger.d('복습 퀴즈 로드 시작: userId=$userId, subjectId=$_selectedSubjectId');
+      // --------- TODO : ReviewCard(getUserQuizData에서 데이터 파싱 중)는 복습로직을 일치시켜야 함 ---------//
       _quizzesForReview = await _quizService.getQuizzesForReview(
         userId,
         _selectedSubjectId!,
-        '', // 복습은 과목 단위로 이루어짐
+        null, // 복습은 과목별로 이루어짐. tpye을 Null로 전달
       );
 
       _logger.i('복습 카드 ${_quizzesForReview.length}개 로드 완료');
+      _logger.d('로드된 퀴즈: ${_quizzesForReview.map((q) => q.id).toList()}');
     } catch (e) {
       _logger.e('퀴즈 복습 데이터를 불러올 수 없음: $e');
     } finally {
@@ -68,9 +85,20 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     return Scaffold(
       body: Column(
         children: [
-          SubjectDropdown(
+          UnifiedSubjectDropdown(
             selectedSubjectId: _selectedSubjectId,
-            onSubjectSelected: _handleSubjectChange,
+            onSubjectSelected: (String? newSubjectId) {
+              setState(() {
+                _selectedSubjectId = newSubjectId;
+              });
+              if (newSubjectId != null) {
+                _loadQuizzesForReview();
+              } else {
+                setState(() {
+                  _quizzesForReview = [];
+                });
+              }
+            },
           ),
           Expanded(
             child: Consumer<UserProvider>(
@@ -103,7 +131,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                               )
                               ?.toIso8601String() ??
                           DateTime.now().toIso8601String(),
-                      buildFeedbackButtons: _buildFeedbackButtons,
+                      buildFeedbackButtons: () => _buildFeedbackButtons(quiz),
                     );
                   },
                 );
@@ -151,12 +179,12 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     _logger.d('복습 페이지 답변 업데이트: isCorrect=$isCorrect');
   }
 
-  Widget _buildFeedbackButtons() {
+  Widget _buildFeedbackButtons(Quiz quiz) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         ElevatedButton(
-          onPressed: () => _giveFeedback(false),
+          onPressed: () => _giveFeedback(quiz, false),
           child: const Text('어려워요 🤔'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Color.fromARGB(255, 245, 127, 121),
@@ -165,11 +193,11 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
           ),
         ),
         ElevatedButton(
-          onPressed: () => _giveFeedback(true),
+          onPressed: () => _giveFeedback(quiz, true),
           child: const Text('이제 알겠어요! 😊'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Color.fromARGB(255, 176, 243, 179),
-            minimumSize: const Size(100, 36), // 버튼 크기 조정
+            minimumSize: const Size(100, 36),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
         ),
@@ -177,33 +205,32 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     );
   }
 
-  void _giveFeedback(bool isUnderstandingImproved) async {
-    if (_currentQuizIndex != null) {
-      final quiz = _quizzesForReview[_currentQuizIndex!];
-      final userData = _userProvider.getUserQuizData();
-      final userAnswer = userData[_selectedSubjectId]?[quiz.typeId]?[quiz.id]
-          ?['selectedOptionIndex'] as int?;
+  void _giveFeedback(Quiz quiz, bool isUnderstandingImproved) async {
+    _logger.i(
+        'Giving feedback: quizId=${quiz.id}, isUnderstandingImproved=$isUnderstandingImproved');
+    final userData = _userProvider.getUserQuizData();
+    final userAnswer = userData[_selectedSubjectId]?[quiz.typeId]?[quiz.id]
+        ?['selectedOptionIndex'] as int?;
 
-      if (userAnswer != null) {
-        final isCorrect = quiz.correctOptionIndex == userAnswer;
+    if (userAnswer != null) {
+      final isCorrect = quiz.correctOptionIndex == userAnswer;
 
-        await _userProvider.updateUserQuizData(
-          _selectedSubjectId!,
-          quiz.typeId,
-          quiz.id,
-          isCorrect,
-          isUnderstandingImproved: isUnderstandingImproved,
-          selectedOptionIndex: userAnswer,
-        );
+      await _userProvider.updateUserQuizData(
+        _selectedSubjectId!,
+        quiz.typeId,
+        quiz.id,
+        isCorrect,
+        isUnderstandingImproved: isUnderstandingImproved,
+        selectedOptionIndex: userAnswer,
+      );
 
-        setState(() {
-          _currentQuizIndex = null;
-        });
+      setState(() {
+        _currentQuizIndex = null;
+      });
 
-        await _refreshQuizzes();
-      } else {
-        _logger.w('사용자 답변이 없습니다. 퀴즈 ID: ${quiz.id}');
-      }
+      await _refreshQuizzes();
+    } else {
+      _logger.w('No user answer found for quiz: ${quiz.id}');
     }
   }
 
@@ -212,16 +239,10 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     setState(() {
       _isLoading = true;
     });
+
     await _loadQuizzesForReview();
     setState(() {
       _isLoading = false;
     });
-  }
-
-  void _handleSubjectChange(String? newSubjectId) {
-    setState(() {
-      _selectedSubjectId = newSubjectId;
-    });
-    _loadQuizzesForReview();
   }
 }

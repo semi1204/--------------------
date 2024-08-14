@@ -36,15 +36,11 @@ class _QuizExplanationState extends State<QuizExplanation> {
   void initState() {
     super.initState();
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    // getNextReviewDate에서 사용자의 다음 복습 시간을 가져옴.
-    final nextReviewDate = userProvider.getNextReviewDate(
+    isInReviewList = userProvider.isInReviewList(
       widget.subjectId,
       widget.quizTypeId,
       widget.quizId,
     );
-    isInReviewList =
-        nextReviewDate != null && nextReviewDate.isAfter(DateTime.now());
-    // 사용자의 복습 목록 여부를 판단함.
   }
 
   @override
@@ -80,16 +76,16 @@ class _QuizExplanationState extends State<QuizExplanation> {
         ),
         const SizedBox(height: 16),
         Align(
-          // Fixed : 버튼이 유동적으로 바뀌지 않음. 수정필요.
           alignment: Alignment.centerRight,
           child: ElevatedButton.icon(
             icon: Icon(
               isInReviewList ? Icons.remove_circle : Icons.add_circle,
               color: isInReviewList ? Colors.red : Colors.green,
             ),
+            // 버튼을 누르면, 복습카드로 전환함
             label: Text(isInReviewList ? '복습 목록에서 제거' : '복습 목록에 추가'),
-            onPressed: () => _toggleReviewStatus(
-                context, userProvider, widget.logger, isInReviewList),
+            onPressed: () =>
+                _toggleReviewStatus(context, userProvider, widget.logger),
             style: ElevatedButton.styleFrom(
               backgroundColor:
                   isInReviewList ? Colors.red[100] : Colors.green[100],
@@ -100,36 +96,42 @@ class _QuizExplanationState extends State<QuizExplanation> {
     );
   }
 
-  // --------- DONE : updateUserQuizData 호출로 변경 ---------//
-  void _toggleReviewStatus(BuildContext context, UserProvider userProvider,
-      Logger logger, bool markForReview) {
+  void _toggleReviewStatus(
+      BuildContext context, UserProvider userProvider, Logger logger) async {
     logger.i('Toggling review status for quiz: ${widget.quizId}');
 
-    userProvider.updateUserQuizData(
-      widget.subjectId,
-      widget.quizTypeId,
-      widget.quizId,
-      true, // isCorrect doesn't matter for review toggling
-      toggleReviewStatus: !markForReview,
-    );
-    logger.d('퀴즈 복습 목록에서 제거됨: quizId=${widget.quizId}');
+    String message;
+    String? reviewTimeString;
 
-    // --------- TODO : getNextReviewTimeString의 시간 데이터 값 추적 확인필요 : 복습시간이 anki 알고리즘을 사용하고 있는지 확인 필요. //
-    final reviewTimeString = userProvider.formatNextReviewDate(
-        widget.subjectId, widget.quizTypeId, widget.quizId);
-
-    logger.d('다음 복습 시간: $reviewTimeString');
+    if (isInReviewList) {
+      await userProvider.removeFromReviewList(
+        widget.subjectId,
+        widget.quizTypeId,
+        widget.quizId,
+      );
+      logger.d('퀴즈가 복습 목록에서 제거됨: quizId=${widget.quizId}');
+      message = '복습 목록에서 제거되었습니다.';
+    } else {
+      await userProvider.addToReviewList(
+        widget.subjectId,
+        widget.quizTypeId,
+        widget.quizId,
+      );
+      logger.d('퀴즈가 복습 목록에 추가됨: quizId=${widget.quizId}');
+      reviewTimeString = userProvider.formatNextReviewDate(
+        widget.subjectId,
+        widget.quizTypeId,
+        widget.quizId,
+      );
+      message = '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $reviewTimeString 후';
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      CommonSnackBar(
-        message: markForReview
-            ? '복습 목록에서 제거되었습니다.'
-            : '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $reviewTimeString 후',
-      ),
+      CommonSnackBar(message: message),
     );
 
     setState(() {
-      isInReviewList = !markForReview; // 상태 업데이트
+      isInReviewList = !isInReviewList;
     });
   }
 }

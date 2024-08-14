@@ -89,6 +89,7 @@ class QuizHeader extends StatelessWidget {
   }
 
   // --------- TODO : 퀴즈 초기화 버튼 클릭 시 데이터 이동확인 ---------//
+  // -------TODO : 초기화가 되었다면 카드의 복습여부 UI가 변경되어야 함 ---------//
   Future<void> _showResetConfirmationDialog(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,

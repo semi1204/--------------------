@@ -29,6 +29,8 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   List<Quiz> _quizzesForReview = [];
   bool _isLoading = false;
   int? _currentQuizIndex;
+  List<String> _completedQuizIds =
+      []; // Added: List to track completed quiz IDs
 
   @override
   void initState() {
@@ -113,7 +115,11 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                   itemCount: _quizzesForReview.length,
                   itemBuilder: (context, index) {
                     final quiz = _quizzesForReview[index];
-                    _logger.d('복습 페이지 카드 빌드: quizId=${quiz.id}');
+                    if (_completedQuizIds.contains(quiz.id)) {
+                      return const SizedBox
+                          .shrink(); // Do not show completed quizzes
+                    }
+                    _logger.d('Building review card: quizId=${quiz.id}');
                     return ReviewPageCard(
                       key: ValueKey(quiz.id),
                       quiz: quiz,
@@ -131,6 +137,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                               )
                               ?.toIso8601String() ??
                           DateTime.now().toIso8601String(),
+                      // TODO : 피드백버튼이 '복습 목록제거'보다 위에 있어야함.
                       buildFeedbackButtons: () => _buildFeedbackButtons(quiz),
                     );
                   },
@@ -185,18 +192,18 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       children: [
         ElevatedButton(
           onPressed: () => _giveFeedback(quiz, false),
-          child: const Text('어려워요 🤔'),
+          child: const Text('어려움 🤔', style: TextStyle(color: Colors.black)),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color.fromARGB(255, 245, 127, 121),
-            minimumSize: const Size(100, 36), // 버튼 크기 조정
+            backgroundColor: Color.fromRGBO(255, 196, 199, 1),
+            minimumSize: const Size(100, 36),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
         ),
         ElevatedButton(
           onPressed: () => _giveFeedback(quiz, true),
-          child: const Text('이제 알겠어요! 😊'),
+          child: const Text('알겠음 😊', style: TextStyle(color: Colors.black)),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color.fromARGB(255, 176, 243, 179),
+            backgroundColor: Color.fromRGBO(196, 251, 199, 1),
             minimumSize: const Size(100, 36),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
@@ -225,10 +232,20 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       );
 
       setState(() {
+        _completedQuizIds.add(quiz.id); // Add completed quiz ID
         _currentQuizIndex = null;
       });
 
-      await _refreshQuizzes();
+      // Logic to remove from review list remains
+      if (isUnderstandingImproved) {
+        await _userProvider.removeFromReviewList(
+          _selectedSubjectId!,
+          quiz.typeId,
+          quiz.id,
+        );
+      }
+
+      // _refreshQuizzes() method call removed
     } else {
       _logger.w('No user answer found for quiz: ${quiz.id}');
     }

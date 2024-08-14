@@ -7,6 +7,7 @@ import 'package:logger/logger.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/network_image_with_loader.dart'; // 새로 추가
 
+//TODO : 마크다운 에디터 내에 있는 글자의 크기를 키우고, 글씨체를 궁서체로 변경해야 함.
 class MarkdownRenderer extends StatelessWidget {
   final String data;
   final Logger logger;
@@ -68,6 +69,8 @@ class MathBuilder extends MarkdownElementBuilder {
   }
 }
 
+// TODO : 이미지 크기 조정 필요함(퀴즈카드의 가로 크기에 맞춰야함)
+// TODO : 퀴즈카드가 빌드 될 때, 캐시나, provider로 이미지를 효율적으로 가져와야함
 class ImageBuilder extends MarkdownElementBuilder {
   final Logger logger;
 
@@ -107,6 +110,7 @@ class InlineMathSyntax extends md.InlineSyntax {
   }
 }
 
+// TODO : 분수 표현 시 글자크기를 1.5배로 키워야 함
 class KoreanFractionSyntax extends md.InlineSyntax {
   KoreanFractionSyntax()
       : super(r'\{([\p{Hangul}\s]+)\s*/\s*([\p{Hangul}\s]+)\}');

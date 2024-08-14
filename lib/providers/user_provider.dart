@@ -96,7 +96,7 @@ class UserProvider with ChangeNotifier {
       isUnderstandingImproved: isUnderstandingImproved,
       toggleReviewStatus: toggleReviewStatus,
     );
-    notifyListeners();
+    //notifyListeners();
   }
 
   // 복습 리스트(복습리스트엔 복습카드가 존재해야 함)에 퀴즈를 추가하는 메소드

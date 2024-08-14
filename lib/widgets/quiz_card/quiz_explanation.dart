@@ -83,12 +83,16 @@ class _QuizExplanationState extends State<QuizExplanation> {
               color: isInReviewList ? Colors.red : Colors.green,
             ),
             // 버튼을 누르면, 복습카드로 전환함
-            label: Text(isInReviewList ? '복습 목록에서 제거' : '복습 목록에 추가'),
+            label: Text(
+              isInReviewList ? '복습 목록에서 제거' : '복습 목록에 추가',
+              style: const TextStyle(color: Colors.black),
+            ),
             onPressed: () =>
                 _toggleReviewStatus(context, userProvider, widget.logger),
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  isInReviewList ? Colors.red[100] : Colors.green[100],
+              backgroundColor: isInReviewList
+                  ? const Color.fromRGBO(255, 196, 199, 1)
+                  : const Color.fromRGBO(196, 251, 199, 1),
             ),
           ),
         ),

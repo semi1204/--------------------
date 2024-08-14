@@ -241,8 +241,8 @@ class _QuizPageCardState extends State<QuizPageCard> {
   void _showAnswerSnackBar(bool isCorrect) {
     String message = isCorrect ? '정답입니다! 🎉' : '오답입니다. 다시 도전해보세요! 💪';
     Color backgroundColor = isCorrect
-        ? const Color.fromARGB(255, 144, 223, 146)
-        : const Color.fromARGB(255, 218, 141, 135);
+        ? const Color.fromRGBO(196, 251, 199, 1)
+        : const Color.fromRGBO(255, 196, 199, 1);
 
     final snackBar = SnackBar(
       content: Text(
@@ -381,11 +381,12 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
     }
   }
 
+  // TODO : 복습페이지에서 정답표시와 복습시간 표시 두개를 동시에 보여줘야함.
   void _showAnswerSnackBar(bool isCorrect) {
     String message = isCorrect ? '정답입니다! 🎉' : '오답입니다. 다시 도전해보세요! 💪';
     Color backgroundColor = isCorrect
-        ? const Color.fromARGB(255, 144, 223, 146)
-        : const Color.fromARGB(255, 218, 141, 135);
+        ? const Color.fromRGBO(196, 251, 199, 1)
+        : const Color.fromRGBO(255, 196, 199, 1);
 
     final reviewTimeString = _userProvider.formatNextReviewDate(
       widget.subjectId,

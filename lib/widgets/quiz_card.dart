@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_admin_actions.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_explanation.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_header.dart';
@@ -424,11 +425,14 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
         selectedOptionIndex: userAnswer,
       );
 
+      // 이해도가 향상되었을 때 복습 목록에서 데이터 업데이트
       if (isUnderstandingImproved) {
-        await _userProvider.removeFromReviewList(
+        await _userProvider.updateUserQuizData(
           widget.subjectId,
           widget.quizTypeId,
           widget.quiz.id,
+          isCorrect,
+          isUnderstandingImproved: true,
         );
       }
 
@@ -443,10 +447,8 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
 
       if (nextReviewDate != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            // ---- TODO : 누르자마자 복습시간이 경과되었습니다라고 표시되는 이유를 찾고 막아야함. ---------//
-            content: Text('다음 복습은 $nextReviewDate 후입니다.'),
-            duration: const Duration(seconds: 3),
+          CommonSnackBar(
+            message: '다음 복습은 $nextReviewDate 후입니다.',
           ),
         );
       }

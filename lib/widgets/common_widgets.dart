@@ -80,7 +80,7 @@ class CommonSnackBar extends SnackBar {
     super.key,
     required String message,
     Color backgroundColor = const Color.fromARGB(255, 106, 105, 106),
-    Duration duration = const Duration(seconds: 3),
+    Duration duration = const Duration(seconds: 2),
   }) : super(
           content: Text(
             message,

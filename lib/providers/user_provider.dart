@@ -206,6 +206,7 @@ class UserProvider with ChangeNotifier {
     await _quizService.syncUserData(_user!.uid, getUserQuizData());
   }
 
+  // ---TODO : reset버튼을 누르면, 개별적인 퀴즈ID를 초기화 해야함. 지금은 전체 퀴즈를 초기화함. ---------//
   Future<void> resetUserAnswers(String subjectId, String quizTypeId,
       {required String quizId}) async {
     if (_user == null) {

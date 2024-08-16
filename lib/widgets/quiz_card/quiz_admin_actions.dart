@@ -5,10 +5,10 @@ class QuizAdminActions extends StatelessWidget {
   final VoidCallback? onDelete;
 
   const QuizAdminActions({
-    Key? key,
+    super.key,
     this.onEdit,
     this.onDelete,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

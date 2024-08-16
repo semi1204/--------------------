@@ -66,7 +66,7 @@ class QuizPageCard extends BaseQuizCard {
 class ReviewPageCard extends BaseQuizCard {
   final Function(int) onAnswerSelected;
   final VoidCallback? onDeleteReview;
-  final Widget Function() buildFeedbackButtons;
+  final Function(Quiz, bool) onFeedbackGiven;
 
   const ReviewPageCard({
     super.key,
@@ -80,7 +80,7 @@ class ReviewPageCard extends BaseQuizCard {
     required super.nextReviewDate,
     required this.onAnswerSelected,
     this.onDeleteReview,
-    required this.buildFeedbackButtons,
+    required this.onFeedbackGiven,
   });
 
   @override
@@ -263,7 +263,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
   }
 }
 
-// --------- TODO : 복습버튼을 누르면서, quizpagecard ui는 그대로 두고, 동일한 quizid의 데이터를 공유하는 reviewcard를 써야함 ---------//
+// 복습버튼을 누르면서, quizpagecard ui는 그대로 두고, 동일한 quizid의 데이터를 공유하는 reviewcard를 써야함 ---------//
 class _ReviewPageCardState extends State<ReviewPageCard> {
   late final Logger _logger;
   late final UserProvider _userProvider;
@@ -334,9 +334,8 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                     subjectId: widget.subjectId,
                     quizTypeId: widget.quizTypeId,
                     rebuildTrigger: false,
+                    feedbackButtons: _buildFeedbackButtons(),
                   ),
-                  const SizedBox(height: 16),
-                  widget.buildFeedbackButtons(),
                 ],
                 if (widget.isAdmin)
                   QuizAdminActions(
@@ -373,47 +372,86 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
 
       widget.onAnswerSelected(index);
 
-      _showAnswerSnackBar(isCorrect);
-
       _logger.i('복습 페이지 카드: 유저가 옵션 $index 선택. 정답: $isCorrect.');
     } else {
       _logger.i('복습 페이지 카드: 옵션이 이미 선택되었습니다. 새로운 선택을 무시합니다.');
     }
   }
 
-  // TODO : 복습페이지에서 정답표시와 복습시간 표시 두개를 동시에 보여줘야함.
-  void _showAnswerSnackBar(bool isCorrect) {
-    String message = isCorrect ? '정답입니다! 🎉' : '오답입니다. 다시 도전해보세요! 💪';
-    Color backgroundColor = isCorrect
-        ? const Color.fromRGBO(196, 251, 199, 1)
-        : const Color.fromRGBO(255, 196, 199, 1);
-
-    final reviewTimeString = _userProvider.formatNextReviewDate(
-      widget.subjectId,
-      widget.quizTypeId,
-      widget.quiz.id,
-    );
-    if (kDebugMode) {
-      message += '\n다음 복습은 $reviewTimeString 후입니다. (디버그 모드)';
-    } else {
-      message += '\n다음 복습은 $reviewTimeString 후입니다.';
-    }
-
-    final snackBar = SnackBar(
-      content: Text(
-        message,
-        style: const TextStyle(
-          color: Colors.black,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
+  Widget _buildFeedbackButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        ElevatedButton(
+          onPressed: () => _giveFeedback(false),
+          child: const Text('어려움 🤔', style: TextStyle(color: Colors.black)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color.fromRGBO(255, 196, 199, 1),
+            minimumSize: const Size(100, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
         ),
-      ),
-      backgroundColor: backgroundColor,
-      duration: const Duration(seconds: 3),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+        ElevatedButton(
+          onPressed: () => _giveFeedback(true),
+          child: const Text('알겠음 😊', style: TextStyle(color: Colors.black)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color.fromRGBO(196, 251, 199, 1),
+            minimumSize: const Size(100, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+        ),
+      ],
     );
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+  // ---- TODO : 피드백 버튼을 누르면 앱 전체가 재빌드 되는 현상이 발생하고 있음 ---------//
+  void _giveFeedback(bool isUnderstandingImproved) async {
+    _logger.i(
+        'Giving feedback: quizId=${widget.quiz.id}, isUnderstandingImproved=$isUnderstandingImproved');
+    final userData = _userProvider.getUserQuizData();
+    final userAnswer = userData[widget.subjectId]?[widget.quizTypeId]
+        ?[widget.quiz.id]?['selectedOptionIndex'] as int?;
+
+    if (userAnswer != null) {
+      final isCorrect = widget.quiz.correctOptionIndex == userAnswer;
+
+      await _userProvider.updateUserQuizData(
+        widget.subjectId,
+        widget.quizTypeId,
+        widget.quiz.id,
+        isCorrect,
+        isUnderstandingImproved: isUnderstandingImproved,
+        selectedOptionIndex: userAnswer,
+      );
+
+      if (isUnderstandingImproved) {
+        await _userProvider.removeFromReviewList(
+          widget.subjectId,
+          widget.quizTypeId,
+          widget.quiz.id,
+        );
+      }
+
+      widget.onFeedbackGiven(widget.quiz, isUnderstandingImproved);
+
+      // 다음 복습 시간을 가져와 Snackbar로 표시
+      final nextReviewDate = _userProvider.formatNextReviewDate(
+        widget.subjectId,
+        widget.quizTypeId,
+        widget.quiz.id,
+      );
+
+      if (nextReviewDate != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            // ---- TODO : 누르자마자 복습시간이 경과되었습니다라고 표시되는 이유를 찾고 막아야함. ---------//
+            content: Text('다음 복습은 $nextReviewDate 후입니다.'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } else {
+      _logger.w('No user answer found for quiz: ${widget.quiz.id}');
+    }
   }
 }

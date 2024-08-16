@@ -116,7 +116,6 @@ class UserProvider with ChangeNotifier {
   }
 
   // 복습 리스트에서 퀴즈를 제거하는 메소드
-  // --------- 복습리스트에 존재하는 것과, 복습카드가 나오는 것을 구분해야 함.---------//
   Future<void> removeFromReviewList(
     String subjectId,
     String quizTypeId,
@@ -135,7 +134,6 @@ class UserProvider with ChangeNotifier {
   }
 
   // 복습 리스트에 복습 퀴즈가 존재하는지 확인하는 메소드
-  // --------- 복습리스트에 존재하는 것과, 복습카드가 나오는 것을 구분해야 함.---------//
   bool isInReviewList(String subjectId, String quizTypeId, String quizId) {
     if (_user == null) {
       _logger.w('사용자 ID가 없습니다. 복습 리스트에 퀴즈가 존재하는지 확인할 수 없음');
@@ -146,7 +144,6 @@ class UserProvider with ChangeNotifier {
   }
 
   // 복습 리스트에 존재하는 퀴즈의 다음 복습 날짜를 확인하는 메소드
-  // --------- 복습리스트에 존재하는 것과, 복습카드가 나오는 것을 구분해야 함.---------//
   DateTime? getNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
     if (_user == null) {
@@ -160,16 +157,20 @@ class UserProvider with ChangeNotifier {
   // 복습 리스트에 존재하는 퀴즈의 다음 복습 날짜를 포맷팅하는 메소드
   String? formatNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
+    //  `getNextReviewDate` 메소드를 호출하여 해당 날짜를 가져옴
     final nextReviewDate = getNextReviewDate(subjectId, quizTypeId, quizId);
+    //다음 복습 날짜가 설정되지 않았는지 확인
     if (nextReviewDate == null) {
       _logger.w('다음 복습 날짜를 포맷팅할 수 없음: 날짜가 설정되지 않았습니다');
       return null;
     }
 
     final now = DateTime.now();
+    // 다음 복습 날짜와 현재 날짜의 차이를 계산
     final difference = nextReviewDate.difference(now);
 
     if (difference.isNegative) {
+      //차이가 음수인지 확인하여 복습 시간이 경과했는지 판단
       return '복습시간이 경과했습니다';
     }
 
@@ -177,8 +178,8 @@ class UserProvider with ChangeNotifier {
   }
 
   // 서비스로부터 리뷰할 퀴즈를 받는 메소드
-  // --------- TODO : 복습리스트에 존재하는 것과, 복습카드가 나오는 것을 구분해야 함.---------//
-  // --------- TODO : getQuizzesForReview의 역할을 명확하게 해야함.---------//
+  // 복습리스트에 존재하는 것과, 복습카드가 나오는 것을 구분해야 함.
+  // getQuizzesForReview의 역할을 명확하게 해야함.
   Future<List<Quiz>> getQuizzesForReview(
       String subjectId, String quizTypeId) async {
     if (_user == null) {

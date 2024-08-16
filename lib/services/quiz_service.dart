@@ -205,6 +205,7 @@ class QuizService {
   DateTime? getNextReviewDate(
       String userId, String subjectId, String quizTypeId, String quizId) {
     return _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId]
+        //`_userQuizData`에서 주어진 ID들로 접근하여 해당 퀴즈의 `nextReviewDate`를 가져옴.
         ?.nextReviewDate;
   }
 

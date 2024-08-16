@@ -13,6 +13,7 @@ class QuizExplanation extends StatefulWidget {
   final String subjectId;
   final String quizTypeId;
   final bool rebuildTrigger;
+  final Widget? feedbackButtons; // New property added
 
   const QuizExplanation({
     super.key,
@@ -23,6 +24,7 @@ class QuizExplanation extends StatefulWidget {
     required this.subjectId,
     required this.quizTypeId,
     required this.rebuildTrigger,
+    this.feedbackButtons, // Added to the constructor
   });
 
   @override
@@ -52,7 +54,7 @@ class _QuizExplanationState extends State<QuizExplanation> {
       children: [
         if (widget.keywords.isNotEmpty) ...[
           const Text(
-            'Keywords',
+            '키워드',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 8),
@@ -66,7 +68,7 @@ class _QuizExplanationState extends State<QuizExplanation> {
           const SizedBox(height: 16),
         ],
         const Text(
-          'Explanation',
+          '해설',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         const SizedBox(height: 8),
@@ -75,6 +77,10 @@ class _QuizExplanationState extends State<QuizExplanation> {
           logger: widget.logger,
         ),
         const SizedBox(height: 16),
+        if (widget.feedbackButtons != null) ...[
+          widget.feedbackButtons!,
+          const SizedBox(height: 16),
+        ],
         Align(
           alignment: Alignment.centerRight,
           child: ElevatedButton.icon(
@@ -100,6 +106,7 @@ class _QuizExplanationState extends State<QuizExplanation> {
     );
   }
 
+  // 복습상태를 토글하는 메소드
   void _toggleReviewStatus(
       BuildContext context, UserProvider userProvider, Logger logger) async {
     logger.i('Toggling review status for quiz: ${widget.quizId}');
@@ -108,6 +115,7 @@ class _QuizExplanationState extends State<QuizExplanation> {
     String? reviewTimeString;
 
     if (isInReviewList) {
+      // 복습목록에서 제거
       await userProvider.removeFromReviewList(
         widget.subjectId,
         widget.quizTypeId,
@@ -116,12 +124,14 @@ class _QuizExplanationState extends State<QuizExplanation> {
       logger.d('퀴즈가 복습 목록에서 제거됨: quizId=${widget.quizId}');
       message = '복습 목록에서 제거되었습니다.';
     } else {
+      // 복습목록에 추가
       await userProvider.addToReviewList(
         widget.subjectId,
         widget.quizTypeId,
         widget.quizId,
       );
       logger.d('퀴즈가 복습 목록에 추가됨: quizId=${widget.quizId}');
+      // 복습목록에 추가하는 순간 다음 복습 시간을 가져옴
       reviewTimeString = userProvider.formatNextReviewDate(
         widget.subjectId,
         widget.quizTypeId,

@@ -64,7 +64,6 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
       }
 
       _logger.d('복습 퀴즈 로드 시작: userId=$userId, subjectId=$_selectedSubjectId');
-      // --------- TODO : ReviewCard(getUserQuizData에서 데이터 파싱 중)는 복습로직을 일치시켜야 함 ---------//
       _quizzesForReview = await _quizService.getQuizzesForReview(
         userId,
         _selectedSubjectId!,
@@ -137,8 +136,12 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                               )
                               ?.toIso8601String() ??
                           DateTime.now().toIso8601String(),
-                      // TODO : 피드백버튼이 '복습 목록제거'보다 위에 있어야함.
-                      buildFeedbackButtons: () => _buildFeedbackButtons(quiz),
+                      onFeedbackGiven: (quiz, isUnderstandingImproved) {
+                        setState(() {
+                          _completedQuizIds.add(quiz.id);
+                          _currentQuizIndex = null;
+                        });
+                      },
                     );
                   },
                 );
@@ -184,82 +187,5 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     });
 
     _logger.d('복습 페이지 답변 업데이트: isCorrect=$isCorrect');
-  }
-
-  Widget _buildFeedbackButtons(Quiz quiz) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        ElevatedButton(
-          onPressed: () => _giveFeedback(quiz, false),
-          child: const Text('어려움 🤔', style: TextStyle(color: Colors.black)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color.fromRGBO(255, 196, 199, 1),
-            minimumSize: const Size(100, 36),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () => _giveFeedback(quiz, true),
-          child: const Text('알겠음 😊', style: TextStyle(color: Colors.black)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color.fromRGBO(196, 251, 199, 1),
-            minimumSize: const Size(100, 36),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _giveFeedback(Quiz quiz, bool isUnderstandingImproved) async {
-    _logger.i(
-        'Giving feedback: quizId=${quiz.id}, isUnderstandingImproved=$isUnderstandingImproved');
-    final userData = _userProvider.getUserQuizData();
-    final userAnswer = userData[_selectedSubjectId]?[quiz.typeId]?[quiz.id]
-        ?['selectedOptionIndex'] as int?;
-
-    if (userAnswer != null) {
-      final isCorrect = quiz.correctOptionIndex == userAnswer;
-
-      await _userProvider.updateUserQuizData(
-        _selectedSubjectId!,
-        quiz.typeId,
-        quiz.id,
-        isCorrect,
-        isUnderstandingImproved: isUnderstandingImproved,
-        selectedOptionIndex: userAnswer,
-      );
-
-      setState(() {
-        _completedQuizIds.add(quiz.id); // Add completed quiz ID
-        _currentQuizIndex = null;
-      });
-
-      // Logic to remove from review list remains
-      if (isUnderstandingImproved) {
-        await _userProvider.removeFromReviewList(
-          _selectedSubjectId!,
-          quiz.typeId,
-          quiz.id,
-        );
-      }
-
-      // _refreshQuizzes() method call removed
-    } else {
-      _logger.w('No user answer found for quiz: ${quiz.id}');
-    }
-  }
-
-  Future<void> _refreshQuizzes() async {
-    _logger.i('복습 페이지 수동 새로고침');
-    setState(() {
-      _isLoading = true;
-    });
-
-    await _loadQuizzesForReview();
-    setState(() {
-      _isLoading = false;
-    });
   }
 }

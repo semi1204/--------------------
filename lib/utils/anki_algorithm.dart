@@ -135,4 +135,9 @@ class AnkiAlgorithm {
       return 2;
     }
   }
+
+  static DateTime calculateNextReviewDate(int interval) {
+    _logger.d('다음 복습 날짜 계산: interval=$interval');
+    return DateTime.now().add(Duration(minutes: interval));
+  }
 }

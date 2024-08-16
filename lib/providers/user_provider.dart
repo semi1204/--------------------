@@ -82,9 +82,11 @@ class UserProvider with ChangeNotifier {
     bool? toggleReviewStatus,
   }) async {
     if (_user == null) {
-      _logger.w('Cannot update quiz data: No user logged in');
+      _logger.w('사용자 ID가 없습니다. 퀴즈 데이터를 업데이트할 수 없음');
       return;
     }
+    _logger.i(
+        '사용자 퀴즈 데이터 업데이트: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, 정답여부=$isCorrect, 이해도 향상여부=$isUnderstandingImproved');
     await _quizService.updateUserQuizData(
       _user!.uid,
       subjectId,
@@ -96,6 +98,7 @@ class UserProvider with ChangeNotifier {
       isUnderstandingImproved: isUnderstandingImproved,
       toggleReviewStatus: toggleReviewStatus,
     );
+    _logger.d('사용자 퀴즈 데이터 업데이트 성공');
     //notifyListeners();
   }
 
@@ -147,7 +150,7 @@ class UserProvider with ChangeNotifier {
   DateTime? getNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
     if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 다음 복습 날짜를 확인할 수 없음');
+      _logger.w('사용자 ID가 없습니다. 다음 복습 날짜를 확인할 수 ��음');
       return null;
     }
     return _quizService.getNextReviewDate(
@@ -206,16 +209,18 @@ class UserProvider with ChangeNotifier {
     await _quizService.syncUserData(_user!.uid, getUserQuizData());
   }
 
-  // ---TODO : reset버튼을 누르면, 개별적인 퀴즈ID를 초기화 해야함. 지금은 전체 퀴즈를 초기화함. ---------//
-  Future<void> resetUserAnswers(String subjectId, String quizTypeId,
-      {required String quizId}) async {
+  // ---DONE : reset버튼을 누르면, 개별적인 퀴즈ID를 초기화 해야함. 지금은 전체 퀴즈를 초기화함. ---------//
+  Future<void> resetUserAnswers(
+      String subjectId, String quizTypeId, String quizId) async {
+    _logger.i('사용자 퀴즈 데이터 초기화: 과목=$subjectId, 퀴즈유형=$quizTypeId, 퀴즈=$quizId');
     if (_user == null) {
-      _logger.w('Cannot reset quiz data: No user logged in');
+      _logger.w('사용자 ID가 없습니다. 퀴즈 데이터를 초기화할 수 없음');
       return;
     }
     await _quizService.resetUserQuizData(
         _user!.uid, subjectId, quizTypeId, quizId);
-    notifyListeners();
+    _logger.d('사용자 퀴즈 데이터 초기화 완료');
+    // notifyListeners();
   }
 
   double getQuizAccuracy(String subjectId, String quizTypeId, String quizId) {

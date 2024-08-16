@@ -81,7 +81,6 @@ class QuizService {
     Duration? answerTime,
     int? selectedOptionIndex,
     bool isUnderstandingImproved = false,
-    // --------- TODO : 복습 버튼을 누르면 복습리스트로 이동하는 로직 추가해야함 ---------//
     bool? toggleReviewStatus,
   }) async {
     _logger.i(
@@ -99,18 +98,19 @@ class QuizService {
     if (toggleReviewStatus != null) {
       quizData.markedForReview = toggleReviewStatus;
       if (toggleReviewStatus) {
-        quizData.nextReviewDate = DateTime.now();
+        // 다음 복습 날짜 <= 현재시간 + anki알고리즘에 의해 계산된 기간
+        quizData.nextReviewDate = DateTime.now()
+            .add(const Duration(minutes: AnkiAlgorithm.initialInterval));
+        _logger.d('퀴즈가 복습 목록에 추가됨: 다음복습날짜=${quizData.nextReviewDate}');
+      } else {
+        // 복습 목록에서 제거될 때 데이터 초기화
+        quizData.interval = 0;
+        quizData.easeFactor = AnkiAlgorithm.defaultEaseFactor;
+        quizData.consecutiveCorrect = 0;
+        quizData.mistakeCount = 0;
+        _logger.d('퀴즈가 복습 목록에서 제거됨: 데이터 초기화');
       }
     } else {
-      quizData.total++;
-      if (isCorrect) {
-        quizData.correct++;
-        quizData.consecutiveCorrect++;
-      } else {
-        quizData.mistakeCount++;
-        quizData.consecutiveCorrect = 0;
-      }
-
       int? qualityOfRecall;
       if (answerTime != null) {
         qualityOfRecall =
@@ -133,7 +133,12 @@ class QuizService {
       quizData.consecutiveCorrect = ankiResult['consecutiveCorrect'] as int;
       quizData.mistakeCount = ankiResult['mistakeCount'] as int;
       quizData.nextReviewDate =
-          DateTime.now().add(Duration(days: quizData.interval));
+          AnkiAlgorithm.calculateNextReviewDate(quizData.interval);
+
+      if (isCorrect) {
+        quizData.correct++;
+      }
+      quizData.total++;
     }
 
     quizData.lastAnswered = DateTime.now();
@@ -162,11 +167,12 @@ class QuizService {
       nextReviewDate: DateTime.now(),
       lastAnswered: DateTime.now(),
     );
-
+    // 퀴즈ID가 복습리스트에 존재하게 됨
     var quizData = _userQuizData[userId]![subjectId]![quizTypeId]![quizId]!;
+    // 퀴즈ID가 복습리스트에 존재하게 ��
     quizData.markedForReview = true;
-    quizData.nextReviewDate =
-        DateTime.now().add(Duration(minutes: AnkiAlgorithm.initialInterval));
+    quizData.nextReviewDate = DateTime.now()
+        .add(const Duration(minutes: AnkiAlgorithm.initialInterval));
 
     _logger.d('복습 목록에 퀴즈를 추가함: quizId=$quizId');
 
@@ -182,7 +188,6 @@ class QuizService {
     var quizData = _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId];
     if (quizData != null) {
       quizData.markedForReview = false;
-      quizData.nextReviewDate = null; // 복습 목록에서 제거하고 데이터를 초기화함
       quizData.interval = 0;
       quizData.easeFactor = AnkiAlgorithm.defaultEaseFactor;
       quizData.consecutiveCorrect = 0;
@@ -202,6 +207,7 @@ class QuizService {
         false;
   }
 
+  // --------- TODO : 복스 ---------//
   DateTime? getNextReviewDate(
       String userId, String subjectId, String quizTypeId, String quizId) {
     return _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId]
@@ -361,7 +367,7 @@ class QuizService {
   // Quizpage에서 퀴즈 데이터를 가져오는 함수
   Future<List<Quiz>> getQuizzes(String subjectId, String quizTypeId) async {
     // 퀴즈를 가져오는 중임을 로그로 기록
-    _logger.i('과목 $subjectId에 대한 퀴즈�� 가져오는 중입니다: $quizTypeId');
+    _logger.i('과목 $subjectId에 대한 퀴즈 가져오는 중입니다: $quizTypeId');
 
     // 캐시 키 생성
     final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
@@ -393,7 +399,7 @@ class QuizService {
               .map((doc) => Quiz.fromFirestore(doc, _logger))
               .toList();
         },
-        // 캐시된 데이터 파싱 방법 정��
+        // 캐시된 데이터 파싱 방
         parseData: (data) => (json.decode(data) as List)
             .map((item) => Quiz.fromJson(item as Map<String, dynamic>))
             .toList(),
@@ -464,7 +470,7 @@ class QuizService {
 
       _logger.i('과목 $subjectId에 퀴즈 유형을 추가했습니다');
     } catch (e) {
-      _logger.e('과목 $subjectId에 퀴즈 유형을 추가하는 중 오류가 발생했습니��: $e');
+      _logger.e('과목 $subjectId에 퀴즈 유형을 추가하는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
@@ -581,7 +587,7 @@ class QuizService {
           .doc(quizId)
           .delete();
 
-      // 수정: 캐시 업데이트 로직 개선
+      // 수정: 캐 업데이트 로직 개선
       final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
       _cachedQuizzes[subjectId]?[quizTypeId]?[key]
           ?.removeWhere((q) => q.id == quizId);
@@ -614,7 +620,7 @@ class QuizService {
 
   // 새로 추가: 메모리 캐시 새로고침 메서드
   Future<void> refreshCache() async {
-    _logger.i('메모리 캐시를 새로고침하는 중입니다');
+    _logger.i('메모리 캐시를 새로고침하는 중입��다');
     _cachedSubjects.clear();
     _cachedQuizTypes.clear();
     _cachedQuizzes.clear();

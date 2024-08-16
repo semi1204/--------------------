@@ -26,11 +26,7 @@ class QuizHeader extends StatelessWidget {
     logger.i('Resetting quiz: ${quiz.id}');
 
     // 사용자의 퀴즈정보를 리셋함
-    await userProvider.resetUserAnswers(
-      subjectId,
-      quizTypeId,
-      quizId: quiz.id,
-    );
+    await userProvider.resetUserAnswers(subjectId, quizTypeId, quiz.id);
 
     // UI 업데이트를 위한 콜백 호출
     onResetQuiz();
@@ -89,7 +85,6 @@ class QuizHeader extends StatelessWidget {
   }
 
   // --------- TODO : 퀴즈 초기화 버튼 클릭 시 데이터 이동확인 ---------//
-  // -------TODO : 초기화가 되었다면 카드의 복습여부 UI가 변경되어야 함 ---------//
   Future<void> _showResetConfirmationDialog(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,

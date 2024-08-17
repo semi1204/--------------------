@@ -425,6 +425,9 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
         selectedOptionIndex: userAnswer,
       );
 
+      // UI 즉시 업데이트
+      setState(() {});
+
       widget.onFeedbackGiven(widget.quiz, isUnderstandingImproved);
 
       // 다음 복습 시간을 가져와 Snackbar로 표시

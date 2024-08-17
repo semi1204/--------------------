@@ -23,14 +23,6 @@ class AnkiAlgorithm {
     easeFactor ??= defaultEaseFactor;
     _logger.i('복습 계산 시작: interval=$interval, easeFactor=$easeFactor, ...');
 
-    // TODO ; MarkForReview로직을 고쳐야함
-    // 수정방향: 복습버튼을 누르면 anki 알고리즘을 사용하는 로직으로 변경해야함. 항상 초기화 된 값을 반환하는 게 아님.
-    if (markForReview) {
-      return _handleMarkForReview(
-          interval, easeFactor, consecutiveCorrect, mistakeCount);
-    }
-
-    // 피드백 처리 로직 추가
     if (isUnderstandingImproved) {
       return _handleImprovedUnderstanding(
           interval, easeFactor, consecutiveCorrect, mistakeCount);
@@ -41,22 +33,6 @@ class AnkiAlgorithm {
             qualityOfRecall, mistakeCount, isUnderstandingImproved)
         : _handleIncorrectAnswer(
             interval, easeFactor, mistakeCount, isUnderstandingImproved);
-  }
-
-  static Map<String, dynamic> _handleMarkForReview(int interval,
-      double easeFactor, int consecutiveCorrect, int? mistakeCount) {
-    _logger.d('복습 표시 처리 중');
-
-    // Apply a modified Anki algorithm for review marking
-    int newInterval = max(initialInterval, (interval * 0.5).round());
-    double newEaseFactor = max(_minEaseFactor, easeFactor - 0.15);
-
-    return {
-      'interval': newInterval,
-      'easeFactor': newEaseFactor,
-      'consecutiveCorrect': max(0, consecutiveCorrect - 1),
-      'mistakeCount': (mistakeCount ?? 0) + 1,
-    };
   }
 
   static Map<String, dynamic> _handleImprovedUnderstanding(int interval,
@@ -83,8 +59,7 @@ class AnkiAlgorithm {
         easeFactor -
             (isUnderstandingImproved ? 0.1 : 0.2) * (mistakeCount ?? 1));
 
-    int newInterval =
-        _calculateNewInterval(interval, isUnderstandingImproved, mistakeCount);
+    int newInterval = max(5, (interval * 0.5).round());
 
     return {
       'interval': newInterval,
@@ -175,7 +150,7 @@ class AnkiAlgorithm {
   static DateTime calculateNextReviewDate(int interval) {
     // 로그를 통해 현재 간격을 기록합니다.
     _logger.d('다음 복습 날짜 계산: interval=$interval');
-    // 현재 시간에 주어진 간격(분)을 더하여 다음 복습 날짜를 계산합니다.
+    // 마지막 복습 날짜에 주어진 간격(분)을 더하여 다음 복습 날짜를 계산합니다.
     return DateTime.now().add(Duration(minutes: interval));
   }
 }

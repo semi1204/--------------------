@@ -85,32 +85,26 @@ class QuizService {
   }) async {
     _logger.i(
         '사용자 퀴즈 데이터 업데이트 중: user=$userId, subject=$subjectId, quizType=$quizTypeId, quiz=$quizId, correct=$isCorrect');
-    _userQuizData[userId] ??= {};
-    _userQuizData[userId]![subjectId] ??= {};
-    _userQuizData[userId]![subjectId]![quizTypeId] ??= {};
-    _userQuizData[userId]![subjectId]![quizTypeId]![quizId] ??= QuizUserData(
-      nextReviewDate: DateTime.now(),
-      lastAnswered: DateTime.now(),
-    );
+
+    if (!_userQuizData.containsKey(userId)) {
+      _userQuizData[userId] = {};
+    }
+    if (!_userQuizData[userId]!.containsKey(subjectId)) {
+      _userQuizData[userId]![subjectId] = {};
+    }
+    if (!_userQuizData[userId]![subjectId]!.containsKey(quizTypeId)) {
+      _userQuizData[userId]![subjectId]![quizTypeId] = {};
+    }
+    if (!_userQuizData[userId]![subjectId]![quizTypeId]!.containsKey(quizId)) {
+      _userQuizData[userId]![subjectId]![quizTypeId]![quizId] = QuizUserData(
+        lastAnswered: DateTime.now(),
+      );
+    }
 
     var quizData = _userQuizData[userId]![subjectId]![quizTypeId]![quizId]!;
 
-    if (toggleReviewStatus != null) {
-      quizData.markedForReview = toggleReviewStatus;
-      if (toggleReviewStatus) {
-        // 다음 복습 날짜 <= 현재시간 + anki알고리즘에 의해 계산된 기간
-        quizData.nextReviewDate = DateTime.now()
-            .add(const Duration(minutes: AnkiAlgorithm.initialInterval));
-        _logger.d('퀴즈가 복습 목록에 추가됨: 다음복습날짜=${quizData.nextReviewDate}');
-      } else {
-        // 복습 목록에서 제거될 때 데이터 초기화
-        quizData.interval = 0;
-        quizData.easeFactor = AnkiAlgorithm.defaultEaseFactor;
-        quizData.consecutiveCorrect = 0;
-        quizData.mistakeCount = 0;
-        _logger.d('퀴즈가 복습 목록에서 제거됨: 데이터 초기화');
-      }
-    } else {
+    // toggleReviewStatus가 true이거나 이미 복습 리스트에 있는 경우에만 Anki 알고리즘 적용
+    if (toggleReviewStatus == true || quizData.markedForReview) {
       int? qualityOfRecall;
       if (answerTime != null) {
         qualityOfRecall =
@@ -125,7 +119,7 @@ class QuizService {
         qualityOfRecall: qualityOfRecall,
         mistakeCount: quizData.mistakeCount,
         isUnderstandingImproved: isUnderstandingImproved,
-        markForReview: quizData.markedForReview,
+        markForReview: true,
       );
 
       quizData.interval = ankiResult['interval'] as int;
@@ -134,13 +128,14 @@ class QuizService {
       quizData.mistakeCount = ankiResult['mistakeCount'] as int;
       quizData.nextReviewDate =
           AnkiAlgorithm.calculateNextReviewDate(quizData.interval);
-
-      if (isCorrect) {
-        quizData.correct++;
-      }
-      quizData.total++;
+      _logger
+          .d('다음 복습 날짜: ${quizData.nextReviewDate}, 간격: ${quizData.interval}');
     }
 
+    if (isCorrect) {
+      quizData.correct++;
+    }
+    quizData.total++;
     quizData.lastAnswered = DateTime.now();
     if (selectedOptionIndex != null) {
       quizData.selectedOptionIndex = selectedOptionIndex;
@@ -149,11 +144,24 @@ class QuizService {
     quizData.accuracy =
         quizData.total > 0 ? quizData.correct / quizData.total : 0.0;
 
-    _logger.d('사용자 퀴즈 데이터 업데이트 완료: $userId');
-    _logger.d('업데이트된 정확도: ${quizData.accuracy}');
-    _logger.d('다음 복습 날짜: ${quizData.nextReviewDate}');
+    if (toggleReviewStatus != null) {
+      quizData.markedForReview = toggleReviewStatus;
+      if (toggleReviewStatus) {
+        // 복습 리스트에 추가될 때 nextReviewDate 설정
+        quizData.nextReviewDate = DateTime.now()
+            .add(const Duration(minutes: AnkiAlgorithm.initialInterval));
+      } else {
+        // 복습 리스트에서 제거될 때 Anki 관련 데이터 초기화
+        quizData.interval = AnkiAlgorithm.initialInterval;
+        quizData.easeFactor = AnkiAlgorithm.defaultEaseFactor;
+        quizData.consecutiveCorrect = 0;
+        quizData.mistakeCount = 0;
+        quizData.nextReviewDate = null;
+      }
+    }
 
     await saveUserQuizData(userId);
+    _logger.d('사용자 퀴즈 데이터 업데이트 완료');
   }
 
   // 복습리스트에 복습카드를 추가하는 메소드

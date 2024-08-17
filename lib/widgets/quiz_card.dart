@@ -425,17 +425,6 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
         selectedOptionIndex: userAnswer,
       );
 
-      // 이해도가 향상되었을 때 복습 목록에서 데이터 업데이트
-      if (isUnderstandingImproved) {
-        await _userProvider.updateUserQuizData(
-          widget.subjectId,
-          widget.quizTypeId,
-          widget.quiz.id,
-          isCorrect,
-          isUnderstandingImproved: true,
-        );
-      }
-
       widget.onFeedbackGiven(widget.quiz, isUnderstandingImproved);
 
       // 다음 복습 시간을 가져와 Snackbar로 표시

@@ -142,7 +142,9 @@ class QuizService {
     }
 
     quizData.lastAnswered = DateTime.now();
-    quizData.selectedOptionIndex = selectedOptionIndex;
+    if (selectedOptionIndex != null) {
+      quizData.selectedOptionIndex = selectedOptionIndex;
+    }
     quizData.isUnderstandingImproved = isUnderstandingImproved;
     quizData.accuracy =
         quizData.total > 0 ? quizData.correct / quizData.total : 0.0;

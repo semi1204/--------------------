@@ -20,14 +20,15 @@ class NetworkImageWithLoader extends StatefulWidget {
   final String imageUrl;
   final double? width;
   final double? height;
-  final BoxFit? fit;
+  final BoxFit fit;
   final Logger logger;
 
   const NetworkImageWithLoader({
+    super.key,
     required this.imageUrl,
     this.width,
     this.height,
-    this.fit,
+    this.fit = BoxFit.contain,
     required this.logger,
   });
 
@@ -119,16 +120,20 @@ class _NetworkImageWithLoaderState extends State<NetworkImageWithLoader> {
               if (validitySnapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               } else if (validitySnapshot.data == true) {
-                return CachedNetworkImage(
-                  imageUrl: snapshot.data!,
-                  width: widget.width,
-                  height: widget.height,
-                  fit: widget.fit ?? BoxFit.cover,
-                  placeholder: (context, url) =>
-                      const Center(child: CircularProgressIndicator()),
-                  errorWidget: (context, url, error) {
-                    widget.logger.e('Error loading image: $error');
-                    return _buildErrorWidget(context, error.toString());
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    return CachedNetworkImage(
+                      imageUrl: snapshot.data!,
+                      width: widget.width ?? constraints.maxWidth,
+                      height: widget.height,
+                      fit: widget.fit,
+                      placeholder: (context, url) =>
+                          const Center(child: CircularProgressIndicator()),
+                      errorWidget: (context, url, error) {
+                        widget.logger.e('Error loading image: $error');
+                        return _buildErrorWidget(context, error.toString());
+                      },
+                    );
                   },
                 );
               } else {

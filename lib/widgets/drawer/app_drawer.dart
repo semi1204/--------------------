@@ -79,14 +79,24 @@ class AppDrawer extends StatelessWidget {
             title: const Text('사용자 정보 동기화'),
             onTap: () async {
               logger.i('Sync User Info button tapped');
-              await userProvider.syncUserData();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                CommonSnackBar(
-                  message: '사용자 데이터 동기화 완료! 🔄',
-                  backgroundColor: Colors.green[300]!,
-                ),
-              );
+              try {
+                await userProvider.syncUserData();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  CommonSnackBar(
+                    message: '사용자 데이터 동기화 완료! 🔄',
+                    backgroundColor: Colors.green[300]!,
+                  ),
+                );
+              } catch (e) {
+                logger.e('Error syncing user data: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  CommonSnackBar(
+                    message: '동기화 중 오류가 발생했습니다. 다시 시도해주세요.',
+                    backgroundColor: Colors.red[300]!,
+                  ),
+                );
+              }
             },
           ),
           ListTile(

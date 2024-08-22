@@ -6,6 +6,7 @@ import '../models/quiz.dart';
 import '../providers/user_provider.dart';
 import '../widgets/quiz_card.dart';
 import 'package:logger/logger.dart';
+import 'package:nursing_quiz_app_6/models/subject.dart';
 
 class ReviewQuizzesPage extends StatefulWidget {
   final String? initialSubjectId;
@@ -31,6 +32,8 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   int? _currentQuizIndex;
   List<String> _completedQuizIds =
       []; // Added: List to track completed quiz IDs
+  bool _isAllQuizzesCompleted = false;
+  List<Subject> _subjects = [];
 
   @override
   void initState() {
@@ -44,6 +47,20 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     if (_selectedSubjectId != null) {
       _loadQuizzesForReview();
     }
+
+    _loadSubjects();
+  }
+
+  Future<void> _loadSubjects() async {
+    _subjects = await _quizService.getSubjects();
+    setState(() {});
+  }
+
+  String _getSubjectName(String? subjectId) {
+    if (subjectId == null) return "선택된 과목";
+    final subject = _subjects.firstWhere((s) => s.id == subjectId,
+        orElse: () => Subject(id: '', name: '알 수 없는 과목'));
+    return subject.name;
   }
 
   Future<void> _loadQuizzesForReview() async {
@@ -72,6 +89,9 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
 
       _logger.i('복습 카드 ${_quizzesForReview.length}개 로드 완료');
       _logger.d('로드된 퀴즈: ${_quizzesForReview.map((q) => q.id).toList()}');
+
+      // Check if all quizzes are completed after loading
+      _checkAllQuizzesCompleted();
     } catch (e) {
       _logger.e('퀴즈 복습 데이터를 불러올 수 없음: $e');
     } finally {
@@ -79,6 +99,14 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
         _isLoading = false;
       });
     }
+  }
+
+  void _checkAllQuizzesCompleted() {
+    setState(() {
+      _isAllQuizzesCompleted = _quizzesForReview.isEmpty ||
+          _quizzesForReview
+              .every((quiz) => _completedQuizIds.contains(quiz.id));
+    });
   }
 
   @override
@@ -107,7 +135,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                 if (_isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (_quizzesForReview.isEmpty) {
+                if (_isAllQuizzesCompleted) {
                   return _buildEmptyState();
                 }
                 return ListView.builder(
@@ -140,6 +168,7 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
                         setState(() {
                           _completedQuizIds.add(quiz.id);
                           _currentQuizIndex = null;
+                          _checkAllQuizzesCompleted();
                         });
                       },
                     );
@@ -154,17 +183,18 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
   }
 
   Widget _buildEmptyState() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.celebration,
+          const Icon(Icons.celebration,
               size: 80, color: Color.fromARGB(255, 255, 153, 0)),
-          SizedBox(height: 20),
-          Text('와! 모든 퀴즈를 완료했어요! 🎉',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          SizedBox(height: 10),
-          Text('잠시 후에 다시 확인해보세요!'),
+          const SizedBox(height: 20),
+          Text('${_getSubjectName(_selectedSubjectId)}의 모든 퀴즈를 완료했어요! 🎉',
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          const Text('잠시 후에 다시 확인해보세요!'),
         ],
       ),
     );
@@ -184,6 +214,8 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
 
     setState(() {
       _currentQuizIndex = _quizzesForReview.indexOf(quiz);
+      _completedQuizIds.add(quiz.id);
+      _checkAllQuizzesCompleted();
     });
 
     _logger.d('복습 페이지 답변 업데이트: isCorrect=$isCorrect');

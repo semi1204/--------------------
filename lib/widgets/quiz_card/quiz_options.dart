@@ -30,12 +30,12 @@ class QuizOptions extends StatelessWidget {
         final isCorrect = index == quiz.correctOptionIndex; // 정답인지 확인
         final bool showSelection =
             isQuizPage ? isSelected : false; // 퀴즈페이지일 때만 선택된 옵션을 보여줌
-        final bool isSelectable =
-            !isQuizPage || hasAnswered; // 퀴즈 페이지가 아니거나 이미 답변한 경우 선택 가능
+        // final bool isSelectable =
+        //     !isQuizPage || hasAnswered; // 퀴즈 페이지가 아니거나 이미 답변한 경우 선택 가능
 
         // 로그 추가
-        logger.d(
-            '옵션 $index: 선택됨=$isSelected, 정답=$isCorrect, 표시=$showSelection, 선택가능=$isSelectable');
+        // logger.d(
+        //     '옵션 $index: 선택됨=$isSelected, 정답=$isCorrect, 표시=$showSelection, 선택가능=$isSelectable');
 
         return InkWell(
           // 퀴즈 페이지가 아니거나 아직 답변하지 않은 경우 선택 가능

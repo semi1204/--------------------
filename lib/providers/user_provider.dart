@@ -29,10 +29,15 @@ class UserProvider with ChangeNotifier {
     if (_user?.uid != user?.uid) {
       _user = user;
       if (user != null) {
-        await _quizService.loadUserQuizData(user.uid);
+        await _loadUserData();
       }
       notifyListeners();
     }
+  }
+
+  Future<void> _loadUserData() async {
+    if (_user == null) return;
+    await _quizService.loadUserQuizData(_user!.uid);
   }
 
   // Firebase의 currentUser를 사용하여 로그인 상태 확인
@@ -98,8 +103,8 @@ class UserProvider with ChangeNotifier {
       isUnderstandingImproved: isUnderstandingImproved,
       toggleReviewStatus: toggleReviewStatus,
     );
+    await _quizService.saveUserQuizData(_user!.uid);
     _logger.d('사용자 퀴즈 데이터 업데이트 성공');
-    //notifyListeners();
   }
 
   // 복습 리스트(복습리스트엔 복습카드가 존재해야 함)에 퀴즈를 추가하는 메소드
@@ -150,7 +155,7 @@ class UserProvider with ChangeNotifier {
   DateTime? getNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
     if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 다음 복습 날짜를 확인할 수 ��음');
+      _logger.w('사용자 ID가 없습니다. 다음 복습 날짜를 확인할 수 없음');
       return null;
     }
     return _quizService.getNextReviewDate(
@@ -206,7 +211,14 @@ class UserProvider with ChangeNotifier {
       _logger.w('Cannot sync user data: No user logged in');
       return;
     }
-    await _quizService.syncUserData(_user!.uid, getUserQuizData());
+    try {
+      await _quizService.syncUserData(_user!.uid, getUserQuizData());
+      _logger.i('사용자 퀴즈 데이터 동기화 성공');
+      notifyListeners();
+    } catch (e) {
+      _logger.e('사용자 퀴즈 데이터 동기화 실패: $e');
+      rethrow;
+    }
   }
 
   // ---DONE : reset버튼을 누르면, 개별적인 퀴즈ID를 초기화 해야함. 지금은 전체 퀴즈를 초기화함. ---------//

@@ -59,10 +59,13 @@ class _MarkdownFieldState extends State<MarkdownField> {
 
   Widget _buildMarkdownEditor() {
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 300), // 최대 높이 설정
+      constraints: const BoxConstraints(maxHeight: 300),
       child: SingleChildScrollView(
         child: TextFormField(
           controller: widget.controller,
+          style: const TextStyle(
+            fontSize: 18, // Increased font size
+          ),
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             hintText: 'Enter ${widget.labelText.toLowerCase()}',

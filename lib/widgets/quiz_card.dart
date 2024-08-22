@@ -9,7 +9,6 @@ import 'package:provider/provider.dart';
 import '../models/quiz.dart';
 import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
-import 'package:flutter/foundation.dart';
 
 abstract class BaseQuizCard extends StatefulWidget {
   final Quiz quiz;

@@ -9,6 +9,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../utils/anki_algorithm.dart';
 
+// TODO : 무조건 firebase에서 데이터 파싱하지 말고, 로컬스토리지에서 가져오도록 수정해야함
+// TODO : 로컬스토리지에서 가져오는 방법 찾아보기
+// TODO : firebase와 연동은 동기화버튼으로 user_quiz_data_${userId} 데이터를 보내고, 받아야 함.
+// 데이터를 보내고 받을 때의 원칙은 무조건, 최신의 데이터를 덮어쓰는 방식으로 최대한 적은 데이터를 송수신하게 해야함
 class QuizService {
   static final QuizService _instance = QuizService._internal();
   factory QuizService() => _instance;
@@ -30,46 +34,117 @@ class QuizService {
 
   QuizService._internal();
 
+  // 로컬 스토리지에서 사용자 퀴즈 데이터를 로드하는 메소드
   Future<void> loadUserQuizData(String userId) async {
-    _logger.i('Loading quiz data for user: $userId');
-    final prefs = await SharedPreferences.getInstance(); // 앱의 로컬 데이터 저장소에 접근
-    final cachedData =
-        prefs.getString('user_quiz_data_$userId'); // 사용자 퀴즈 데이터 캐시 데이터 가져오기
-
-    // 캐시된 데이터가 존재하는지 확인
-    if (cachedData != null) {
-      // 캐시된 데이터를 사용자 퀴즈 데이터 맵에 로드
-      _userQuizData[userId] =
-          _convertToQuizUserDataMap(json.decode(cachedData));
-      _logger.d('사용자 퀴즈 데이터 캐시 로드 완료: $userId');
-    } else {
-      // 캐시된 데이터가 없으면 Firestore에서 데이터 가져오기
-      final docSnapshot =
-          await _firestore.collection('users').doc(userId).get();
-      final firestoreData =
-          docSnapshot.data()?['quizData'] as Map<String, dynamic>? ?? {};
-
-      // Firestore 데이터를 사용자 퀴즈 데이터 맵에 로드
-      _userQuizData[userId] = _convertToQuizUserDataMap(firestoreData);
-      _logger.d('Firestore 퀴즈 데이터 로드 완료: $userId');
+    _logger.i('사용자 $userId의 퀴즈 데이터를 로드하는 중');
+    try {
+      final prefs = await SharedPreferences.getInstance(); // 앱의 로컬 데이터 저장소에 접근
+      final String? jsonString = prefs
+          .getString('user_quiz_data_$userId'); // 로컬 저장소에서 퀴즈 데이터를 문자열로 가져옴
+      if (jsonString != null) {
+        // 로컬 저장소에 퀴즈 데이터가 있으면
+        final Map<String, dynamic> jsonData =
+            json.decode(jsonString); // 문자열을 Map으로 변환
+        _userQuizData[userId] = _convertToQuizUserDataMap(
+            jsonData); // Map을 QuizUserData 객체로 변환하여 저장
+        _logger.i('로컬 스토리지에서 사용자 $userId의 퀴즈 데이터를 로드했습니다');
+      } else {
+        // 로컬 저장소에 퀴즈 데이터가 없으면
+        _logger.i('로컬 스토리지에 사용자 $userId의 데이터가 없습니다. Firebase에서 로드를 시도합니다.');
+        await _loadUserQuizDataFromFirebase(userId); // Firebase에서 퀴즈 데이터를 로드
+      }
+    } catch (e) {
+      _logger.e('사용자 $userId의 퀴즈 데이터를 로드하는 중 오류 발생: $e');
+      rethrow;
     }
   }
 
-  // userQuizData 저장하는 메소드
-  Future<void> saveUserQuizData(String userId) async {
-    _logger.i('사용자 퀴즈 데이터 저장 중: $userId');
-    final prefs = await SharedPreferences.getInstance();
-    final jsonData =
-        json.encode(_convertFromQuizUserDataMap(_userQuizData[userId] ?? {}));
-    await prefs.setString('user_quiz_data_$userId', jsonData);
-    await _firestore.collection('users').doc(userId).set(
-        {'quizData': _convertFromQuizUserDataMap(_userQuizData[userId] ?? {})},
-        SetOptions(merge: true));
-    _logger.d('사용자 퀴즈 데이터 저장 완료: $userId');
+  // Firebase에서 사용자 퀴즈 데이터를 로드하는 메소드
+  Future<void> _loadUserQuizDataFromFirebase(String userId) async {
+    try {
+      final docSnapshot =
+          await _firestore.collection('users').doc(userId).get();
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data() as Map<String, dynamic>;
+        _userQuizData[userId] = _convertToQuizUserDataMap(data);
+        _logger.i('Firebase에서 사용자 $userId의 퀴즈 데이터를 로드했습니다');
+      } else {
+        _logger.w('Firebase에 사용자 $userId의 데이터가 없습니다');
+      }
+    } catch (e) {
+      _logger.e('Firebase에서 사용자 $userId의 퀴즈 데이터를 로드하는 중 오류 발생: $e');
+      rethrow;
+    }
+  }
 
-    // 새로운 로깅 추가
-    _logger.d('사용자 퀴즈 데이터 저장 완료: $userId');
-    _logger.d(json.encode(_userQuizData[userId]));
+  // 로컬 스토리지에 사용자 퀴즈 데이터를 저장하는 메소드
+  Future<void> saveUserQuizData(String userId) async {
+    _logger.i('사용자 $userId의 퀴즈 데이터를 저장하는 중');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String jsonString = json.encode(_userQuizData[userId]);
+      await prefs.setString('user_quiz_data_$userId', jsonString);
+      _logger.i('사용자 $userId의 퀴즈 데이터를 로컬 스토리지에 저장했습니다');
+    } catch (e) {
+      _logger.e('사용자 $userId의 퀴즈 데이터를 저장하는 중 오류 발생: $e');
+      rethrow;
+    }
+  }
+
+  // Firebase와 데이터를 동기화하는 메소드
+  Future<void> syncUserData(
+      String userId, Map<String, dynamic> userData) async {
+    _logger.i('사용자 $userId의 데이터를 동기화하는 중');
+    try {
+      // 로컬 데이터를 Firebase로 전송
+      await _sendDataToFirebase(userId, userData);
+
+      // Firebase에서 최신 데이터를 받아옴
+      final firebaseData = await _getDataFromFirebase(userId);
+
+      // 로컬 데이터 업데이트
+      _userQuizData[userId] = _convertToQuizUserDataMap(firebaseData);
+      await saveUserQuizData(userId);
+
+      _logger.i('사용자 $userId의 데이터 동기화 완료');
+    } catch (e) {
+      _logger.e('사용자 $userId의 데이터 동기화 중 오류 발생: $e');
+      rethrow;
+    }
+  }
+
+  // Firebase로 데이터를 전송하는 메소드
+  Future<void> _sendDataToFirebase(
+      String userId, Map<String, dynamic> data) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .set(data, SetOptions(merge: true));
+      _logger.i('사용자 $userId의 데이터를 Firebase로 전송했습니다');
+    } catch (e) {
+      _logger.e('사용자 $userId의 데이터를 Firebase로 전송하는 중 오류 발생: $e');
+      rethrow;
+    }
+  }
+
+  // Firebase에서 데이터를 받아오는 메소드
+  Future<Map<String, dynamic>> _getDataFromFirebase(String userId) async {
+    try {
+      final docSnapshot =
+          await _firestore.collection('users').doc(userId).get();
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data() as Map<String, dynamic>;
+        _logger.i('Firebase에서 사용자 $userId의 데이터를 받아왔습니다');
+        return data;
+      } else {
+        _logger.w('Firebase에 사용자 $userId의 데이터가 없습니다');
+        return {};
+      }
+    } catch (e) {
+      _logger.e('Firebase에서 사용자 $userId의 데이터를 받아오는 중 오류 발생: $e');
+      rethrow;
+    }
   }
 
   Future<void> updateUserQuizData(
@@ -179,7 +254,7 @@ class QuizService {
     );
     // 퀴즈ID가 복습리스트에 존재하게 됨
     var quizData = _userQuizData[userId]![subjectId]![quizTypeId]![quizId]!;
-    // 퀴즈ID가 복습리스트에 존재하게 ��
+    // 퀴즈ID가 복습리스트에 존재하게
     quizData.markedForReview = true;
     quizData.nextReviewDate = DateTime.now()
         .add(const Duration(minutes: AnkiAlgorithm.initialInterval));
@@ -423,7 +498,7 @@ class QuizService {
         quizTypeId: {key: quizzes}
       };
       _logger.i(
-          '과목 $subjectId 및 퀴즈 유형 $quizTypeId에 대한 퀴즈를 가져왔습니다: ${quizzes.length}');
+          '과목 $subjectId 및 퀴즈 유형 $quizTypeId에 대한 퀴���를 가져왔습니다: ${quizzes.length}');
       return quizzes;
     } catch (e) {
       _logger
@@ -630,7 +705,7 @@ class QuizService {
 
   // 새로 추가: 메모리 캐시 새로고침 메서드
   Future<void> refreshCache() async {
-    _logger.i('메모리 캐시를 새로고침하는 중입��다');
+    _logger.i('메모리 캐시를 새로고침하는 중입다');
     _cachedSubjects.clear();
     _cachedQuizTypes.clear();
     _cachedQuizzes.clear();
@@ -745,20 +820,6 @@ class QuizService {
           .toList();
     } catch (e) {
       _logger.e('과목 $subjectId에 대한 퀴즈를 가져오는 중 오류가 발생했습니다: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> syncUserData(
-      String userId, Map<String, dynamic> userData) async {
-    _logger.i('사용자 $userId에 대한 데이터를 동기화하는 중입니다');
-    try {
-      _userQuizData[userId] = _convertToQuizUserDataMap(userData);
-      await saveUserQuizData(userId);
-      _logger.i('사용자 $userId에 대한 데이터를 동기화했습니다');
-      _logger.d('동기화된 사용자 데이터: $userData');
-    } catch (e) {
-      _logger.e('사용자 $userId에 대한 데이터를 동기화하는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }

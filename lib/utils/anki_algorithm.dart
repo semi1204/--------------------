@@ -39,8 +39,10 @@ class AnkiAlgorithm {
       double easeFactor, int consecutiveCorrect, int? mistakeCount) {
     _logger.d('이해도 향상 처리 중');
 
-    int newInterval = (interval * 1.5).round();
-    double newEaseFactor = min(easeFactor + 0.15, 2.5);
+    // 이해도 향상 시 간격 증가를 더 크게 조정
+    int newInterval = (interval * 2.0).round(); // 1.5에서 2.0으로 증가
+    // 이해도 향상 시 용이성 계수 증가를 더 크게 조정
+    double newEaseFactor = min(easeFactor + 0.25, 2.5); // 0.15에서 0.25로 증가
 
     return {
       'interval': newInterval,
@@ -54,12 +56,16 @@ class AnkiAlgorithm {
       double easeFactor, int? mistakeCount, bool isUnderstandingImproved) {
     _logger.d('오답 처리 중');
 
+    // 이해도 향상 시 용이성 계수 감소를 더 작게 조정
     double newEaseFactor = max(
         _minEaseFactor,
         easeFactor -
-            (isUnderstandingImproved ? 0.1 : 0.2) * (mistakeCount ?? 1));
+            (isUnderstandingImproved ? 0.05 : 0.2) *
+                (mistakeCount ?? 1)); // 0.1에서 0.05로 감소
 
-    int newInterval = max(5, (interval * 0.5).round());
+    // 이해도 향상 시 간격 감소를 더 작게 조정
+    int newInterval =
+        max(5, (interval * (isUnderstandingImproved ? 0.8 : 0.5)).round());
 
     return {
       'interval': newInterval,
@@ -95,9 +101,10 @@ class AnkiAlgorithm {
   static int _calculateNewInterval(
       int interval, bool isUnderstandingImproved, int? mistakeCount,
       {bool isCorrect = false}) {
+    // 이해도 향상 시 간격 증가를 더 크게 조정
     double multiplier = isCorrect
-        ? (isUnderstandingImproved ? 2.5 : 2.0)
-        : (isUnderstandingImproved ? 0.7 : 0.5);
+        ? (isUnderstandingImproved ? 3.0 : 2.0) // 2.5에서 3.0으로 증가
+        : (isUnderstandingImproved ? 0.8 : 0.5); // 0.7에서 0.8로 증가
 
     int newInterval = (interval * multiplier).round();
 
@@ -116,16 +123,17 @@ class AnkiAlgorithm {
 
     if (qualityOfRecall == null) return easeFactor;
 
-    double change = 0.1 * (qualityOfRecall - 3);
+    // 이해도 향상 시 용이성 계수 변화를 더 크게 조정
+    double change = 0.15 * (qualityOfRecall - 3); // 0.1에서 0.15로 증가
 
-    change *= isUnderstandingImproved ? 1.1 : 0.9;
+    change *= isUnderstandingImproved ? 1.2 : 0.9; // 1.1에서 1.2로 증가
 
     return max(
         _minEaseFactor,
         easeFactor +
             change -
             (mistakeCount ?? 0) * 0.05 +
-            (isUnderstandingImproved ? 0.05 : 0));
+            (isUnderstandingImproved ? 0.1 : 0)); // 0.05에서 0.1로 증가
   }
 
   static int evaluateRecallQuality(Duration answerTime, bool isCorrect) {

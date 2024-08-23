@@ -122,17 +122,18 @@ class _NetworkImageWithLoaderState extends State<NetworkImageWithLoader> {
               } else if (validitySnapshot.data == true) {
                 return LayoutBuilder(
                   builder: (context, constraints) {
-                    return CachedNetworkImage(
-                      imageUrl: snapshot.data!,
-                      width: widget.width ?? constraints.maxWidth,
-                      height: widget.height,
-                      fit: widget.fit,
-                      placeholder: (context, url) =>
-                          const Center(child: CircularProgressIndicator()),
-                      errorWidget: (context, url, error) {
-                        widget.logger.e('Error loading image: $error');
-                        return _buildErrorWidget(context, error.toString());
-                      },
+                    return FittedBox(
+                      fit: BoxFit.fitWidth,
+                      child: CachedNetworkImage(
+                        imageUrl: snapshot.data!,
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) =>
+                            const Center(child: CircularProgressIndicator()),
+                        errorWidget: (context, url, error) {
+                          widget.logger.e('Error loading image: $error');
+                          return _buildErrorWidget(context, error.toString());
+                        },
+                      ),
                     );
                   },
                 );

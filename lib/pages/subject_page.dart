@@ -39,7 +39,7 @@ class SubjectPage extends StatelessWidget {
           itemBuilder: (context, index) {
             final subject = subjects[index];
             return Card(
-              elevation: 0.5,
+              elevation: 0.3,
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: ListTile(
                 title: Text(subject.name),

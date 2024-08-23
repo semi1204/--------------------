@@ -38,7 +38,7 @@ class MarkdownRenderer extends StatelessWidget {
       styleSheet: mergedStyleSheet,
       builders: {
         'math': MathBuilder(logger: logger),
-        'img': ImageBuilder(logger: logger),
+        'img': ImageBuilder(logger: logger, context: context),
       },
       extensionSet: md.ExtensionSet([
         const md.TableSyntax(),
@@ -69,12 +69,12 @@ class MathBuilder extends MarkdownElementBuilder {
   }
 }
 
-// TODO : 이미지 크기 조정 필요함(퀴즈카드의 가로 크기에 맞춰야함)
 // TODO : 퀴즈카드가 빌드 될 때, 캐시나, provider로 이미지를 효율적으로 가져와야함
 class ImageBuilder extends MarkdownElementBuilder {
   final Logger logger;
+  final BuildContext context;
 
-  ImageBuilder({required this.logger});
+  ImageBuilder({required this.logger, required this.context});
 
   @override
   Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
@@ -82,16 +82,18 @@ class ImageBuilder extends MarkdownElementBuilder {
       final src = element.attributes['src'];
       if (src != null) {
         logger.d('Rendering image: $src');
-        return ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 300,
-            maxHeight: 200,
-          ),
-          child: NetworkImageWithLoader(
-            imageUrl: src,
-            fit: BoxFit.contain,
-            logger: logger,
-          ),
+        return LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            return FittedBox(
+              fit: BoxFit.fitWidth,
+              child: NetworkImageWithLoader(
+                imageUrl: src,
+                fit: BoxFit.contain,
+                logger: logger,
+                width: constraints.maxWidth,
+              ),
+            );
+          },
         );
       }
     }
@@ -110,7 +112,6 @@ class InlineMathSyntax extends md.InlineSyntax {
   }
 }
 
-// TODO : 분수 표현 시 글자크기를 1.5배로 키워야 함
 class KoreanFractionSyntax extends md.InlineSyntax {
   KoreanFractionSyntax()
       : super(r'\{([\p{Hangul}\s]+)\s*/\s*([\p{Hangul}\s]+)\}');

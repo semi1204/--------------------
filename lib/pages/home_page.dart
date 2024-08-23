@@ -14,6 +14,8 @@ class DraggablePage extends StatefulWidget {
   DraggablePageState createState() => DraggablePageState();
 }
 
+//TODO : DraggablePage는 homepage이고, subjectpage와 별개의 페이지로 분리시켜야함
+// TODO : DraggablePage에선 확장되는 APPBar를 통해 공지를 보고, 문제의 진행률, 오답률등을 차트로 볼 수 있음.
 class DraggablePageState extends State<DraggablePage> {
   int _selectedIndex = 0;
   late final Logger _logger;
@@ -77,11 +79,11 @@ class DraggablePageState extends State<DraggablePage> {
   Widget _getAppBarTitle(int index) {
     switch (index) {
       case 0:
-        return const Text('Subjects');
+        return const Text('과목');
       case 1:
-        return const Text('Review');
+        return const Text('복습');
       case 2:
-        return const Text('Add Quiz');
+        return const Text('퀴즈 추가');
       default:
         return const Text('Nursing Quiz App');
     }

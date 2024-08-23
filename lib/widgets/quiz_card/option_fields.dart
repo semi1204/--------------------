@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
+import 'markdown_field.dart'; // Add this import
 
 class OptionFields extends StatelessWidget {
   final List<TextEditingController> controllers;
@@ -23,12 +24,9 @@ class OptionFields extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: RadioListTile<int>(
-            title: TextFormField(
+            title: MarkdownField(
               controller: controllers[index],
-              decoration: InputDecoration(
-                labelText: 'Option ${index + 1}',
-                border: const OutlineInputBorder(),
-              ),
+              labelText: 'Option ${index + 1}',
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   logger.w('Option ${index + 1} is empty');
@@ -36,6 +34,8 @@ class OptionFields extends StatelessWidget {
                 }
                 return null;
               },
+              isPreviewMode: false, // 미리보기 모드 비활성화
+              logger: logger,
             ),
             value: index,
             groupValue: correctOptionIndex,

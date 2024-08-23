@@ -128,7 +128,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
   Widget build(BuildContext context) {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
-        // ---- TODO : quizCard에서는 복습 버튼을 눌러야 복습을 시작함. 복습계산을 하지않음. 무조건 지우지말고, 이 변수 존재이유를 확인해야함 ---------//
+        //  quizCard에서는 복습 버튼을 눌러야 복습을 시작함. 복습계산을 하지않음. 무조건 지우지말고, 이 변수 존재이유를 확인해야함 ---------//
         final nextReviewDate = userProvider.getNextReviewDate(
           widget.subjectId,
           widget.quizTypeId,
@@ -386,7 +386,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
           onPressed: () => _giveFeedback(false),
           child: const Text('어려움 🤔', style: TextStyle(color: Colors.black)),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color.fromRGBO(255, 196, 199, 1),
+            backgroundColor: Color.fromRGBO(255, 196, 199, 0.5),
             minimumSize: const Size(100, 36),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
@@ -395,7 +395,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
           onPressed: () => _giveFeedback(true),
           child: const Text('알겠음 😊', style: TextStyle(color: Colors.black)),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color.fromRGBO(196, 251, 199, 1),
+            backgroundColor: Color.fromRGBO(196, 251, 199, 0.5),
             minimumSize: const Size(100, 36),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),

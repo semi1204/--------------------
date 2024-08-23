@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/models/quiz.dart';
 import 'package:logger/logger.dart';
+import 'package:flutter_markdown/flutter_markdown.dart'; // Add this import
+import 'markdown_widgets.dart'; // Add this import
 
+//옵션도 마크다운을 사용할 수 있음.
 class QuizOptions extends StatelessWidget {
   final Quiz quiz;
   final int? selectedOptionIndex;
@@ -37,6 +40,11 @@ class QuizOptions extends StatelessWidget {
         // logger.d(
         //     '옵션 $index: 선택됨=$isSelected, 정답=$isCorrect, 표시=$showSelection, 선택가능=$isSelectable');
 
+        // Apply strikethrough in Markdown if necessary
+        final optionText = (hasAnswered && isSelected && !isCorrect)
+            ? '~~$option~~'
+            : option; // 오답이면 옵션에 줄긋기
+
         return InkWell(
           // 퀴즈 페이지가 아니거나 아직 답변하지 않은 경우 선택 가능
           onTap: (!isQuizPage || !hasAnswered)
@@ -57,16 +65,15 @@ class QuizOptions extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    option,
-                    style: TextStyle(
-                      decoration: hasAnswered && isSelected && !isCorrect
-                          ? TextDecoration.lineThrough
-                          : null,
-                      decorationColor: Colors.black.withOpacity(0.4),
-                      decorationThickness: 2,
-                      color: _getOptionTextColor(
-                          showSelection, isSelected, isCorrect),
+                  // Replace Text widget with MarkdownRenderer
+                  child: MarkdownRenderer(
+                    data: optionText,
+                    logger: logger,
+                    styleSheet: MarkdownStyleSheet(
+                      p: TextStyle(
+                        color: _getOptionTextColor(
+                            showSelection, isSelected, isCorrect),
+                      ),
                     ),
                   ),
                 ),

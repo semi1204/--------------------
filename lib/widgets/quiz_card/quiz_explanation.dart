@@ -97,8 +97,8 @@ class _QuizExplanationState extends State<QuizExplanation> {
                 _toggleReviewStatus(context, userProvider, widget.logger),
             style: ElevatedButton.styleFrom(
               backgroundColor: isInReviewList
-                  ? const Color.fromRGBO(255, 196, 199, 1)
-                  : const Color.fromRGBO(196, 251, 199, 1),
+                  ? const Color.fromRGBO(255, 196, 199, 0.7)
+                  : const Color.fromRGBO(196, 251, 199, 0.7),
             ),
           ),
         ),

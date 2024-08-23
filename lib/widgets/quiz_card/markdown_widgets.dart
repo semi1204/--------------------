@@ -45,6 +45,7 @@ class MarkdownRenderer extends StatelessWidget {
       ], [
         ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
         InlineMathSyntax(),
+        KoreanFractionSyntax(),
       ]),
     );
   }

@@ -12,6 +12,7 @@ import '../utils/anki_algorithm.dart';
 // TODO : 무조건 firebase에서 데이터 파싱하지 말고, 로컬스토리지에서 가져오도록 수정해야함
 // TODO : 로컬스토리지에서 가져오는 방법 찾아보기
 // TODO : firebase와 연동은 동기화버튼으로 user_quiz_data_${userId} 데이터를 보내고, 받아야 함.
+// TODO : 모든 문제를 한번에 파싱하지 말고, 부분적으로 파싱하는 걸 생각해야 함.
 // 데이터를 보내고 받을 때의 원칙은 무조건, 최신의 데이터를 덮어쓰는 방식으로 최대한 적은 데이터를 송수신하게 해야함
 class QuizService {
   static final QuizService _instance = QuizService._internal();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:nursing_quiz_app_6/providers/quiz_provider.dart';
 import 'package:nursing_quiz_app_6/utils/auth_wrapper.dart';
 import 'package:provider/provider.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
@@ -32,6 +33,12 @@ void main() async {
         Provider<QuizService>(create: (_) => QuizService()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => SubjectProvider()),
+        ChangeNotifierProvider(
+            create: (context) => QuizProvider(
+                  context.read<QuizService>(),
+                  context.read<UserProvider>(),
+                  context.read<Logger>(),
+                )),
       ],
       child: const MyApp(),
     ),

@@ -6,6 +6,7 @@ import '../models/subject.dart';
 import '../models/quiz_type.dart';
 import 'quiz_page.dart';
 import 'package:logger/logger.dart';
+import '../widgets/close_button.dart'; // CustomCloseButton import
 
 class QuizTypePage extends StatelessWidget {
   final Subject subject;
@@ -29,7 +30,7 @@ class QuizTypePage extends StatelessWidget {
           },
         ),
         actions: const [
-          CloseButton(),
+          CustomCloseButton(),
         ],
       ),
       body: FutureBuilder<List<QuizType>>(

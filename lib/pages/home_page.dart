@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:nursing_quiz_app_6/pages/review_quizzes_page.dart';
-import 'package:nursing_quiz_app_6/pages/subject_page.dart';
-import 'package:nursing_quiz_app_6/pages/add_quiz_page.dart';
 import 'package:nursing_quiz_app_6/widgets/drawer/app_drawer.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
+import 'subject_page.dart';
 
 class DraggablePage extends StatefulWidget {
   const DraggablePage({super.key});
@@ -14,10 +12,7 @@ class DraggablePage extends StatefulWidget {
   DraggablePageState createState() => DraggablePageState();
 }
 
-//TODO : DraggablePage는 homepage이고, subjectpage와 별개의 페이지로 분리시켜야함
-// TODO : DraggablePage에선 확장되는 APPBar를 통해 공지를 보고, 문제의 진행률, 오답률등을 차트로 볼 수 있음.
 class DraggablePageState extends State<DraggablePage> {
-  int _selectedIndex = 0;
   late final Logger _logger;
 
   @override
@@ -37,56 +32,56 @@ class DraggablePageState extends State<DraggablePage> {
         _logger.i(
             'DraggablePage 빌드. 로그인 여부: ${userProvider.user != null}. 관리자 여부: ${userProvider.isAdmin}');
 
-        final List<Widget> _pages = [
-          SubjectPage(key: const PageStorageKey('과목')),
-          const ReviewQuizzesPage(key: PageStorageKey('복습')),
-          if (userProvider.isAdmin)
-            const AddQuizPage(key: PageStorageKey('퀴즈 추가')),
-        ];
-
         return Scaffold(
-          appBar: AppBar(
-            title: _getAppBarTitle(_selectedIndex),
-          ),
-          drawer: const AppDrawer(),
-          body: IndexedStack(
-            index: _selectedIndex,
-            children: _pages,
-          ),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: (int index) {
-              setState(() {
-                _selectedIndex = index;
-              });
-              _logger.i('유저가 페이지 인덱스 $index로 이동');
-            },
-            items: [
-              const BottomNavigationBarItem(
-                  icon: Icon(Icons.home), label: '과목'),
-              const BottomNavigationBarItem(
-                  icon: Icon(Icons.error_outline), label: '복습'),
-              if (userProvider.isAdmin)
-                const BottomNavigationBarItem(
-                    icon: Icon(Icons.add), label: '퀴즈 추가'),
+          body: CustomScrollView(
+            slivers: <Widget>[
+              SliverAppBar(
+                expandedHeight: 200.0,
+                floating: false,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                  title: const Text('Quiz App'),
+                  background: Container(
+                    color: Colors.blue,
+                    child: const Center(
+                      child: Text(
+                        '공지사항: 새로운 기능이 추가되었습니다!',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        '퀴즈 앱에 오신 것을 환영합니다!',
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (context) => const SubjectPage()),
+                          );
+                        },
+                        child: const Text('시작하기'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
+          drawer: const AppDrawer(),
         );
       },
     );
-  }
-
-  Widget _getAppBarTitle(int index) {
-    switch (index) {
-      case 0:
-        return const Text('과목');
-      case 1:
-        return const Text('복습');
-      case 2:
-        return const Text('퀴즈 추가');
-      default:
-        return const Text('Nursing Quiz App');
-    }
   }
 
   @override

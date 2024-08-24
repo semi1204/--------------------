@@ -404,7 +404,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
     );
   }
 
-  // ---- TODO : 피드백 버튼을 누르면 앱 전체가 재빌드 되는 현상이 발생하고 있음 ---------//
+  // ---- DONE : 피드백 버튼을 누르면 앱 전체가 재빌드 되는 현상이 발생하고 있음 ---------//
   void _giveFeedback(bool isUnderstandingImproved) async {
     _logger.i(
         'Giving feedback: quizId=${widget.quiz.id}, isUnderstandingImproved=$isUnderstandingImproved');

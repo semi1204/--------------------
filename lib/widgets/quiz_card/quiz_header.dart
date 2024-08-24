@@ -43,7 +43,7 @@ class QuizHeader extends StatelessWidget {
     }
   }
 
-  // 문제의 가장 상단엔, keyword, accuracy, reset button이 Row로 표시
+  // 문제의 가장 상단엔, 기출, accuracy, reset button이 Row로 표시
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -84,7 +84,7 @@ class QuizHeader extends StatelessWidget {
     );
   }
 
-  // --------- TODO : 퀴즈 초기화 버튼 클릭 시 데이터 이동확인 ---------//
+  // --------- DONE : 퀴즈 초기화 버튼 클릭 시 데이터 이동확인 ---------//
   Future<void> _showResetConfirmationDialog(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,

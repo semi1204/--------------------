@@ -8,6 +8,7 @@ import 'package:logger/logger.dart';
 import '../widgets/quiz_card.dart';
 import 'edit_quiz_page.dart';
 import 'dart:async'; // Timer를 사용하기 위해 추가
+import '../widgets/close_button.dart'; // 커스텀 CloseButton import
 
 class QuizPage extends StatefulWidget {
   final String subjectId;
@@ -148,7 +149,9 @@ class _QuizPageState extends State<QuizPage> {
                         icon: const Icon(Icons.arrow_back),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
-                      actions: const [CloseButton()],
+                      actions: const [
+                        CustomCloseButton()
+                      ], // CustomCloseButton 사용
                     ),
                     SliverToBoxAdapter(
                       child: SizedBox(

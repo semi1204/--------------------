@@ -8,6 +8,7 @@ import 'package:nursing_quiz_app_6/providers/user_provider.dart';
 import 'package:logger/logger.dart';
 import 'firebase_options.dart';
 import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
+import 'package:nursing_quiz_app_6/providers/subject_provider.dart';
 
 const Color primaryColor = Color(0xFF4A90E2); // 밝은 파란색
 const Color secondaryColor = Color(0xFF50E3C2); // 민트색
@@ -30,6 +31,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         Provider<QuizService>(create: (_) => QuizService()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => SubjectProvider()),
       ],
       child: const MyApp(),
     ),

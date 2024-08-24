@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/providers/review_quiz_provider.dart';
 import 'package:nursing_quiz_app_6/widgets/add_quiz/subject_dropdown_with_add_button.dart';
 import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
@@ -6,183 +7,115 @@ import '../models/quiz.dart';
 import '../providers/user_provider.dart';
 import '../widgets/quiz_card.dart';
 import 'package:logger/logger.dart';
-import 'package:nursing_quiz_app_6/models/subject.dart';
 
-class ReviewQuizzesPage extends StatefulWidget {
+class ReviewQuizzesPage extends StatelessWidget {
   final String? initialSubjectId;
   final String? initialQuizId;
 
   const ReviewQuizzesPage({
+    Key? key,
+    this.initialSubjectId,
+    this.initialQuizId,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (context) => ReviewQuizzesProvider(
+        Provider.of<QuizService>(context, listen: false),
+        Provider.of<Logger>(context, listen: false),
+        Provider.of<UserProvider>(context, listen: false).user?.uid,
+      )..loadSubjects(),
+      child: _ReviewQuizzesPageContent(
+        initialSubjectId: initialSubjectId,
+        initialQuizId: initialQuizId,
+      ),
+    );
+  }
+}
+
+class _ReviewQuizzesPageContent extends StatelessWidget {
+  final String? initialSubjectId;
+  final String? initialQuizId;
+
+  const _ReviewQuizzesPageContent({
     super.key,
     this.initialSubjectId,
     this.initialQuizId,
   });
 
   @override
-  State<ReviewQuizzesPage> createState() => _ReviewQuizzesPageState();
-}
-
-class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
-  late final QuizService _quizService;
-  late final UserProvider _userProvider;
-  late final Logger _logger;
-  String? _selectedSubjectId;
-  List<Quiz> _quizzesForReview = [];
-  bool _isLoading = false;
-  int? _currentQuizIndex;
-  List<String> _completedQuizIds =
-      []; // Added: List to track completed quiz IDs
-  bool _isAllQuizzesCompleted = false;
-  List<Subject> _subjects = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _quizService = Provider.of<QuizService>(context, listen: false);
-    _userProvider = Provider.of<UserProvider>(context, listen: false);
-    _logger = Provider.of<Logger>(context, listen: false);
-    _selectedSubjectId = widget.initialSubjectId;
-    _logger.i('복습 페이지 초기화 완료');
-
-    if (_selectedSubjectId != null) {
-      _loadQuizzesForReview();
-    }
-
-    _loadSubjects();
-  }
-
-  Future<void> _loadSubjects() async {
-    _subjects = await _quizService.getSubjects();
-    setState(() {});
-  }
-
-  String _getSubjectName(String? subjectId) {
-    if (subjectId == null) return "선택된 과목";
-    final subject = _subjects.firstWhere((s) => s.id == subjectId,
-        orElse: () => Subject(id: '', name: '알 수 없는 과목'));
-    return subject.name;
-  }
-
-  Future<void> _loadQuizzesForReview() async {
-    if (_selectedSubjectId == null || _selectedSubjectId!.isEmpty) {
-      _logger.w('선택된 과목이 없습니다.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final userId = _userProvider.user?.uid;
-      if (userId == null) {
-        _logger.w('사용자 ID가 없습니다. 복습 카드를 로드할 수 없음');
-        return;
-      }
-
-      _logger.d('복습 퀴즈 로드 시작: userId=$userId, subjectId=$_selectedSubjectId');
-      _quizzesForReview = await _quizService.getQuizzesForReview(
-        userId,
-        _selectedSubjectId!,
-        null, // 복습은 과목별로 이루어짐. tpye을 Null로 전달
-      );
-
-      _logger.i('복습 카드 ${_quizzesForReview.length}개 로드 완료');
-      _logger.d('로드된 퀴즈: ${_quizzesForReview.map((q) => q.id).toList()}');
-
-      // Check if all quizzes are completed after loading
-      _checkAllQuizzesCompleted();
-    } catch (e) {
-      _logger.e('퀴즈 복습 데이터를 불러올 수 없음: $e');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _checkAllQuizzesCompleted() {
-    setState(() {
-      _isAllQuizzesCompleted = _quizzesForReview.isEmpty ||
-          _quizzesForReview
-              .every((quiz) => _completedQuizIds.contains(quiz.id));
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final provider = Provider.of<ReviewQuizzesProvider>(context);
+    final userProvider = Provider.of<UserProvider>(context);
+
+    if (provider.selectedSubjectId == null && initialSubjectId != null) {
+      provider.setSelectedSubjectId(initialSubjectId);
+      provider.loadQuizzesForReview();
+    }
+
     return Scaffold(
       body: Column(
         children: [
           UnifiedSubjectDropdown(
-            selectedSubjectId: _selectedSubjectId,
+            selectedSubjectId: provider.selectedSubjectId,
             onSubjectSelected: (String? newSubjectId) {
-              setState(() {
-                _selectedSubjectId = newSubjectId;
-              });
+              provider.setSelectedSubjectId(newSubjectId);
               if (newSubjectId != null) {
-                _loadQuizzesForReview();
-              } else {
-                setState(() {
-                  _quizzesForReview = [];
-                });
+                provider.loadQuizzesForReview();
               }
             },
           ),
           Expanded(
-            child: Consumer<UserProvider>(
-              builder: (context, userProvider, _) {
-                if (_isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (_isAllQuizzesCompleted) {
-                  return _buildEmptyState();
-                }
-                return ListView.builder(
-                  itemCount: _quizzesForReview.length,
-                  itemBuilder: (context, index) {
-                    final quiz = _quizzesForReview[index];
-                    if (_completedQuizIds.contains(quiz.id)) {
-                      return const SizedBox
-                          .shrink(); // Do not show completed quizzes
-                    }
-                    _logger.d('Building review card: quizId=${quiz.id}');
-                    return ReviewPageCard(
-                      key: ValueKey(quiz.id),
-                      quiz: quiz,
-                      isAdmin: userProvider.isAdmin,
-                      questionNumber: index + 1,
-                      onAnswerSelected: (answerIndex) =>
-                          _handleAnswerSelected(quiz, answerIndex),
-                      subjectId: _selectedSubjectId!,
-                      quizTypeId: quiz.typeId,
-                      nextReviewDate: userProvider
-                              .getNextReviewDate(
-                                _selectedSubjectId!,
-                                quiz.typeId,
-                                quiz.id,
-                              )
-                              ?.toIso8601String() ??
-                          DateTime.now().toIso8601String(),
-                      onFeedbackGiven: (quiz, isUnderstandingImproved) {
-                        setState(() {
-                          _completedQuizIds.add(quiz.id);
-                          _currentQuizIndex = null;
-                          _checkAllQuizzesCompleted();
-                        });
-                      },
-                    );
-                  },
-                );
-              },
-            ),
+            child: _buildQuizList(context, provider, userProvider),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildQuizList(BuildContext context, ReviewQuizzesProvider provider,
+      UserProvider userProvider) {
+    if (provider.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (provider.isAllQuizzesCompleted) {
+      return _buildEmptyState(context, provider);
+    }
+    return ListView.builder(
+      itemCount: provider.quizzesForReview.length,
+      itemBuilder: (context, index) {
+        final quiz = provider.quizzesForReview[index];
+        if (provider.completedQuizIds.contains(quiz.id)) {
+          return const SizedBox.shrink();
+        }
+        return ReviewPageCard(
+          key: ValueKey(quiz.id),
+          quiz: quiz,
+          isAdmin: userProvider.isAdmin,
+          questionNumber: index + 1,
+          onAnswerSelected: (answerIndex) =>
+              _handleAnswerSelected(quiz, answerIndex, provider, userProvider),
+          subjectId: provider.selectedSubjectId!,
+          quizTypeId: quiz.typeId,
+          nextReviewDate: userProvider
+                  .getNextReviewDate(
+                    provider.selectedSubjectId!,
+                    quiz.typeId,
+                    quiz.id,
+                  )
+                  ?.toIso8601String() ??
+              DateTime.now().toIso8601String(),
+          onFeedbackGiven: (quiz, isUnderstandingImproved) {
+            provider.addCompletedQuizId(quiz.id);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(
+      BuildContext context, ReviewQuizzesProvider provider) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -190,7 +123,8 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
           const Icon(Icons.celebration,
               size: 80, color: Color.fromARGB(255, 255, 153, 0)),
           const SizedBox(height: 20),
-          Text('${_getSubjectName(_selectedSubjectId)}의 모든 퀴즈를 완료했어요! 🎉',
+          Text(
+              '${provider.getSubjectName(provider.selectedSubjectId)}의 모든 퀴즈를 완료했어요! 🎉',
               style:
                   const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
@@ -200,24 +134,22 @@ class _ReviewQuizzesPageState extends State<ReviewQuizzesPage> {
     );
   }
 
-  Future<void> _handleAnswerSelected(Quiz quiz, int answerIndex) async {
-    _logger.i('복습 페이지 답변 선택: quizId=${quiz.id}, answerIndex=$answerIndex');
+  Future<void> _handleAnswerSelected(Quiz quiz, int answerIndex,
+      ReviewQuizzesProvider provider, UserProvider userProvider) async {
+    final logger = Provider.of<Logger>(provider as BuildContext, listen: false);
+    logger.i('복습 페이지 답변 선택: quizId=${quiz.id}, answerIndex=$answerIndex');
     final isCorrect = quiz.correctOptionIndex == answerIndex;
 
-    await _userProvider.updateUserQuizData(
-      _selectedSubjectId!,
+    await userProvider.updateUserQuizData(
+      provider.selectedSubjectId!,
       quiz.typeId,
       quiz.id,
       isCorrect,
       selectedOptionIndex: answerIndex,
     );
 
-    setState(() {
-      _currentQuizIndex = _quizzesForReview.indexOf(quiz);
-      _completedQuizIds.add(quiz.id);
-      _checkAllQuizzesCompleted();
-    });
+    provider.addCompletedQuizId(quiz.id);
 
-    _logger.d('복습 페이지 답변 업데이트: isCorrect=$isCorrect');
+    logger.d('복습 페이지 답변 업데이트: isCorrect=$isCorrect');
   }
 }

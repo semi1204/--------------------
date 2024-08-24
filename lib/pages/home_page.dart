@@ -42,7 +42,7 @@ class DraggablePageState extends State<DraggablePage> {
                 flexibleSpace: FlexibleSpaceBar(
                   title: const Text('Quiz App'),
                   background: Container(
-                    color: Colors.blue,
+                    color: const Color(0xFF424242),
                     child: const Center(
                       child: Text(
                         '공지사항: 새로운 기능이 추가되었습니다!',

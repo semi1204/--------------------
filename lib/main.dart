@@ -11,8 +11,8 @@ import 'firebase_options.dart';
 import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
 import 'package:nursing_quiz_app_6/providers/subject_provider.dart';
 
-const Color primaryColor = Color(0xFF4A90E2); // 밝은 파란색
-const Color secondaryColor = Color(0xFF50E3C2); // 민트색
+const Color primaryColor = Color.fromARGB(255, 152, 183, 219); // 밝은 파란색
+const Color secondaryColor = Color.fromARGB(255, 190, 236, 225); // 민트색
 
 // 다크 모드를 위한 회색 톤의 색상 정의
 const Color darkModeBackground = Color(0xFF303030); // 어두운 회색

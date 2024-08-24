@@ -85,7 +85,6 @@ class AppDrawer extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   CommonSnackBar(
                     message: '사용자 데이터 동기화 완료! 🔄',
-                    backgroundColor: Colors.green[300]!,
                   ),
                 );
               } catch (e) {

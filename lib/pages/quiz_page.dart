@@ -8,6 +8,7 @@ import '../widgets/quiz_card.dart';
 import 'edit_quiz_page.dart';
 import 'dart:async'; // Timer를 사용하기 위해 추가
 import '../widgets/close_button.dart'; // 커스텀 CloseButton import
+import '../providers/theme_provider.dart';
 
 class QuizPage extends StatefulWidget {
   final String subjectId;
@@ -65,10 +66,10 @@ class _QuizPageState extends State<QuizPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Consumer2<QuizProvider, UserProvider>(
-        builder: (context, quizProvider, userProvider, child) {
-          return quizProvider.quizzes.isEmpty
+    return Consumer3<QuizProvider, UserProvider, ThemeProvider>(
+      builder: (context, quizProvider, userProvider, themeProvider, child) {
+        return Scaffold(
+          body: quizProvider.quizzes.isEmpty
               ? const Center(child: CircularProgressIndicator())
               : CustomScrollView(
                   slivers: [
@@ -76,12 +77,13 @@ class _QuizPageState extends State<QuizPage> {
                       floating: true,
                       snap: true,
                       pinned: false,
-                      title: const Text('Quiz'),
+                      title: const Text('문제', style: TextStyle(fontSize: 18)),
                       leading: IconButton(
-                        icon: const Icon(Icons.arrow_back),
+                        icon: const Icon(Icons.arrow_back, size: 20),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                       actions: const [CustomCloseButton()],
+                      toolbarHeight: kToolbarHeight / 1.4,
                     ),
                     SliverToBoxAdapter(
                       child: SizedBox(
@@ -107,7 +109,7 @@ class _QuizPageState extends State<QuizPage> {
                                   widget.quizTypeId,
                                   quiz.id,
                                   answerIndex,
-                                  index, // 현재 퀴즈의 인덱스를 전달
+                                  index,
                                 );
                               },
                               onResetQuiz: () {
@@ -134,9 +136,9 @@ class _QuizPageState extends State<QuizPage> {
                       ),
                     ),
                   ],
-                );
-        },
-      ),
+                ),
+        );
+      },
     );
   }
 

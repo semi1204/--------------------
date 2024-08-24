@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
-import 'package:nursing_quiz_app_6/constants.dart';
+import 'package:nursing_quiz_app_6/utils/constants.dart';
 import '../models/quiz.dart';
 import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';

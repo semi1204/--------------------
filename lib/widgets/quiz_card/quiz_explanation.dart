@@ -4,6 +4,7 @@ import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/markdown_widgets.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
 import 'package:provider/provider.dart';
+import '../../constants.dart';
 
 class QuizExplanation extends StatefulWidget {
   final String explanation;
@@ -55,7 +56,7 @@ class _QuizExplanationState extends State<QuizExplanation> {
         if (widget.keywords.isNotEmpty) ...[
           const Text(
             '키워드',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -97,8 +98,13 @@ class _QuizExplanationState extends State<QuizExplanation> {
                 _toggleReviewStatus(context, userProvider, widget.logger),
             style: ElevatedButton.styleFrom(
               backgroundColor: isInReviewList
-                  ? const Color.fromRGBO(255, 196, 199, 0.7)
-                  : const Color.fromRGBO(196, 251, 199, 0.7),
+                  ? INCORRECT_OPTION_COLOR
+                  : CORRECT_OPTION_COLOR,
+              elevation: 0, // 그림자 제거
+              shadowColor: Colors.transparent, // 그림자 색상 투명하게
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8), // 모서리 둥글게
+              ),
             ),
           ),
         ),

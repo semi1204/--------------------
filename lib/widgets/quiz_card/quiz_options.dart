@@ -3,6 +3,7 @@ import 'package:nursing_quiz_app_6/models/quiz.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter_markdown/flutter_markdown.dart'; // Add this import
 import 'markdown_widgets.dart'; // Add this import
+import '../../constants.dart'; // Import constants
 
 //옵션도 마크다운을 사용할 수 있음.
 class QuizOptions extends StatelessWidget {
@@ -88,8 +89,8 @@ class QuizOptions extends StatelessWidget {
   Color _getOptionColor(bool showSelection, bool isSelected, bool isCorrect) {
     if (!hasAnswered) return Colors.transparent;
     if (isCorrect && (hasAnswered || showSelection))
-      return Colors.green.withOpacity(0.2);
-    if (isSelected) return Colors.red.withOpacity(0.2);
+      return CORRECT_OPTION_COLOR;
+    if (isSelected) return INCORRECT_OPTION_COLOR;
     return Colors.transparent;
   }
 

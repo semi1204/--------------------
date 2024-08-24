@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/constants.dart';
 import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_admin_actions.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_explanation.dart';
@@ -386,7 +387,9 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
           onPressed: () => _giveFeedback(false),
           child: const Text('어려움 🤔', style: TextStyle(color: Colors.black)),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color.fromRGBO(255, 196, 199, 0.5),
+            backgroundColor: INCORRECT_OPTION_COLOR,
+            elevation: 0,
+            shadowColor: Colors.transparent,
             minimumSize: const Size(100, 36),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
@@ -395,7 +398,9 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
           onPressed: () => _giveFeedback(true),
           child: const Text('알겠음 😊', style: TextStyle(color: Colors.black)),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color.fromRGBO(196, 251, 199, 0.5),
+            backgroundColor: CORRECT_OPTION_COLOR,
+            elevation: 0,
+            shadowColor: Colors.transparent,
             minimumSize: const Size(100, 36),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),

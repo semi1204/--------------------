@@ -5,6 +5,7 @@ import 'package:nursing_quiz_app_6/widgets/quiz_card/markdown_widgets.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
 import 'package:provider/provider.dart';
 import '../../constants.dart';
+import '../../providers/theme_provider.dart';
 
 class QuizExplanation extends StatefulWidget {
   final String explanation;
@@ -50,65 +51,73 @@ class _QuizExplanationState extends State<QuizExplanation> {
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (widget.keywords.isNotEmpty) ...[
-          const Text(
-            '키워드',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 4.0,
-            runSpacing: 2.0,
-            children: widget.keywords
-                .map((keyword) => Chip(label: Text(keyword)))
-                .toList(),
-          ),
-          const SizedBox(height: 16),
-        ],
-        const Text(
-          '해설',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        const SizedBox(height: 8),
-        MarkdownRenderer(
-          data: widget.explanation,
-          logger: widget.logger,
-        ),
-        const SizedBox(height: 16),
-        if (widget.feedbackButtons != null) ...[
-          widget.feedbackButtons!,
-          const SizedBox(height: 16),
-        ],
-        Align(
-          alignment: Alignment.centerRight,
-          child: ElevatedButton.icon(
-            icon: Icon(
-              isInReviewList ? Icons.remove_circle : Icons.add_circle,
-              color: isInReviewList ? Colors.red : Colors.green,
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final textColor =
+            themeProvider.isDarkMode ? Colors.white : Colors.black;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (widget.keywords.isNotEmpty) ...[
+              const Text(
+                '키워드',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 4.0,
+                runSpacing: 2.0,
+                children: widget.keywords
+                    .map((keyword) => Chip(label: Text(keyword)))
+                    .toList(),
+              ),
+              const SizedBox(height: 16),
+            ],
+            const Text(
+              '해설',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            // 버튼을 누르면, 복습카드로 전환함
-            label: Text(
-              isInReviewList ? '복습 목록에서 제거' : '복습 목록에 추가',
-              style: const TextStyle(color: Colors.black),
+            const SizedBox(height: 8),
+            MarkdownRenderer(
+              data: widget.explanation,
+              logger: widget.logger,
             ),
-            onPressed: () =>
-                _toggleReviewStatus(context, userProvider, widget.logger),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isInReviewList
-                  ? INCORRECT_OPTION_COLOR
-                  : CORRECT_OPTION_COLOR,
-              elevation: 0, // 그림자 제거
-              shadowColor: Colors.transparent, // 그림자 색상 투명하게
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8), // 모서리 둥글게
+            const SizedBox(height: 16),
+            if (widget.feedbackButtons != null) ...[
+              widget.feedbackButtons!,
+              const SizedBox(height: 16),
+            ],
+            Align(
+              // 버튼을 누르면, 복습카드로 전환함
+              alignment: Alignment.centerRight,
+              child: ElevatedButton.icon(
+                icon: Icon(
+                  isInReviewList ? Icons.remove_circle : Icons.add_circle,
+                  color: isInReviewList ? Colors.red : Colors.green,
+                ),
+                label: Text(
+                  isInReviewList ? '복습 목록에서 제거' : '복습 목록에 추가',
+                  style: TextStyle(color: textColor),
+                ),
+                onPressed: () =>
+                    _toggleReviewStatus(context, userProvider, widget.logger),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isInReviewList
+                      ? INCORRECT_OPTION_COLOR
+                      : CORRECT_OPTION_COLOR,
+                  foregroundColor: textColor,
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 

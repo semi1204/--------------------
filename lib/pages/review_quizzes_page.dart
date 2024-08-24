@@ -13,10 +13,10 @@ class ReviewQuizzesPage extends StatelessWidget {
   final String? initialQuizId;
 
   const ReviewQuizzesPage({
-    Key? key,
+    super.key,
     this.initialSubjectId,
     this.initialQuizId,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

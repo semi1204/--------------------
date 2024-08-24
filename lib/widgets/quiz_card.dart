@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../models/quiz.dart';
 import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
+import '../providers/theme_provider.dart';
 
 abstract class BaseQuizCard extends StatefulWidget {
   final Quiz quiz;
@@ -380,32 +381,40 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
   }
 
   Widget _buildFeedbackButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        ElevatedButton(
-          onPressed: () => _giveFeedback(false),
-          child: const Text('어려움 🤔', style: TextStyle(color: Colors.black)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: INCORRECT_OPTION_COLOR,
-            elevation: 0,
-            shadowColor: Colors.transparent,
-            minimumSize: const Size(100, 36),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () => _giveFeedback(true),
-          child: const Text('알겠음 😊', style: TextStyle(color: Colors.black)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: CORRECT_OPTION_COLOR,
-            elevation: 0,
-            shadowColor: Colors.transparent,
-            minimumSize: const Size(100, 36),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          ),
-        ),
-      ],
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final textColor =
+            themeProvider.isDarkMode ? Colors.white : Colors.black;
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            ElevatedButton(
+              onPressed: () => _giveFeedback(false),
+              child: Text('어려움 🤔', style: TextStyle(color: textColor)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: INCORRECT_OPTION_COLOR,
+                elevation: 0,
+                shadowColor: Colors.transparent,
+                minimumSize: const Size(100, 36),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => _giveFeedback(true),
+              child: Text('알겠음 😊', style: TextStyle(color: textColor)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CORRECT_OPTION_COLOR,
+                elevation: 0,
+                shadowColor: Colors.transparent,
+                minimumSize: const Size(100, 36),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

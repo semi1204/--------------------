@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
 import 'package:nursing_quiz_app_6/utils/constants.dart';
-import '../models/quiz.dart';
 import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
 
@@ -188,15 +187,15 @@ class UserProvider with ChangeNotifier {
   // 서비스로부터 리뷰할 퀴즈를 받는 메소드
   // 복습리스트에 존재하는 것과, 복습카드가 나오는 것을 구분해야 함.
   // getQuizzesForReview의 역할을 명확하게 해야함.
-  Future<List<Quiz>> getQuizzesForReview(
-      String subjectId, String quizTypeId) async {
-    if (_user == null) {
-      _logger.w('Cannot get quizzes for review: No user logged in');
-      return [];
-    }
-    return await _quizService.getQuizzesForReview(
-        _user!.uid, subjectId, quizTypeId);
-  }
+  // Future<List<Quiz>> getQuizzesForReview(
+  //     String subjectId, String quizTypeId) async {
+  //   if (_user == null) {
+  //     _logger.w('Cannot get quizzes for review: No user logged in');
+  //     return [];
+  //   }
+  //   return await _quizService.getQuizzesForReview(
+  //       _user!.uid, subjectId, quizTypeId);
+  // }
 
   Map<String, dynamic> getUserQuizData() {
     if (_user == null) {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nursing_quiz_app_6/constants.dart';
+import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_admin_actions.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_explanation.dart';

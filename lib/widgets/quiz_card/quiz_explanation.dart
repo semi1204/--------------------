@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
+import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/markdown_widgets.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
 import 'package:provider/provider.dart';
-import '../../constants.dart';
 import '../../providers/theme_provider.dart';
 
 class QuizExplanation extends StatefulWidget {

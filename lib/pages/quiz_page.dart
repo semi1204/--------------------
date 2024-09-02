@@ -73,6 +73,7 @@ class _QuizPageState extends State<QuizPage> {
               ? const Center(child: CircularProgressIndicator())
               : CustomScrollView(
                   slivers: [
+                    // TODO : 앱바 삭제 필요
                     SliverAppBar(
                       floating: true,
                       snap: true,

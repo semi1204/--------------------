@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/models/quiz.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter_markdown/flutter_markdown.dart'; // Add this import
+import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'markdown_widgets.dart'; // Add this import
-import '../../constants.dart'; // Import constants
 
 //옵션도 마크다운을 사용할 수 있음.
 class QuizOptions extends StatelessWidget {

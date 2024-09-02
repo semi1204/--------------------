@@ -36,8 +36,8 @@ class ReviewQuizzesProvider with ChangeNotifier {
   }
 
   Future<void> loadQuizzesForReview() async {
-    if (_selectedSubjectId == null || _selectedSubjectId!.isEmpty) {
-      _logger.w('선택된 과목이 없습니다.');
+    if (_selectedSubjectId == null || userId == null) {
+      _logger.w('과목 또는 사용자 ID가 선택되지 않았습니다.');
       return;
     }
 
@@ -67,6 +67,13 @@ class ReviewQuizzesProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // 새로운 메서드: 선택된 과목의 복습 퀴즈를 로드하고 페이지 전환을 준비
+  Future<bool> prepareReviewQuizzes(String subjectId) async {
+    _selectedSubjectId = subjectId;
+    await loadQuizzesForReview();
+    return _quizzesForReview.isNotEmpty;
   }
 
   void _checkAllQuizzesCompleted() {

@@ -267,6 +267,8 @@ class _AddQuizPageState extends State<AddQuizPage> {
         );
         await _quizService.addQuiz(
             _selectedSubjectId!, _selectedTypeId!, newQuiz);
+        await _quizService.refreshSubjectData(_selectedSubjectId!); // 데이터 새로고침
+
         _logger.i('새 퀴즈 추가 성공: $imageUrl');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -179,7 +179,7 @@ class QuizService {
 
     var quizData = _userQuizData[userId]![subjectId]![quizTypeId]![quizId]!;
 
-    // toggleReviewStatus가 true이거나 이미 복습 리스트에 있는 경우에만 Anki 알고리즘 적용
+    // toggleReviewStatus가 true이거 이미 복습 리스트에 있는 경우에만 Anki ��고리즘 적용
     if (toggleReviewStatus == true || quizData.markedForReview) {
       int? qualityOfRecall;
       if (answerTime != null) {
@@ -293,7 +293,6 @@ class QuizService {
         false;
   }
 
-  // --------- TODO : 복스 ---------//
   DateTime? getNextReviewDate(
       String userId, String subjectId, String quizTypeId, String quizId) {
     return _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId]
@@ -374,10 +373,10 @@ class QuizService {
     return data;
   }
 
-  Future<List<Subject>> getSubjects() async {
+  Future<List<Subject>> getSubjects({bool forceRefresh = false}) async {
     _logger.i('과목을 가져오는 중입니다');
     const key = _subjectsKey;
-    if (_cachedSubjects.containsKey(key)) {
+    if (!forceRefresh && _cachedSubjects.containsKey(key)) {
       _logger.d('메모리 캐시에서 과목을 가져왔습니다');
       return _cachedSubjects[key]!;
     }
@@ -397,6 +396,7 @@ class QuizService {
             .toList(),
         encodeData: (subjects) =>
             json.encode(subjects.map((s) => s.toJson()).toList()),
+        forceRefresh: forceRefresh,
       );
 
       _cachedSubjects[key] = subjects;
@@ -408,11 +408,12 @@ class QuizService {
     }
   }
 
-  // 수정: Stream 대신 Future를 반환하록 변경
-  Future<List<QuizType>> getQuizTypes(String subjectId) async {
+  Future<List<QuizType>> getQuizTypes(String subjectId,
+      {bool forceRefresh = false}) async {
     _logger.i('과목 $subjectId에 대한 퀴즈 타입을 가져오는 중입니다');
     final key = '${_quizTypesKey}_$subjectId';
-    if (_cachedQuizTypes.containsKey(subjectId) &&
+    if (!forceRefresh &&
+        _cachedQuizTypes.containsKey(subjectId) &&
         _cachedQuizTypes[subjectId]!.containsKey(key)) {
       _logger.d('메모리 캐시에서 퀴즈 타입을 가져왔습니다: $subjectId');
       return _cachedQuizTypes[subjectId]![key]!;
@@ -436,10 +437,13 @@ class QuizService {
             .toList(),
         encodeData: (quizTypes) =>
             json.encode(quizTypes.map((qt) => qt.toJson()).toList()),
+        forceRefresh: forceRefresh,
       );
 
       _cachedQuizTypes[subjectId] = {key: quizTypes};
       _logger.i('과목 $subjectId에 대한 퀴즈 타입을 가져왔습니다: ${quizTypes.length}');
+      _logger.d(
+          'Retrieved quiz types: ${quizTypes.map((qt) => qt.name).join(', ')}');
       return quizTypes;
     } catch (e) {
       _logger.e('과목 $subjectId에 대한 퀴즈 타입을 가져오는 중 오류가 발생했습니다: $e');
@@ -451,15 +455,16 @@ class QuizService {
   // --------- TODO : 모든 과목을 한번에 가져올지 고민해봐야함. ---------//
   // --------- TODO : 퀴즈 데이터를 가져오는 로직을 로컬데이터를 가져오는 로직을 추가해야함 ---------//
   // Quizpage에서 퀴즈 데이터를 가져오는 함수
-  Future<List<Quiz>> getQuizzes(String subjectId, String quizTypeId) async {
-    // 퀴즈를 가져오는 중임을 로그로 기록
+  Future<List<Quiz>> getQuizzes(String subjectId, String quizTypeId,
+      {bool forceRefresh = false}) async {
     _logger.i('과목 $subjectId에 대한 퀴즈 가져오는 중입니다: $quizTypeId');
 
     // 캐시 키 생성
     final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
 
     // 캐시에서 퀴즈가 존재하는지 확인
-    if (_cachedQuizzes.containsKey(subjectId) &&
+    if (!forceRefresh &&
+        _cachedQuizzes.containsKey(subjectId) &&
         _cachedQuizzes[subjectId]!.containsKey(quizTypeId) &&
         _cachedQuizzes[subjectId]![quizTypeId]!.containsKey(key)) {
       // 캐시에서 퀴즈를 가져왔음을 로그로 기록
@@ -492,6 +497,7 @@ class QuizService {
         // 퀴즈 데이터를 JSON으로 인코딩
         encodeData: (quizzes) =>
             json.encode(quizzes.map((q) => q.toJson()).toList()),
+        forceRefresh: forceRefresh,
       );
 
       // 캐시에 퀴즈 데이터 저장
@@ -499,7 +505,7 @@ class QuizService {
         quizTypeId: {key: quizzes}
       };
       _logger.i(
-          '과목 $subjectId 및 퀴즈 유형 $quizTypeId에 대한 퀴���를 가져왔습니다: ${quizzes.length}');
+          '과목 $subjectId 및 퀴즈 유형 $quizTypeId에 대한 퀴를 가져왔습니다: ${quizzes.length}');
       return quizzes;
     } catch (e) {
       _logger
@@ -513,13 +519,14 @@ class QuizService {
     required Future<T> Function() fetchFromFirestore,
     required T Function(String) parseData,
     required String Function(T) encodeData,
+    bool forceRefresh = false,
   }) async {
     _logger.d('캐시를 사용하여 데이터 가져오는 중: $key');
     final prefs = await SharedPreferences.getInstance();
     final cachedData = prefs.getString(key);
     final cacheTimestamp = prefs.getInt('${key}_timestamp');
 
-    if (cachedData != null && cacheTimestamp != null) {
+    if (!forceRefresh && cachedData != null && cacheTimestamp != null) {
       final now = DateTime.now().millisecondsSinceEpoch;
       if (now - cacheTimestamp < _cacheExpiration.inMilliseconds) {
         _logger.d('캐시된 데이터 사용: $key');
@@ -536,25 +543,35 @@ class QuizService {
     return data;
   }
 
-  Future<void> addQuizTypeToSubject(String subjectId, String typeName) async {
+  Future<String> addQuizTypeToSubject(String subjectId, String typeName) async {
+    _logger.i('과목 $subjectId에 퀴즈 유형 추가 중: $typeName');
     try {
       final quizTypeId = _uuid.v4();
-      final quizTypeData =
-          QuizType(id: quizTypeId, name: typeName, subjectId: subjectId);
+      final quizTypeData = {
+        'id': quizTypeId,
+        'name': typeName,
+      };
 
+      // subjects 컬렉션 내의 특정 문서(subjectId)의 quizTypes 하위 컬렉션에 새 문서 추가
       await _firestore
           .collection('subjects')
           .doc(subjectId)
           .collection('quizTypes')
           .doc(quizTypeId)
-          .set(quizTypeData.toFirestore());
+          .set(quizTypeData);
 
+      // 캐시 업데이트
       _cachedQuizTypes[subjectId] ??= {};
       _cachedQuizTypes[subjectId]!['${_quizTypesKey}_$subjectId'] ??= [];
-      _cachedQuizTypes[subjectId]!['${_quizTypesKey}_$subjectId']!
-          .add(quizTypeData);
+      _cachedQuizTypes[subjectId]!['${_quizTypesKey}_$subjectId']!.add(
+        QuizType(id: quizTypeId, name: typeName, subjectId: subjectId),
+      );
 
-      _logger.i('과목 $subjectId에 퀴즈 유형을 추가했습니다');
+      // SharedPreferences 업데이트
+      await _updateSharedPreferences(subjectId, quizTypeId);
+
+      _logger.i('과목 $subjectId에 퀴즈 유형을 추가했습니다: $quizTypeId');
+      return quizTypeId;
     } catch (e) {
       _logger.e('과목 $subjectId에 퀴즈 유형을 추가하는 중 오류가 발생했습니다: $e');
       rethrow;
@@ -724,15 +741,19 @@ class QuizService {
 
   // 새로 추가: 특정 주제의 즈 타입 및 퀴즈 새로고침 메서드
   Future<void> refreshSubjectData(String subjectId) async {
-    _logger.i('과목 $subjectId에 대한 데이터를 새로고침하는 중입니다');
-    _cachedQuizTypes.remove(subjectId);
-    _cachedQuizzes.remove(subjectId);
+    try {
+      // Clear the cache for this subject
+      _cachedQuizTypes.remove(subjectId);
+      _cachedQuizzes.remove(subjectId);
 
-    final quizTypes = await getQuizTypes(subjectId);
-    for (final quizType in quizTypes) {
-      await getQuizzes(subjectId, quizType.id);
+      await getSubjects();
+      await getQuizTypes(subjectId);
+
+      // ... rest of the method
+    } catch (e) {
+      _logger.e('과목 $subjectId의 데이터를 새로고침하는 중 오류가 발생했습니다: $e');
+      rethrow;
     }
-    _logger.i('과목 $subjectId에 대한 데이터를 새로고침했습니다');
   }
 
   // New method to generate performance analytics

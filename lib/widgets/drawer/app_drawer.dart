@@ -8,6 +8,8 @@ import 'drawer_header.dart';
 import 'package:logger/logger.dart';
 import '../common_widgets.dart';
 import '../../providers/theme_provider.dart';
+import '../../services/quiz_service.dart';
+import '../../services/background_sync_service.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -18,6 +20,8 @@ class AppDrawer extends StatelessWidget {
     final authService = Provider.of<AuthService>(context, listen: false);
     final logger = Provider.of<Logger>(context, listen: false);
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final quizService = Provider.of<QuizService>(context, listen: false);
+    final backgroundSyncService = BackgroundSyncService(quizService);
 
     return Drawer(
       child: ListView(
@@ -76,19 +80,28 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.sync),
-            title: const Text('사용자 정보 동기화'),
+            title: const Text('전체 데이터 동기화'),
             onTap: () async {
-              logger.i('Sync User Info button tapped');
+              logger.i('Sync All Data button tapped');
               try {
-                await userProvider.syncUserData();
                 Navigator.pop(context);
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   CommonSnackBar(
-                    message: '사용자 데이터 동기화 완료! 🔄',
+                    message: '데이터 동기화 시작... 잠시만 기다려주세요.',
+                  ),
+                );
+
+                await userProvider.syncUserData();
+                await backgroundSyncService.syncAllData();
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  CommonSnackBar(
+                    message: '모든 데이터 동기화 완료! 🔄',
                   ),
                 );
               } catch (e) {
-                logger.e('Error syncing user data: $e');
+                logger.e('Error syncing all data: $e');
                 ScaffoldMessenger.of(context).showSnackBar(
                   CommonSnackBar(
                     message: '동기화 중 오류가 발생했습니다. 다시 시도해주세요.',

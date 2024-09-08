@@ -67,6 +67,14 @@ class UserProvider with ChangeNotifier {
     return user;
   }
 
+  Future<User?> signInWithApple() async {
+    final user = await _authService.signInWithApple();
+    if (user != null) {
+      await setUser(user);
+    }
+    return user;
+  }
+
   Future<void> signOut() async {
     await _authService.signOut();
     await setUser(null);

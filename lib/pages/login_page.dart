@@ -141,6 +141,40 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _handleAppleSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final logger = Provider.of<Logger>(context, listen: false);
+
+      final user = await userProvider.signInWithApple();
+
+      if (!mounted) return;
+
+      if (user != null) {
+        logger.i('User ${user.email} signed in with Apple');
+        _navigateAfterLogin();
+      }
+    } catch (e) {
+      final logger = Provider.of<Logger>(context, listen: false);
+      logger.e('Error signing in with Apple: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Failed to sign in with Apple: ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,18 +212,26 @@ class _LoginPageState extends State<LoginPage> {
                 },
               ),
               const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _handleEmailSignIn,
-                child: _isLoading
+              ElevatedButton.icon(
+                icon: const Icon(Icons.email),
+                label: _isLoading
                     ? const CircularProgressIndicator()
                     : const Text('Sign in with Email'),
+                onPressed: _isLoading ? null : _handleEmailSignIn,
               ),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _handleGoogleSignIn,
-                child: _isLoading
+              ElevatedButton.icon(
+                icon: const Icon(Icons.android), // Google 아이콘 사용
+                label: _isLoading
                     ? const CircularProgressIndicator()
                     : const Text('Sign in with Google'),
+                onPressed: _isLoading ? null : _handleGoogleSignIn,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.apple),
+                label: const Text('Sign in with Apple'),
+                onPressed: _isLoading ? null : _handleAppleSignIn,
               ),
               const SizedBox(height: 16),
               TextButton(

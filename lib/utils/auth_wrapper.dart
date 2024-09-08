@@ -24,10 +24,16 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.data == true) {
-          logger.i('유저${userProvider.user!.email}의 로그인 성공, DraggablePage 로드');
+          // userProvider.user가 null이 아닌 경우에만 로그를 출력
+          if (userProvider.user != null) {
+            logger
+                .i('유저 ${userProvider.user!.email}의 로그인 성공, DraggablePage 로드');
+          } else {
+            logger.i('유저 로그인 성공, 하지만 유저 정보가 없음');
+          }
           return const DraggablePage();
         } else {
-          logger.i('유저${userProvider.user!.email}의 로그인 실패, LoginPage 표시');
+          logger.i('유저 로그인 실패, LoginPage 표시');
           return const LoginPage();
         }
       },

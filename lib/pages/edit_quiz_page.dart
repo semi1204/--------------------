@@ -158,7 +158,7 @@ class _EditQuizPageState extends State<EditQuizPage> {
                 decoration: const InputDecoration(
                   labelText: 'Exam Type',
                 ),
-                items: ['CPA', 'CTA'].map((String value) {
+                items: ['CPA', 'CTA', '기출문제', '기출'].map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
                     child: Text(value),

@@ -79,32 +79,63 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.sync),
-            title: const Text('전체 데이터 동기화'),
+            leading: const Icon(Icons.sync_alt),
+            title: const Text('사용자 퀴즈 데이터 동기화'),
             onTap: () async {
-              logger.i('Sync All Data button tapped');
+              logger.i('Sync User Quiz Data button tapped');
               try {
                 Navigator.pop(context);
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   CommonSnackBar(
-                    message: '데이터 동기화 시작... 잠시만 기다려주세요.',
+                    message: '사용자 퀴즈 데이터 동기화 시작...',
                   ),
                 );
 
-                await userProvider.syncUserData();
+                await userProvider.syncUserQuizData();
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  CommonSnackBar(
+                    message: '사용자 퀴즈 데이터 동기화 완료! 🔄',
+                  ),
+                );
+              } catch (e) {
+                logger.e('Error syncing user quiz data: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  CommonSnackBar(
+                    message: '동기화 중 오류가 발생했습니다. 다시 시도해주세요.',
+                    backgroundColor: Colors.red[300]!,
+                  ),
+                );
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.update),
+            title: const Text('전체 퀴즈 데이터 업데이트'),
+            onTap: () async {
+              logger.i('Update All Quiz Data button tapped');
+              try {
+                Navigator.pop(context);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  CommonSnackBar(
+                    message: '전체 퀴즈 데이터 업데이트 시작...',
+                  ),
+                );
+
                 await backgroundSyncService.syncAllData();
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   CommonSnackBar(
-                    message: '모든 데이터 동기화 완료! 🔄',
+                    message: '전체 퀴즈 데이터 업데이트 완료! 🔄',
                   ),
                 );
               } catch (e) {
-                logger.e('Error syncing all data: $e');
+                logger.e('Error updating all quiz data: $e');
                 ScaffoldMessenger.of(context).showSnackBar(
                   CommonSnackBar(
-                    message: '동기화 중 오류가 발생했습니다. 다시 시도해주세요.',
+                    message: '업데이트 중 오류가 발생했습니다. 다시 시도해주세요.',
                     backgroundColor: Colors.red[300]!,
                   ),
                 );

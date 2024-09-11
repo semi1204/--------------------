@@ -907,4 +907,21 @@ class QuizService {
     }
     return quizData.correct / quizData.total;
   }
+
+  // type별 퀴즈 수 가져오기
+  Future<int> getTotalQuizCount(String subjectId, String quizTypeId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('subjects')
+          .doc(subjectId)
+          .collection('quizTypes')
+          .doc(quizTypeId)
+          .collection('quizzes')
+          .get();
+      return querySnapshot.docs.length;
+    } catch (e) {
+      _logger.e('퀴즈 수를 가져오는 중 오류 발생: $e');
+      return 0;
+    }
+  }
 }

@@ -262,4 +262,19 @@ class UserProvider with ChangeNotifier {
       return '${difference.inSeconds}초 후';
     }
   }
+
+  Future<void> syncUserQuizData() async {
+    if (_user == null) {
+      _logger.w('사용자 ID가 없습니다. 퀴즈 데이터를 동기화할 수 없음');
+      return;
+    }
+    try {
+      await _quizService.syncUserData(_user!.uid, getUserQuizData());
+      _logger.i('사용자 퀴즈 데이터 동기화 성공');
+      notifyListeners();
+    } catch (e) {
+      _logger.e('사용자 퀴즈 데이터 동기화 실패: $e');
+      rethrow;
+    }
+  }
 }

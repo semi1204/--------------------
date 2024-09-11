@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:nursing_quiz_app_6/pages/home_page.dart' show DraggablePage;
+import 'dart:io' show Platform;
 
 class LoginPage extends StatefulWidget {
   final bool isFromDrawer;
@@ -227,12 +228,14 @@ class _LoginPageState extends State<LoginPage> {
                     : const Text('Sign in with Google'),
                 onPressed: _isLoading ? null : _handleGoogleSignIn,
               ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.apple),
-                label: const Text('Sign in with Apple'),
-                onPressed: _isLoading ? null : _handleAppleSignIn,
-              ),
+              if (Platform.isIOS) ...[
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.apple),
+                  label: const Text('Sign in with Apple'),
+                  onPressed: _isLoading ? null : _handleAppleSignIn,
+                ),
+              ],
               const SizedBox(height: 16),
               TextButton(
                 onPressed: _isLoading

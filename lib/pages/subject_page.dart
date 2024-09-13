@@ -70,9 +70,10 @@ class _SubjectPageState extends State<SubjectPage> {
             type: BottomNavigationBarType.fixed,
             items: [
               const BottomNavigationBarItem(
-                  icon: Icon(Icons.book), label: '과목별 문제'),
+                  icon: Icon(Icons.local_library), label: '과목별 기출'),
               const BottomNavigationBarItem(
-                  icon: Icon(Icons.refresh), label: '복습'),
+                  icon: Icon(Icons.refresh), label: '복습하기'),
+              // TODO : 복습목록에 추가된 문제들의 차트 기록 화면
               if (Provider.of<UserProvider>(context, listen: false).isAdmin)
                 const BottomNavigationBarItem(
                     icon: Icon(Icons.add), label: '퀴즈 추가'),

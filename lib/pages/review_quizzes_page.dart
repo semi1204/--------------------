@@ -76,7 +76,7 @@ class _ReviewQuizzesPageContent extends StatelessWidget {
             ),
             const SizedBox(height: 10), // 간격 추가
             const Text(
-              '과목을 선택하세요! \n복습문제를 확인할 수 있어요',
+              '과목을 선택하세요! \n오늘의 복습문제를 확인할 수 있어요',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

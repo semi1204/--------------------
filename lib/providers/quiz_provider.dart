@@ -3,7 +3,6 @@ import '../models/quiz.dart';
 import '../services/quiz_service.dart';
 import 'user_provider.dart';
 import 'package:logger/logger.dart';
-import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class QuizProvider with ChangeNotifier {
   final QuizService _quizService;
@@ -15,7 +14,6 @@ class QuizProvider with ChangeNotifier {
   bool _rebuildExplanation = false;
   bool _isAppBarVisible = true;
   int _lastScrollIndex = 0;
-  final ItemScrollController scrollController = ItemScrollController();
 
   QuizProvider(this._quizService, this._userProvider, this._logger);
 
@@ -25,27 +23,18 @@ class QuizProvider with ChangeNotifier {
   bool get isAppBarVisible => _isAppBarVisible;
   int get lastScrollIndex => _lastScrollIndex;
 
-  // 퀴즈를 로딩하고, 초기 스크롤 위치를 설정
+// 퀴즈를 로딩하고, 초기 스크롤 위치를 설정
   // 초기 스크롤 위치는 마지막으로 푼 퀴즈의 다음 퀴즈로 설정
   Future<void> loadQuizzesAndSetInitialScroll(
-      String subjectId, String quizTypeId) async {
+    String subjectId,
+    String quizTypeId,
+  ) async {
     _logger.i('퀴즈 로딩 및 초기 스크롤 위치 설정 시작');
     try {
       _quizzes = await _quizService.getQuizzes(subjectId, quizTypeId);
       _loadSavedAnswers(subjectId, quizTypeId);
       _lastScrollIndex = _findLastAnsweredQuizIndex(subjectId, quizTypeId);
       notifyListeners();
-
-      // 스크롤 위치 설정을 약간 지연
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (_lastScrollIndex > 0 && scrollController.isAttached) {
-          scrollController.scrollTo(
-            index: _lastScrollIndex,
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-          );
-        }
-      });
 
       _logger.i(
           'Loaded ${_quizzes.length} quizzes, initial scroll index: $_lastScrollIndex');
@@ -76,29 +65,18 @@ class QuizProvider with ChangeNotifier {
   }
 
   void setAppBarVisibility(bool isVisible) {
-    _isAppBarVisible = isVisible;
-    notifyListeners();
+    if (_isAppBarVisible != isVisible) {
+      _isAppBarVisible = isVisible;
+      notifyListeners();
+    }
   }
 
   void setLastScrollIndex(int index) {
     _lastScrollIndex = index;
-    notifyListeners();
   }
 
-  void scrollToNextQuiz(int currentIndex) {
-    if (currentIndex < _quizzes.length - 1) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        scrollController.scrollTo(
-          index: currentIndex + 1,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      });
-    }
-  }
-
-  void selectAnswer(String subjectId, String quizTypeId, String quizId,
-      int answerIndex, int currentIndex) {
+  void selectAnswer(
+      String subjectId, String quizTypeId, String quizId, int answerIndex) {
     _logger.i('퀴즈 정답 선택: $quizId, 정답: $answerIndex');
     _selectedAnswers[quizId] = answerIndex;
     _userProvider.updateUserQuizData(
@@ -110,7 +88,6 @@ class QuizProvider with ChangeNotifier {
       selectedOptionIndex: answerIndex,
     );
     notifyListeners();
-    scrollToNextQuiz(currentIndex);
   }
 
   void resetQuiz(String subjectId, String quizTypeId, String quizId) {
@@ -123,8 +100,7 @@ class QuizProvider with ChangeNotifier {
 
   Future<void> deleteQuiz(
       String subjectId, String quizTypeId, String quizId) async {
-    await _quizService.deleteQuiz(
-        subjectId, quizTypeId, quizId); // service.deleteQuiz 호출
+    await _quizService.deleteQuiz(subjectId, quizTypeId, quizId);
     _quizzes.removeWhere((q) => q.id == quizId);
     notifyListeners();
     _logger.i('퀴즈 삭제: $quizId');

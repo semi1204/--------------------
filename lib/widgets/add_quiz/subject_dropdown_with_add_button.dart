@@ -12,13 +12,13 @@ class UnifiedSubjectDropdown extends StatelessWidget {
   final bool useFormField;
 
   const UnifiedSubjectDropdown({
-    super.key,
+    Key? key,
     required this.selectedSubjectId,
     required this.onSubjectSelected,
     this.onAddPressed,
     this.showAddButton = false,
     this.useFormField = false,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +31,7 @@ class UnifiedSubjectDropdown extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           logger.i('과목 데이터 대기 중');
-          return const CircularProgressIndicator();
+          return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
           logger.e('과목 데이터 로드 실패: ${snapshot.error}');
@@ -41,39 +41,11 @@ class UnifiedSubjectDropdown extends StatelessWidget {
           logger.w('과목 데이터 없음');
           return const Text('사용 가능한 과목이 없습니다.');
         }
-        logger.i('과목 로드 완료. 개수: ${snapshot.data!.length}');
 
+        logger.i('과목 로드 완료. 개수: ${snapshot.data!.length}');
         final subjects = snapshot.data!;
-        Widget dropdownWidget;
-        if (useFormField) {
-          dropdownWidget = DropdownButtonFormField<String>(
-            value: selectedSubjectId,
-            decoration: const InputDecoration(
-              labelText: '과목 선택',
-              border: OutlineInputBorder(),
-            ),
-            items: _buildDropdownItems(subjects),
-            onChanged: (String? newValue) {
-              final selectedSubject =
-                  subjects.firstWhere((s) => s.id == newValue);
-              logger.i('선택된 과목: ${selectedSubject.name} (ID: $newValue)');
-              onSubjectSelected(newValue);
-            },
-            validator: (value) => value == null ? '과목을 선택해주세요' : null,
-          );
-        } else {
-          dropdownWidget = DropdownButton<String>(
-            value: selectedSubjectId,
-            hint: const Text('과목을 선택하세요'),
-            items: _buildDropdownItems(subjects),
-            onChanged: (String? newValue) {
-              final selectedSubject =
-                  subjects.firstWhere((s) => s.id == newValue);
-              logger.i('선택된 과목: ${selectedSubject.name} (ID: $newValue)');
-              onSubjectSelected(newValue);
-            },
-          );
-        }
+
+        Widget dropdownWidget = _buildModernDropdown(context, subjects);
 
         if (showAddButton) {
           return Row(
@@ -81,7 +53,8 @@ class UnifiedSubjectDropdown extends StatelessWidget {
               Expanded(child: dropdownWidget),
               if (onAddPressed != null)
                 IconButton(
-                  icon: const Icon(Icons.add),
+                  icon: const Icon(Icons.add_circle),
+                  color: Theme.of(context).primaryColor,
                   onPressed: onAddPressed,
                 ),
             ],
@@ -93,6 +66,59 @@ class UnifiedSubjectDropdown extends StatelessWidget {
     );
   }
 
+  Widget _buildModernDropdown(BuildContext context, List<Subject> subjects) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.grey[200],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: useFormField
+            ? DropdownButtonFormField<String>(
+                value: selectedSubjectId,
+                decoration: InputDecoration(
+                  labelText: '과목 선택',
+                  border: InputBorder.none,
+                  labelStyle: TextStyle(
+                    color: Theme.of(context).primaryColor,
+                    fontSize: 18,
+                  ),
+                ),
+                items: _buildDropdownItems(subjects),
+                onChanged: _onSubjectChanged,
+                validator: (value) => value == null ? '과목을 선택해주세요' : null,
+                icon: Icon(Icons.arrow_drop_down,
+                    color: Theme.of(context).primaryColor, size: 30),
+                dropdownColor: Colors.grey[100],
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  fontSize: 18,
+                ),
+                menuMaxHeight: 300,
+              )
+            : DropdownButton<String>(
+                value: selectedSubjectId,
+                hint: Text('과목을 선택하세요',
+                    style: TextStyle(
+                        color: Theme.of(context).hintColor, fontSize: 18)),
+                items: _buildDropdownItems(subjects),
+                onChanged: _onSubjectChanged,
+                icon: Icon(Icons.arrow_drop_down,
+                    color: Theme.of(context).primaryColor, size: 30),
+                dropdownColor: Colors.grey[100],
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  fontSize: 18,
+                ),
+                underline: Container(),
+                isExpanded: true,
+                menuMaxHeight: 300,
+              ),
+      ),
+    );
+  }
+
   List<DropdownMenuItem<String>> _buildDropdownItems(List<Subject> subjects) {
     return subjects.map<DropdownMenuItem<String>>((Subject subject) {
       return DropdownMenuItem<String>(
@@ -100,5 +126,9 @@ class UnifiedSubjectDropdown extends StatelessWidget {
         child: Text(subject.name),
       );
     }).toList();
+  }
+
+  void _onSubjectChanged(String? newValue) {
+    onSubjectSelected(newValue);
   }
 }

@@ -3,7 +3,7 @@ import Flutter
 import MobileCoreServices
 import os // OSLog를 위해 추가
 
-@UIApplicationMain
+@main
 @objc class AppDelegate: FlutterAppDelegate {
     // OSLog 인스턴스 생성
     let osLog = OSLog(subsystem: Bundle.main.bundleIdentifier!, category: "AppDelegate")

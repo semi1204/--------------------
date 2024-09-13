@@ -16,8 +16,23 @@ class SubjectReviewPage extends StatelessWidget {
     return Consumer2<ReviewQuizzesProvider, UserProvider>(
       builder: (context, provider, userProvider, child) {
         return Scaffold(
-          body: SafeArea(
-            child: _buildQuizList(context, provider, userProvider),
+          body: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                title: Text(
+                  provider.getSubjectName(provider.selectedSubjectId),
+                ),
+                floating: true,
+                snap: true,
+                pinned: false,
+              ),
+              SliverSafeArea(
+                sliver: SliverPadding(
+                  padding: const EdgeInsets.all(8.0),
+                  sliver: _buildQuizList(context, provider, userProvider),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -27,40 +42,43 @@ class SubjectReviewPage extends StatelessWidget {
   Widget _buildQuizList(BuildContext context, ReviewQuizzesProvider provider,
       UserProvider userProvider) {
     if (provider.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const SliverFillRemaining(
+          child: Center(child: CircularProgressIndicator()));
     }
     if (provider.isAllQuizzesCompleted) {
-      return _buildEmptyState(context, provider);
+      return SliverFillRemaining(child: _buildEmptyState(context, provider));
     }
-    return ListView.builder(
-      itemCount: provider.quizzesForReview.length,
-      itemBuilder: (context, index) {
-        final quiz = provider.quizzesForReview[index];
-        if (provider.completedQuizIds.contains(quiz.id)) {
-          return const SizedBox.shrink();
-        }
-        return ReviewPageCard(
-          key: ValueKey(quiz.id),
-          quiz: quiz,
-          isAdmin: userProvider.isAdmin,
-          questionNumber: index + 1,
-          onAnswerSelected: (answerIndex) =>
-              _handleAnswerSelected(quiz, answerIndex, provider, userProvider),
-          subjectId: provider.selectedSubjectId!,
-          quizTypeId: quiz.typeId,
-          nextReviewDate: userProvider
-                  .getNextReviewDate(
-                    provider.selectedSubjectId!,
-                    quiz.typeId,
-                    quiz.id,
-                  )
-                  ?.toIso8601String() ??
-              DateTime.now().toIso8601String(),
-          onFeedbackGiven: (quiz, isUnderstandingImproved) {
-            provider.addCompletedQuizId(quiz.id);
-          },
-        );
-      },
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final quiz = provider.quizzesForReview[index];
+          if (provider.completedQuizIds.contains(quiz.id)) {
+            return const SizedBox.shrink();
+          }
+          return ReviewPageCard(
+            key: ValueKey(quiz.id),
+            quiz: quiz,
+            isAdmin: userProvider.isAdmin,
+            questionNumber: index + 1,
+            onAnswerSelected: (answerIndex) => _handleAnswerSelected(
+                quiz, answerIndex, provider, userProvider),
+            subjectId: provider.selectedSubjectId!,
+            quizTypeId: quiz.typeId,
+            nextReviewDate: userProvider
+                    .getNextReviewDate(
+                      provider.selectedSubjectId!,
+                      quiz.typeId,
+                      quiz.id,
+                    )
+                    ?.toIso8601String() ??
+                DateTime.now().toIso8601String(),
+            onFeedbackGiven: (quiz, isUnderstandingImproved) {
+              provider.addCompletedQuizId(quiz.id);
+            },
+          );
+        },
+        childCount: provider.quizzesForReview.length,
+      ),
     );
   }
 

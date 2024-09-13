@@ -12,7 +12,6 @@ class QuizProvider with ChangeNotifier {
   List<Quiz> _quizzes = [];
   final Map<String, int?> _selectedAnswers = {};
   bool _rebuildExplanation = false;
-  bool _isAppBarVisible = true;
   int _lastScrollIndex = 0;
 
   QuizProvider(this._quizService, this._userProvider, this._logger);
@@ -20,24 +19,20 @@ class QuizProvider with ChangeNotifier {
   List<Quiz> get quizzes => _quizzes;
   Map<String, int?> get selectedAnswers => _selectedAnswers;
   bool get rebuildExplanation => _rebuildExplanation;
-  bool get isAppBarVisible => _isAppBarVisible;
   int get lastScrollIndex => _lastScrollIndex;
 
-// 퀴즈를 로딩하고, 초기 스크롤 위치를 설정
-  // 초기 스크롤 위치는 마지막으로 푼 퀴즈의 다음 퀴즈로 설정
+// 퀴즈를 로딩하고, 초기 화면 위치를 설정
+  // 초기 화면의 위치는 마지막으로 푼 퀴즈의 다음 퀴즈로 설정
   Future<void> loadQuizzesAndSetInitialScroll(
-    String subjectId,
-    String quizTypeId,
-  ) async {
-    _logger.i('퀴즈 로딩 및 초기 스크롤 위치 설정 시작');
+      String subjectId, String quizTypeId) async {
+    //_logger.i('퀴즈 로딩 및 초기 스크롤 위치 설정 시작');
     try {
       _quizzes = await _quizService.getQuizzes(subjectId, quizTypeId);
       _loadSavedAnswers(subjectId, quizTypeId);
       _lastScrollIndex = _findLastAnsweredQuizIndex(subjectId, quizTypeId);
       notifyListeners();
-
-      _logger.i(
-          'Loaded ${_quizzes.length} quizzes, initial scroll index: $_lastScrollIndex');
+      //_logger.i(
+      //    'Loaded ${_quizzes.length} quizzes, initial scroll index: $_lastScrollIndex');
     } catch (e) {
       _logger.e('Error loading quizzes: $e');
     }
@@ -64,20 +59,13 @@ class QuizProvider with ChangeNotifier {
     }
   }
 
-  void setAppBarVisibility(bool isVisible) {
-    if (_isAppBarVisible != isVisible) {
-      _isAppBarVisible = isVisible;
-      notifyListeners();
-    }
-  }
-
   void setLastScrollIndex(int index) {
     _lastScrollIndex = index;
   }
 
   void selectAnswer(
       String subjectId, String quizTypeId, String quizId, int answerIndex) {
-    _logger.i('퀴즈 정답 선택: $quizId, 정답: $answerIndex');
+    //_logger.i('퀴즈 정답 선택: $quizId, 정답: $answerIndex');
     _selectedAnswers[quizId] = answerIndex;
     _userProvider.updateUserQuizData(
       subjectId,

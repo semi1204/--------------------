@@ -1,3 +1,4 @@
+// quiz_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/subject.dart';
 import '../models/quiz_type.dart';
@@ -158,6 +159,7 @@ class QuizService {
     int? selectedOptionIndex,
     bool isUnderstandingImproved = false,
     bool? toggleReviewStatus,
+    double reviewPeriodMultiplier = 1.0,
   }) async {
     _logger.i(
         '사용자 퀴즈 데이터 업데이트 중: user=$userId, subject=$subjectId, quizType=$quizTypeId, quiz=$quizId, correct=$isCorrect');
@@ -196,14 +198,17 @@ class QuizService {
         mistakeCount: quizData.mistakeCount,
         isUnderstandingImproved: isUnderstandingImproved,
         markForReview: true,
+        reviewPeriodMultiplier: reviewPeriodMultiplier,
       );
 
       quizData.interval = ankiResult['interval'] as int;
       quizData.easeFactor = ankiResult['easeFactor'] as double;
       quizData.consecutiveCorrect = ankiResult['consecutiveCorrect'] as int;
       quizData.mistakeCount = ankiResult['mistakeCount'] as int;
-      quizData.nextReviewDate =
-          AnkiAlgorithm.calculateNextReviewDate(quizData.interval);
+      quizData.nextReviewDate = AnkiAlgorithm.calculateNextReviewDate(
+        quizData.interval,
+        reviewPeriodMultiplier,
+      );
       _logger
           .d('다음 복습 날짜: ${quizData.nextReviewDate}, 간격: ${quizData.interval}');
     }

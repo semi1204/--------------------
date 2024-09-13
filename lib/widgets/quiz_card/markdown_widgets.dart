@@ -1,11 +1,12 @@
-// lib/widgets/markdown_widgets.dart
-
+// lib/widgets/quiz_card/markdown_widgets.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:logger/logger.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
-import 'package:nursing_quiz_app_6/widgets/quiz_card/network_image_with_loader.dart'; // 새로 추가
+import 'package:nursing_quiz_app_6/widgets/quiz_card/network_image_with_loader.dart';
+import 'package:provider/provider.dart';
+import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
 
 //TODO : 마크다운 에디터 내에 있는 글자의 크기를 키우고, 글씨체를 궁서체로 변경해야 함.
 class MarkdownRenderer extends StatelessWidget {
@@ -22,39 +23,62 @@ class MarkdownRenderer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final defaultStyle = DefaultTextStyle.of(context).style;
-    final mergedStyleSheet = styleSheet?.copyWith(
-          p: styleSheet?.p?.merge(defaultStyle) ?? defaultStyle,
-          // Merge other styles as needed
-        ) ??
-        MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-          p: defaultStyle,
-          // Set other styles as needed
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final defaultStyle = DefaultTextStyle.of(context).style;
+        final scaleFactor = themeProvider.textScaleFactor;
+
+        final mergedStyleSheet =
+            (styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context)))
+                .copyWith(
+          p: TextStyle(fontSize: defaultStyle.fontSize! * scaleFactor),
+          h1: TextStyle(
+              fontSize: defaultStyle.fontSize! * 2 * scaleFactor,
+              fontWeight: FontWeight.bold),
+          h2: TextStyle(
+              fontSize: defaultStyle.fontSize! * 1.5 * scaleFactor,
+              fontWeight: FontWeight.bold),
+          h3: TextStyle(
+              fontSize: defaultStyle.fontSize! * 1.17 * scaleFactor,
+              fontWeight: FontWeight.bold),
+          h4: TextStyle(
+              fontSize: defaultStyle.fontSize! * 1 * scaleFactor,
+              fontWeight: FontWeight.bold),
+          h5: TextStyle(
+              fontSize: defaultStyle.fontSize! * 0.83 * scaleFactor,
+              fontWeight: FontWeight.bold),
+          h6: TextStyle(
+              fontSize: defaultStyle.fontSize! * 0.67 * scaleFactor,
+              fontWeight: FontWeight.bold),
+          listBullet: TextStyle(fontSize: defaultStyle.fontSize! * scaleFactor),
         );
 
-    return MarkdownBody(
-      data: data,
-      selectable: true,
-      styleSheet: mergedStyleSheet,
-      builders: {
-        'math': MathBuilder(logger: logger),
-        'img': ImageBuilder(logger: logger, context: context),
+        return MarkdownBody(
+          data: data,
+          selectable: true,
+          styleSheet: mergedStyleSheet,
+          builders: {
+            'math': MathBuilder(logger: logger, scaleFactor: scaleFactor),
+            'img': ImageBuilder(logger: logger, context: context),
+          },
+          extensionSet: md.ExtensionSet([
+            const md.TableSyntax(),
+          ], [
+            ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+            InlineMathSyntax(),
+            KoreanFractionSyntax(),
+          ]),
+        );
       },
-      extensionSet: md.ExtensionSet([
-        const md.TableSyntax(),
-      ], [
-        ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
-        InlineMathSyntax(),
-        KoreanFractionSyntax(),
-      ]),
     );
   }
 }
 
 class MathBuilder extends MarkdownElementBuilder {
   final Logger logger;
+  final double scaleFactor;
 
-  MathBuilder({required this.logger});
+  MathBuilder({required this.logger, required this.scaleFactor});
 
   @override
   Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
@@ -63,7 +87,8 @@ class MathBuilder extends MarkdownElementBuilder {
       return Math.tex(
         element.textContent,
         mathStyle: MathStyle.display,
-        textStyle: preferredStyle,
+        textStyle: preferredStyle?.copyWith(
+            fontSize: preferredStyle.fontSize! * scaleFactor),
       );
     }
     return null;

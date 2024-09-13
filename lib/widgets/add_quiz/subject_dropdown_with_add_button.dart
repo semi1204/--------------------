@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../services/quiz_service.dart';
 import '../../models/subject.dart';
 import 'package:logger/logger.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/constants.dart';
 
 class UnifiedSubjectDropdown extends StatelessWidget {
   final String? selectedSubjectId;
@@ -12,19 +14,20 @@ class UnifiedSubjectDropdown extends StatelessWidget {
   final bool useFormField;
 
   const UnifiedSubjectDropdown({
-    Key? key,
+    super.key,
     required this.selectedSubjectId,
     required this.onSubjectSelected,
     this.onAddPressed,
     this.showAddButton = false,
     this.useFormField = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final QuizService quizService =
         Provider.of<QuizService>(context, listen: false);
     final Logger logger = Provider.of<Logger>(context, listen: false);
+    final ThemeProvider themeProvider = Provider.of<ThemeProvider>(context);
 
     return FutureBuilder<List<Subject>>(
       future: quizService.getSubjects(),
@@ -45,7 +48,8 @@ class UnifiedSubjectDropdown extends StatelessWidget {
         logger.i('과목 로드 완료. 개수: ${snapshot.data!.length}');
         final subjects = snapshot.data!;
 
-        Widget dropdownWidget = _buildModernDropdown(context, subjects);
+        Widget dropdownWidget =
+            _buildModernDropdown(context, subjects, themeProvider);
 
         if (showAddButton) {
           return Row(
@@ -66,56 +70,77 @@ class UnifiedSubjectDropdown extends StatelessWidget {
     );
   }
 
-  Widget _buildModernDropdown(BuildContext context, List<Subject> subjects) {
+  Widget _buildModernDropdown(BuildContext context, List<Subject> subjects,
+      ThemeProvider themeProvider) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(16),
+        color: themeProvider.isDarkMode
+            ? ThemeProvider.darkModeSurface
+            : Colors.grey[200],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 8), // Increased padding
         child: useFormField
-            ? DropdownButtonFormField<String>(
-                value: selectedSubjectId,
-                decoration: InputDecoration(
-                  labelText: '과목 선택',
-                  border: InputBorder.none,
-                  labelStyle: TextStyle(
-                    color: Theme.of(context).primaryColor,
-                    fontSize: 18,
-                  ),
-                ),
-                items: _buildDropdownItems(subjects),
-                onChanged: _onSubjectChanged,
-                validator: (value) => value == null ? '과목을 선택해주세요' : null,
-                icon: Icon(Icons.arrow_drop_down,
-                    color: Theme.of(context).primaryColor, size: 30),
-                dropdownColor: Colors.grey[100],
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                  fontSize: 18,
-                ),
-                menuMaxHeight: 300,
-              )
-            : DropdownButton<String>(
-                value: selectedSubjectId,
-                hint: Text('과목을 선택하세요',
-                    style: TextStyle(
-                        color: Theme.of(context).hintColor, fontSize: 18)),
-                items: _buildDropdownItems(subjects),
-                onChanged: _onSubjectChanged,
-                icon: Icon(Icons.arrow_drop_down,
-                    color: Theme.of(context).primaryColor, size: 30),
-                dropdownColor: Colors.grey[100],
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                  fontSize: 18,
-                ),
-                underline: Container(),
-                isExpanded: true,
-                menuMaxHeight: 300,
-              ),
+            ? _buildDropdownFormField(context, subjects, themeProvider)
+            : _buildDropdownButton(context, subjects, themeProvider),
       ),
+    );
+  }
+
+  Widget _buildDropdownFormField(BuildContext context, List<Subject> subjects,
+      ThemeProvider themeProvider) {
+    return DropdownButtonFormField<String>(
+      value: selectedSubjectId,
+      decoration: InputDecoration(
+        labelText: '과목 선택',
+        border: InputBorder.none,
+        labelStyle: getAppTextStyle(context,
+                fontSize: 20,
+                fontWeight: FontWeight.bold) // Increased font size
+            .copyWith(
+          color: ThemeProvider.primaryColor,
+        ),
+        contentPadding: EdgeInsets.symmetric(
+            vertical: 12, horizontal: 16), // Added content padding
+      ),
+      items: _buildDropdownItems(subjects),
+      onChanged: _onSubjectChanged,
+      validator: (value) => value == null ? '과목을 선택해주세요' : null,
+      icon: const Icon(Icons.arrow_drop_down,
+          color: ThemeProvider.primaryColor, size: 36), // Increased icon size
+      dropdownColor: themeProvider.isDarkMode
+          ? ThemeProvider.darkModeSurface
+          : Colors.grey[100],
+      style: getAppTextStyle(context, fontSize: 20), // Increased font size
+      menuMaxHeight: 300,
+      isExpanded: true,
+      elevation: 8,
+      borderRadius: BorderRadius.circular(16),
+    );
+  }
+
+  Widget _buildDropdownButton(BuildContext context, List<Subject> subjects,
+      ThemeProvider themeProvider) {
+    return DropdownButton<String>(
+      value: selectedSubjectId,
+      hint: Text('과목을 선택하세요',
+          style: getAppTextStyle(context, fontSize: 17) // Increased font size
+              .copyWith(color: Theme.of(context).hintColor)),
+      items: _buildDropdownItems(subjects),
+      onChanged: _onSubjectChanged,
+      icon: const Icon(Icons.arrow_drop_down,
+          color: ThemeProvider.primaryColor, size: 36), // Increased icon size
+      dropdownColor: themeProvider.isDarkMode
+          ? ThemeProvider.darkModeSurface
+          : Colors.grey[100],
+      style: getAppTextStyle(context, fontSize: 20), // Increased font size
+      underline: Container(),
+      isExpanded: true,
+      menuMaxHeight: 300,
+      elevation: 8,
+      borderRadius: BorderRadius.circular(16),
     );
   }
 
@@ -123,7 +148,11 @@ class UnifiedSubjectDropdown extends StatelessWidget {
     return subjects.map<DropdownMenuItem<String>>((Subject subject) {
       return DropdownMenuItem<String>(
         value: subject.id,
-        child: Text(subject.name),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+              vertical: 8.0), // Added padding to menu items
+          child: Text(subject.name),
+        ),
       );
     }).toList();
   }

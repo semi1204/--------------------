@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/pages/home_page.dart';
 import 'package:nursing_quiz_app_6/pages/login_page.dart';
+import 'package:nursing_quiz_app_6/pages/settings_page.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/auth_service.dart';
@@ -75,7 +76,10 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               logger.i('Settings menu item tapped');
               Navigator.pop(context);
-              // TODO: Navigate to settings page
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsPage()),
+              );
             },
           ),
           ListTile(

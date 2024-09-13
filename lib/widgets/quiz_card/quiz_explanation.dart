@@ -1,9 +1,10 @@
+import 'package:any_animated_button/any_animated_button.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
-import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/markdown_widgets.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
+import 'package:nursing_quiz_app_6/widgets/quiz_card/review_toggle_bloc.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 
@@ -35,6 +36,7 @@ class QuizExplanation extends StatefulWidget {
 
 class _QuizExplanationState extends State<QuizExplanation> {
   late bool isInReviewList;
+  late ReviewToggleBloc _reviewToggleBloc;
 
   @override
   void initState() {
@@ -45,6 +47,13 @@ class _QuizExplanationState extends State<QuizExplanation> {
       widget.quizTypeId,
       widget.quizId,
     );
+    _reviewToggleBloc = ReviewToggleBloc();
+  }
+
+  @override
+  void dispose() {
+    _reviewToggleBloc.close();
+    super.dispose();
   }
 
   @override
@@ -82,31 +91,12 @@ class _QuizExplanationState extends State<QuizExplanation> {
                   '해설',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton.icon(
-                    icon: Icon(
-                      isInReviewList ? Icons.remove_circle : Icons.add_circle,
-                      color: isInReviewList ? Colors.red : Colors.green,
-                    ),
-                    label: Text(
-                      isInReviewList ? '복습 목록에서 제거' : '복습 목록에 추가',
-                      style: TextStyle(color: textColor),
-                    ),
-                    onPressed: () => _toggleReviewStatus(
-                        context, userProvider, widget.logger),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isInReviewList
-                          ? INCORRECT_OPTION_COLOR
-                          : CORRECT_OPTION_COLOR,
-                      foregroundColor: textColor,
-                      elevation: 0,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
+                ReviewToggleButton(
+                  bloc: _reviewToggleBloc,
+                  isInReviewList: isInReviewList,
+                  textColor: textColor,
+                  onTap: () =>
+                      _toggleReviewStatus(context, userProvider, widget.logger),
                 ),
               ],
             ),
@@ -130,6 +120,8 @@ class _QuizExplanationState extends State<QuizExplanation> {
   void _toggleReviewStatus(
       BuildContext context, UserProvider userProvider, Logger logger) async {
     logger.i('Toggling review status for quiz: ${widget.quizId}');
+
+    _reviewToggleBloc.add(TriggerAnyAnimatedButtonEvent(isInReviewList));
 
     String message;
     String? reviewTimeString;

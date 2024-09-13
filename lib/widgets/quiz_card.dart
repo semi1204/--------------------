@@ -128,80 +128,84 @@ class _QuizPageCardState extends State<QuizPageCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<UserProvider>(
-      builder: (context, userProvider, child) {
-        //  quizCard에서는 복습 버튼을 눌러야 복습을 시작함. 복습계산을 하지않음. 무조건 지우지말고, 이 변수 존재이유를 확인해야함 ---------//
-        final nextReviewDate = userProvider.getNextReviewDate(
-          widget.subjectId,
-          widget.quizTypeId,
-          widget.quiz.id,
-        );
-        final quizData = userProvider.getUserQuizData()[widget.subjectId]
-            ?[widget.quizTypeId]?[widget.quiz.id];
-        final isInReviewList = nextReviewDate != null &&
-            (nextReviewDate.isBefore(DateTime.now()) ||
-                quizData?['markedForReview'] == true);
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return Consumer<UserProvider>(
+          builder: (context, userProvider, child) {
+            //  quizCard에서는 복습 버튼을 눌러야 복습을 시작함. 복습계산을 하지않음. 무조건 지우지말고, 이 변수 존재이유를 확인해야함 ---------//
+            final nextReviewDate = userProvider.getNextReviewDate(
+              widget.subjectId,
+              widget.quizTypeId,
+              widget.quiz.id,
+            );
+            final quizData = userProvider.getUserQuizData()[widget.subjectId]
+                ?[widget.quizTypeId]?[widget.quiz.id];
+            final isInReviewList = nextReviewDate != null &&
+                (nextReviewDate.isBefore(DateTime.now()) ||
+                    quizData?['markedForReview'] == true);
 
-        _logger.d(
-            '퀴즈 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList, nextReviewDate=$nextReviewDate, markedForReview=${quizData?['markedForReview']}');
+            _logger.d(
+                '퀴즈 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList, nextReviewDate=$nextReviewDate, markedForReview=${quizData?['markedForReview']}');
 
-        return Card(
-          margin: const EdgeInsets.all(8.0),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                QuizHeader(
-                  quiz: widget.quiz,
-                  subjectId: widget.subjectId,
-                  quizTypeId: widget.quizTypeId,
-                  onResetQuiz: () {
-                    setState(() {
-                      _selectedOptionIndex = null;
-                      _hasAnswered = false;
-                      _startTime = DateTime.now();
-                    });
-                    widget.onResetQuiz?.call();
-                  },
-                  logger: _logger,
+            return Card(
+              margin: const EdgeInsets.all(8.0),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    QuizHeader(
+                      quiz: widget.quiz,
+                      subjectId: widget.subjectId,
+                      quizTypeId: widget.quizTypeId,
+                      onResetQuiz: () {
+                        setState(() {
+                          _selectedOptionIndex = null;
+                          _hasAnswered = false;
+                          _startTime = DateTime.now();
+                        });
+                        widget.onResetQuiz?.call();
+                      },
+                      logger: _logger,
+                    ),
+                    const SizedBox(height: 16),
+                    QuizQuestion(
+                      question: widget.quiz.question,
+                      logger: _logger,
+                    ),
+                    const SizedBox(height: 16),
+                    QuizOptions(
+                      quiz: widget.quiz,
+                      selectedOptionIndex: _selectedOptionIndex,
+                      hasAnswered: _hasAnswered,
+                      isQuizPage: widget.isQuizPage,
+                      onSelectOption: (index) {
+                        _selectOption(index, userProvider);
+                      },
+                      logger: _logger,
+                    ),
+                    if (_hasAnswered) ...[
+                      const SizedBox(height: 16),
+                      QuizExplanation(
+                        explanation: widget.quiz.explanation,
+                        logger: _logger,
+                        keywords: widget.quiz.keywords,
+                        quizId: widget.quiz.id,
+                        subjectId: widget.subjectId,
+                        quizTypeId: widget.quizTypeId,
+                        rebuildTrigger: widget.rebuildExplanation,
+                      ),
+                    ],
+                    if (widget.isAdmin)
+                      QuizAdminActions(
+                        onEdit: widget.onEdit,
+                        onDelete: widget.onDelete,
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                QuizQuestion(
-                  question: widget.quiz.question,
-                  logger: _logger,
-                ),
-                const SizedBox(height: 16),
-                QuizOptions(
-                  quiz: widget.quiz,
-                  selectedOptionIndex: _selectedOptionIndex,
-                  hasAnswered: _hasAnswered,
-                  isQuizPage: widget.isQuizPage,
-                  onSelectOption: (index) {
-                    _selectOption(index, userProvider);
-                  },
-                  logger: _logger,
-                ),
-                if (_hasAnswered) ...[
-                  const SizedBox(height: 16),
-                  QuizExplanation(
-                    explanation: widget.quiz.explanation,
-                    logger: _logger,
-                    keywords: widget.quiz.keywords,
-                    quizId: widget.quiz.id,
-                    subjectId: widget.subjectId,
-                    quizTypeId: widget.quizTypeId,
-                    rebuildTrigger: widget.rebuildExplanation,
-                  ),
-                ],
-                if (widget.isAdmin)
-                  QuizAdminActions(
-                    onEdit: widget.onEdit,
-                    onDelete: widget.onDelete,
-                  ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -282,71 +286,76 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<UserProvider>(
-      builder: (context, userProvider, child) {
-        final nextReviewDate = userProvider.getNextReviewDate(
-          widget.subjectId,
-          widget.quizTypeId,
-          widget.quiz.id,
-        );
-        final quizData = userProvider.getUserQuizData()[widget.subjectId]
-            ?[widget.quizTypeId]?[widget.quiz.id];
-        final isInReviewList = nextReviewDate != null &&
-            (nextReviewDate.isBefore(DateTime.now()) ||
-                quizData?['markedForReview'] == true);
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return Consumer<UserProvider>(
+          builder: (context, userProvider, child) {
+            final nextReviewDate = userProvider.getNextReviewDate(
+              widget.subjectId,
+              widget.quizTypeId,
+              widget.quiz.id,
+            );
+            final quizData = userProvider.getUserQuizData()[widget.subjectId]
+                ?[widget.quizTypeId]?[widget.quiz.id];
+            final isInReviewList = nextReviewDate != null &&
+                (nextReviewDate.isBefore(DateTime.now()) ||
+                    quizData?['markedForReview'] == true);
 
-        _logger.d(
-            '복습 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList, nextReviewDate=$nextReviewDate, markedForReview=${quizData?['markedForReview']}');
+            _logger.d(
+                '복습 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList, nextReviewDate=$nextReviewDate, markedForReview=${quizData?['markedForReview']}');
 
-        return Card(
-          margin: const EdgeInsets.all(8.0),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                QuizHeader(
-                  quiz: widget.quiz,
-                  subjectId: widget.subjectId,
-                  quizTypeId: widget.quizTypeId,
-                  onResetQuiz: () {}, // ReviewPageCard에서는 리셋 기능을 제공하지 않습니다.
-                  logger: _logger,
+            return Card(
+              margin: const EdgeInsets.all(8.0),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    QuizHeader(
+                      quiz: widget.quiz,
+                      subjectId: widget.subjectId,
+                      quizTypeId: widget.quizTypeId,
+                      onResetQuiz: () {}, // ReviewPageCard에서는 리셋 기능을 제공하지 않습니다.
+                      logger: _logger,
+                    ),
+                    const SizedBox(height: 16),
+                    QuizQuestion(
+                      question: widget.quiz.question,
+                      logger: _logger,
+                    ),
+                    const SizedBox(height: 16),
+                    QuizOptions(
+                      quiz: widget.quiz,
+                      selectedOptionIndex: _selectedOptionIndex,
+                      hasAnswered: _hasAnswered,
+                      isQuizPage: false,
+                      onSelectOption: (index) =>
+                          _selectOption(index, userProvider),
+                      logger: _logger,
+                    ),
+                    if (_hasAnswered) ...[
+                      const SizedBox(height: 16),
+                      QuizExplanation(
+                        explanation: widget.quiz.explanation,
+                        logger: _logger,
+                        keywords: widget.quiz.keywords,
+                        quizId: widget.quiz.id,
+                        subjectId: widget.subjectId,
+                        quizTypeId: widget.quizTypeId,
+                        rebuildTrigger: false,
+                        feedbackButtons: _buildFeedbackButtons(),
+                      ),
+                    ],
+                    if (widget.isAdmin)
+                      QuizAdminActions(
+                        onEdit: widget.onEdit,
+                        onDelete: widget.onDelete,
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                QuizQuestion(
-                  question: widget.quiz.question,
-                  logger: _logger,
-                ),
-                const SizedBox(height: 16),
-                QuizOptions(
-                  quiz: widget.quiz,
-                  selectedOptionIndex: _selectedOptionIndex,
-                  hasAnswered: _hasAnswered,
-                  isQuizPage: false,
-                  onSelectOption: (index) => _selectOption(index, userProvider),
-                  logger: _logger,
-                ),
-                if (_hasAnswered) ...[
-                  const SizedBox(height: 16),
-                  QuizExplanation(
-                    explanation: widget.quiz.explanation,
-                    logger: _logger,
-                    keywords: widget.quiz.keywords,
-                    quizId: widget.quiz.id,
-                    subjectId: widget.subjectId,
-                    quizTypeId: widget.quizTypeId,
-                    rebuildTrigger: false,
-                    feedbackButtons: _buildFeedbackButtons(),
-                  ),
-                ],
-                if (widget.isAdmin)
-                  QuizAdminActions(
-                    onEdit: widget.onEdit,
-                    onDelete: widget.onDelete,
-                  ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

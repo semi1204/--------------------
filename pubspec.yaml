@@ -60,6 +60,10 @@ dependencies:
   flutter_debouncer: ^2.0.0
   scroll_to_index: ^3.0.1
   any_animated_button: ^0.0.4
+  dartz: ^0.10.1
+  flutter_bloc: ^8.1.6
+  ionicons: ^0.2.2
+  card_swiper: ^3.0.1
 
 dev_dependencies:
   flutter_test:

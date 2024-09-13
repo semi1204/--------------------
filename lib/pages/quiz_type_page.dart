@@ -8,6 +8,7 @@ import 'quiz_page.dart';
 import 'package:logger/logger.dart';
 import '../widgets/close_button.dart'; // CustomCloseButton import
 import '../providers/user_provider.dart';
+import '../utils/constants.dart';
 
 // TODO : 리스트 정렬은 23년도 기출부터 최신순으로 정렬해야 함
 // 리스트에 기존에 풀었던 문제들을 산정해서, 각 tpye에 대한 진행률을 보여줘야 함
@@ -30,7 +31,7 @@ class QuizTypePage extends StatelessWidget {
         child: AppBar(
           title: Text(
             subject.name,
-            style: const TextStyle(fontSize: 18),
+            style: getAppTextStyle(context, fontSize: 18),
           ),
           centerTitle: true,
           elevation: 0,

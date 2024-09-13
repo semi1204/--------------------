@@ -1,3 +1,4 @@
+// anki_algorithm.dart
 import 'dart:math';
 import 'package:logger/logger.dart';
 import 'package:flutter/foundation.dart';
@@ -19,6 +20,7 @@ class AnkiAlgorithm {
     int? mistakeCount,
     bool isUnderstandingImproved = false,
     required bool markForReview,
+    required double reviewPeriodMultiplier,
   }) {
     easeFactor ??= defaultEaseFactor;
     _logger.i('복습 계산 시작: interval=$interval, easeFactor=$easeFactor, ...');
@@ -155,10 +157,13 @@ class AnkiAlgorithm {
   }
 
   // 다음 복습 날짜를 계산하는 메소드입니다. 주어진 간격에 따라 다음 복습 날짜를 반환합니다.
-  static DateTime calculateNextReviewDate(int interval) {
+  static DateTime calculateNextReviewDate(
+      int interval, double reviewPeriodMultiplier) {
     // 로그를 통해 현재 간격을 기록합니다.
-    _logger.d('다음 복습 날짜 계산: interval=$interval');
+    _logger.d(
+        '다음 복습 날짜 계산: interval=$interval, reviewPeriodMultiplier=$reviewPeriodMultiplier');
     // 마지막 복습 날짜에 주어진 간격(분)을 더하여 다음 복습 날짜를 계산합니다.
-    return DateTime.now().add(Duration(minutes: interval));
+    return DateTime.now()
+        .add(Duration(minutes: (interval * reviewPeriodMultiplier).round()));
   }
 }

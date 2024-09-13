@@ -74,9 +74,41 @@ class _QuizExplanationState extends State<QuizExplanation> {
               ),
               const SizedBox(height: 16),
             ],
-            const Text(
-              '해설',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            // Modified section to use Row for "해설" and review button
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '해설',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    icon: Icon(
+                      isInReviewList ? Icons.remove_circle : Icons.add_circle,
+                      color: isInReviewList ? Colors.red : Colors.green,
+                    ),
+                    label: Text(
+                      isInReviewList ? '복습 목록에서 제거' : '복습 목록에 추가',
+                      style: TextStyle(color: textColor),
+                    ),
+                    onPressed: () => _toggleReviewStatus(
+                        context, userProvider, widget.logger),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isInReviewList
+                          ? INCORRECT_OPTION_COLOR
+                          : CORRECT_OPTION_COLOR,
+                      foregroundColor: textColor,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             MarkdownRenderer(
@@ -88,33 +120,6 @@ class _QuizExplanationState extends State<QuizExplanation> {
               widget.feedbackButtons!,
               const SizedBox(height: 16),
             ],
-            Align(
-              // 버튼을 누르면, 복습카드로 전환함
-              alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                icon: Icon(
-                  isInReviewList ? Icons.remove_circle : Icons.add_circle,
-                  color: isInReviewList ? Colors.red : Colors.green,
-                ),
-                label: Text(
-                  isInReviewList ? '복습 목록에서 제거' : '복습 목록에 추가',
-                  style: TextStyle(color: textColor),
-                ),
-                onPressed: () =>
-                    _toggleReviewStatus(context, userProvider, widget.logger),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isInReviewList
-                      ? INCORRECT_OPTION_COLOR
-                      : CORRECT_OPTION_COLOR,
-                  foregroundColor: textColor,
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
           ],
         );
       },

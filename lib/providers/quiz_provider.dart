@@ -16,6 +16,8 @@ class QuizProvider with ChangeNotifier {
   bool _rebuildExplanation = false;
   int _lastScrollIndex = 0;
   SortOption _currentSortOption = SortOption.all;
+  bool _isFilterEmpty = true;
+  bool get isFilterEmpty => _isFilterEmpty;
 
   QuizProvider(this._quizService, this._userProvider, this._logger);
 
@@ -27,26 +29,56 @@ class QuizProvider with ChangeNotifier {
 
   void setSortOption(SortOption option) {
     _currentSortOption = option;
-    _sortQuizzes();
+    _filterQuizzes();
     notifyListeners();
   }
 
-  void _sortQuizzes() {
+  void _filterQuizzes() {
     switch (_currentSortOption) {
       case SortOption.all:
-        // 원래 순서로 복원
-        _quizzes.sort((a, b) => a.id.compareTo(b.id));
+        _quizzes = List.from(_quizzes);
+        _isFilterEmpty = false;
         break;
       case SortOption.low:
-        sortQuizzesByAccuracy(0, 0.6);
+        filterQuizzesByAccuracy(0, 0.6);
+        _isFilterEmpty = _quizzes.isEmpty;
         break;
       case SortOption.medium:
-        sortQuizzesByAccuracy(0.6, 0.85);
+        filterQuizzesByAccuracy(0.6, 0.85);
+        _isFilterEmpty = _quizzes.isEmpty;
         break;
       case SortOption.high:
-        sortQuizzesByAccuracy(0.85, 1.0);
+        filterQuizzesByAccuracy(0.85, 1.0);
+        _isFilterEmpty = _quizzes.isEmpty;
         break;
     }
+    notifyListeners();
+  }
+
+  void filterQuizzesByAccuracy(double minAccuracy, double maxAccuracy) {
+    _logger
+        .i('Filtering quizzes by accuracy: min=$minAccuracy, max=$maxAccuracy');
+
+    if (_selectedSubjectId == null || _selectedQuizTypeId == null) {
+      _logger.w('Cannot filter quizzes: Subject or QuizType not selected');
+      return;
+    }
+
+    _quizzes = _quizzes.where((quiz) {
+      double accuracy = _userProvider.getQuizAccuracy(
+        _selectedSubjectId!,
+        _selectedQuizTypeId!,
+        quiz.id,
+      );
+
+      _logger.d('Quiz ${quiz.id} accuracy: $accuracy');
+
+      // 정확도가 1.0인 경우를 포함하도록 수정
+      return accuracy >= minAccuracy && accuracy <= maxAccuracy;
+    }).toList();
+
+    _logger.i('Quizzes filtered. New count: ${_quizzes.length}');
+    _isFilterEmpty = _quizzes.isEmpty;
   }
 
   // 퀴즈를 로딩하고, 초기 화면 위치를 설정
@@ -123,53 +155,6 @@ class QuizProvider with ChangeNotifier {
     _logger.i('퀴즈 삭제: $quizId');
   }
 
-  void sortQuizzesByAccuracy(double minAccuracy, double maxAccuracy) {
-    _logger
-        .i('Sorting quizzes by accuracy: min=$minAccuracy, max=$maxAccuracy');
-
-    if (_selectedSubjectId == null || _selectedQuizTypeId == null) {
-      _logger.w('Cannot sort quizzes: Subject or QuizType not selected');
-      return;
-    }
-
-    _quizzes.sort((a, b) {
-      double accuracyA = _userProvider.getQuizAccuracy(
-        _selectedSubjectId!,
-        _selectedQuizTypeId!,
-        a.id,
-      );
-      double accuracyB = _userProvider.getQuizAccuracy(
-        _selectedSubjectId!,
-        _selectedQuizTypeId!,
-        b.id,
-      );
-
-      _logger.d('Quiz ${a.id} accuracy: $accuracyA');
-      _logger.d('Quiz ${b.id} accuracy: $accuracyB');
-
-      bool isAInRange = accuracyA >= minAccuracy && accuracyA < maxAccuracy;
-      bool isBInRange = accuracyB >= minAccuracy && accuracyB < maxAccuracy;
-
-      if (isAInRange && isBInRange) {
-        // 둘 다 범위 내에 있으면 정확도가 높은 순으로 정렬
-        return accuracyB.compareTo(accuracyA);
-      } else if (isAInRange) {
-        // A만 범위 내에 있으면 A를 앞으로
-        return -1;
-      } else if (isBInRange) {
-        // B만 범위 내에 있으면 B를 앞으로
-        return 1;
-      } else {
-        // 둘 다 범위 밖이면 원래 순서 유지
-        return 0;
-      }
-    });
-
-    _logger
-        .i('Quizzes sorted. New order: ${_quizzes.map((q) => q.id).toList()}');
-    notifyListeners();
-  }
-
   // Add these properties if they don't exist
   String? _selectedSubjectId;
   String? _selectedQuizTypeId;
@@ -187,5 +172,10 @@ class QuizProvider with ChangeNotifier {
 
   void updateQuizAccuracy(String subjectId, String quizTypeId, String quizId) {
     notifyListeners();
+  }
+
+  void resetSortOption() {
+    _currentSortOption = SortOption.all;
+    _filterQuizzes();
   }
 }

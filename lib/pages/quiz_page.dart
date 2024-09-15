@@ -61,122 +61,157 @@ class _QuizPageState extends State<QuizPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer3<QuizProvider, UserProvider, ThemeProvider>(
-      builder: (context, quizProvider, userProvider, themeProvider, child) {
-        return Scaffold(
-          body: quizProvider.quizzes.isEmpty
-              ? const Center(child: CircularProgressIndicator())
-              : CustomScrollView(
-                  controller: _scrollController, // Set the controller here
-                  slivers: [
-                    SliverAppBar(
-                      title: LinkedTitle(
-                        //  selceted subject(이름) > selected quizType(이름)
-                        // TODO : subjectName, quizTypeName 변수 사용
-                        titles: [widget.subject.name, widget.quizType.name],
-                        onTap: (index) {
-                          if (index == 0) {
-                            // Navigate to SubjectPage
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (context) => const SubjectPage(),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        if (didPop) {
+          // Reset the sort option when leaving the page
+          context.read<QuizProvider>().resetSortOption();
+        }
+        // No need to return anything
+      },
+      child: Consumer3<QuizProvider, UserProvider, ThemeProvider>(
+        builder: (context, quizProvider, userProvider, themeProvider, child) {
+          return Scaffold(
+            body: quizProvider.quizzes.isEmpty
+                ? Center(
+                    child: Text(
+                      quizProvider.isFilterEmpty
+                          ? '선택한 필터에 해당하는 퀴즈가 없습니다.'
+                          : '퀴즈를 불러오는 중입니다',
+                      style: getAppTextStyle(context, fontSize: 16),
+                    ),
+                  )
+                : CustomScrollView(
+                    controller: _scrollController, // Set the controller here
+                    slivers: [
+                      SliverAppBar(
+                        title: LinkedTitle(
+                          //  selceted subject(이름) > selected quizType(이름)
+                          // TODO : subjectName, quizTypeName 변수 사용
+                          titles: [widget.subject.name, widget.quizType.name],
+                          onTap: (index) {
+                            if (index == 0) {
+                              // Navigate to SubjectPage
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (context) => const SubjectPage(),
+                                ),
+                              );
+                            } else if (index == 1) {
+                              // Navigate back to QuizTypePage
+                              Navigator.of(context).pop();
+                            }
+                            // 페이지를 나갈 때 정렬 옵션을 리셋합니다.
+                            quizProvider.resetSortOption();
+                          },
+                          textStyle: getAppTextStyle(context, fontSize: 16),
+                        ),
+                        floating: true,
+                        snap: true,
+                        pinned: false,
+                        actions: [
+                          IconButton(
+                            icon: const Icon(Icons.sort),
+                            onPressed: () =>
+                                _showFilterDialog(context, quizProvider),
+                          ),
+                          const CustomCloseButton(),
+                        ],
+                      ),
+                      // Done : Quizpage의 AppBar title 의 오른쪽에 정렬 아이콘 추가 후 클릭하면 quizpage 내에서 빨간색, 노란색, 초록색 카드를 선별하는 popup 띄우기
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final quiz = quizProvider.quizzes[index];
+                            final selectedAnswer =
+                                quizProvider.selectedAnswers[quiz.id];
+                            return AutoScrollTag(
+                              key: ValueKey(index),
+                              controller: _scrollController,
+                              index: index,
+                              child: QuizPageCard(
+                                key: ValueKey(quiz.id),
+                                quiz: quiz,
+                                questionNumber: index + 1,
+                                isAdmin: userProvider.isAdmin,
+                                onEdit: () => _editQuiz(quiz),
+                                onDelete: () => _deleteQuiz(quiz),
+                                onAnswerSelected: (answerIndex) =>
+                                    _selectAnswer(
+                                        quizProvider, quiz.id, answerIndex),
+                                onResetQuiz: () =>
+                                    _resetQuiz(quizProvider, quiz.id),
+                                subjectId: widget.subject.id,
+                                quizTypeId: widget.quizType.id,
+                                selectedOptionIndex: selectedAnswer,
+                                isQuizPage: true,
+                                nextReviewDate: userProvider
+                                        .getNextReviewDate(
+                                          widget.subject.id,
+                                          widget.quizType.id,
+                                          quiz.id,
+                                        )
+                                        ?.toIso8601String() ??
+                                    DateTime.now().toIso8601String(),
+                                rebuildExplanation:
+                                    quizProvider.rebuildExplanation,
                               ),
                             );
-                          } else if (index == 1) {
-                            // Navigate back to QuizTypePage
-                            Navigator.of(context).pop();
-                          }
-                        },
-                        textStyle: getAppTextStyle(context, fontSize: 16),
-                      ),
-                      floating: true,
-                      snap: true,
-                      pinned: false,
-                      actions: [
-                        IconButton(
-                          icon: const Icon(Icons.sort),
-                          onPressed: () =>
-                              _showSortingPopup(context, quizProvider),
+                          },
+                          childCount: quizProvider.quizzes.length,
                         ),
-                        const CustomCloseButton(),
-                      ],
-                    ),
-                    // TODO : Quizpage의 AppBar title 의 오른쪽에 정렬 아이콘 추가 후 클릭하면 quizpage 내에서 빨간색, 노란색, 초록색 카드를 선별하는 popup 띄우기
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final quiz = quizProvider.quizzes[index];
-                          final selectedAnswer =
-                              quizProvider.selectedAnswers[quiz.id];
-                          return AutoScrollTag(
-                            key: ValueKey(index),
-                            controller: _scrollController,
-                            index: index,
-                            child: QuizPageCard(
-                              key: ValueKey(quiz.id),
-                              quiz: quiz,
-                              questionNumber: index + 1,
-                              isAdmin: userProvider.isAdmin,
-                              onEdit: () => _editQuiz(quiz),
-                              onDelete: () => _deleteQuiz(quiz),
-                              onAnswerSelected: (answerIndex) => _selectAnswer(
-                                  quizProvider, quiz.id, answerIndex),
-                              onResetQuiz: () =>
-                                  _resetQuiz(quizProvider, quiz.id),
-                              subjectId: widget.subject.id,
-                              quizTypeId: widget.quizType.id,
-                              selectedOptionIndex: selectedAnswer,
-                              isQuizPage: true,
-                              nextReviewDate: userProvider
-                                      .getNextReviewDate(
-                                        widget.subject.id,
-                                        widget.quizType.id,
-                                        quiz.id,
-                                      )
-                                      ?.toIso8601String() ??
-                                  DateTime.now().toIso8601String(),
-                              rebuildExplanation:
-                                  quizProvider.rebuildExplanation,
-                            ),
-                          );
-                        },
-                        childCount: quizProvider.quizzes.length,
                       ),
-                    ),
-                  ],
-                ),
-        );
-      },
+                    ],
+                  ),
+          );
+        },
+      ),
     );
   }
 
-  void _showSortingPopup(BuildContext context, QuizProvider quizProvider) {
+  void _showFilterDialog(BuildContext context, QuizProvider quizProvider) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('정렬 옵션'),
+          title: const Text('카드 필터'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
+              RadioListTile<SortOption>(
+                title: const Text('모든 카드'),
+                value: SortOption.all,
+                groupValue: quizProvider.currentSortOption,
+                onChanged: (SortOption? value) {
+                  quizProvider.setSortOption(value!);
+                  Navigator.pop(context);
+                },
+              ),
+              RadioListTile<SortOption>(
                 title: const Text('빨간색 카드 (60% 미만)'),
-                onTap: () {
-                  quizProvider.sortQuizzesByAccuracy(0, 60);
+                value: SortOption.low,
+                groupValue: quizProvider.currentSortOption,
+                onChanged: (SortOption? value) {
+                  quizProvider.setSortOption(value!);
                   Navigator.pop(context);
                 },
               ),
-              ListTile(
+              RadioListTile<SortOption>(
                 title: const Text('노란색 카드 (60% - 85%)'),
-                onTap: () {
-                  quizProvider.sortQuizzesByAccuracy(60, 85);
+                value: SortOption.medium,
+                groupValue: quizProvider.currentSortOption,
+                onChanged: (SortOption? value) {
+                  quizProvider.setSortOption(value!);
                   Navigator.pop(context);
                 },
               ),
-              ListTile(
+              RadioListTile<SortOption>(
                 title: const Text('초록색 카드 (85% 이상)'),
-                onTap: () {
-                  quizProvider.sortQuizzesByAccuracy(85, 100);
+                value: SortOption.high,
+                groupValue: quizProvider.currentSortOption,
+                onChanged: (SortOption? value) {
+                  quizProvider.setSortOption(value!);
                   Navigator.pop(context);
                 },
               ),

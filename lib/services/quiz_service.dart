@@ -179,7 +179,7 @@ class QuizService {
 
     var quizData = _userQuizData[userId]![subjectId]![quizTypeId]![quizId]!;
 
-    // toggleReviewStatus가 true이거 이미 복습 리스트에 있는 경우에만 Anki ��고리즘 적용
+    // toggleReviewStatus가 true이거 이미 복습 리스트에 있는 경우에만 Anki 알고리즘 적용
     if (toggleReviewStatus == true || quizData.markedForReview) {
       int? qualityOfRecall;
       if (answerTime != null) {
@@ -202,8 +202,10 @@ class QuizService {
       quizData.easeFactor = ankiResult['easeFactor'] as double;
       quizData.consecutiveCorrect = ankiResult['consecutiveCorrect'] as int;
       quizData.mistakeCount = ankiResult['mistakeCount'] as int;
-      quizData.nextReviewDate =
-          AnkiAlgorithm.calculateNextReviewDate(quizData.interval);
+      quizData.nextReviewDate = AnkiAlgorithm.calculateNextReviewDate(
+        quizData.interval,
+        quizData.easeFactor,
+      );
       _logger
           .d('다음 복습 날짜: ${quizData.nextReviewDate}, 간격: ${quizData.interval}');
     }

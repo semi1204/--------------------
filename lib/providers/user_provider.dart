@@ -1,15 +1,37 @@
+// user_provider.dart
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
 import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProvider with ChangeNotifier {
   User? _user;
   final Logger _logger = Logger();
   final AuthService _authService = AuthService();
   final QuizService _quizService = QuizService();
+
+  double _reviewPeriodMultiplier = 1.0;
+  double get reviewPeriodMultiplier => _reviewPeriodMultiplier;
+
+  void setReviewPeriodMultiplier(double value) {
+    _reviewPeriodMultiplier = value;
+    notifyListeners();
+    _saveReviewPeriodMultiplier();
+  }
+
+  void _loadReviewPeriodMultiplier() async {
+    final prefs = await SharedPreferences.getInstance();
+    _reviewPeriodMultiplier = prefs.getDouble('reviewPeriodMultiplier') ?? 1.0;
+    notifyListeners();
+  }
+
+  void _saveReviewPeriodMultiplier() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('reviewPeriodMultiplier', _reviewPeriodMultiplier);
+  }
 
   User? get user => _user;
 
@@ -112,6 +134,7 @@ class UserProvider with ChangeNotifier {
     );
     await _quizService.saveUserQuizData(_user!.uid);
     _logger.d('사용자 퀴즈 데이터 업데이트 성공');
+    notifyListeners();
   }
 
   // 복습 리스트(복습리스트엔 복습카드가 존재해야 함)에 퀴즈를 추가하는 메소드
@@ -247,8 +270,10 @@ class UserProvider with ChangeNotifier {
       _logger.w('Cannot get quiz accuracy: No user logged in');
       return 0.0;
     }
-    return _quizService.getQuizAccuracy(
-        _user!.uid, subjectId, quizTypeId, quizId);
+    double accuracy =
+        _quizService.getQuizAccuracy(_user!.uid, subjectId, quizTypeId, quizId);
+    _logger.d('Quiz accuracy for $quizId: $accuracy');
+    return accuracy;
   }
 
   String _formatTimeDifference(Duration difference) {
@@ -276,5 +301,17 @@ class UserProvider with ChangeNotifier {
       _logger.e('사용자 퀴즈 데이터 동기화 실패: $e');
       rethrow;
     }
+  }
+
+  DateTime calculateNextReviewDate(int repetitions, Duration easeFactor) {
+    final now = DateTime.now();
+    final intervalDays =
+        (easeFactor.inMinutes * _reviewPeriodMultiplier).round();
+    return now.add(Duration(minutes: intervalDays));
+  }
+
+  UserProvider() {
+    _loadUserData();
+    _loadReviewPeriodMultiplier();
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/models/quiz.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
+import 'package:nursing_quiz_app_6/providers/quiz_provider.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/accuracy_display.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
@@ -46,41 +47,51 @@ class QuizHeader extends StatelessWidget {
   // 문제의 가장 상단엔, 기출, accuracy, reset button이 Row로 표시
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // 좌측: 기출문제 연도와 시험 유형
-        Text(
-          _getExamInfo(),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
-        ),
-        // 우측: 정답률과 초기화 버튼
-        Row(
+    return Consumer2<UserProvider, QuizProvider>(
+      builder: (context, userProvider, quizProvider, child) {
+        final accuracy = userProvider.getQuizAccuracy(
+          subjectId,
+          quizTypeId,
+          quiz.id,
+        );
+        logger.d('퀴즈 정답률: $accuracy');
+
+        return Row(
+          // 우측: 정답률과 초기화 버튼
+          // TODO : 정답률 표시와 Row를 이루는 왼쪽에 빨색, 노란색, 초록색, 으로 작은 원으로 불빛이 들어오게 함.정답률이 85% 이상이면 초록색, 60% 이상이면 노란색, 60% 미만이면 빨간색으로 표시
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Consumer<UserProvider>(
-              builder: (context, userProvider, child) {
-                final accuracy = userProvider.getQuizAccuracy(
-                  subjectId,
-                  quizTypeId,
-                  quiz.id,
-                );
-                logger.d('퀴즈 정답률: $accuracy');
-                return AccuracyDisplay(accuracy: accuracy);
-              },
+            Text(
+              _getExamInfo(),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.refresh, size: 20),
-              onPressed: () => _showResetConfirmationDialog(context),
-              tooltip: 'Reset Quiz',
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _getAccuracyColor(accuracy),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                AccuracyDisplay(accuracy: accuracy),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20),
+                  onPressed: () => _showResetConfirmationDialog(context),
+                  tooltip: 'Reset Quiz',
+                ),
+              ],
             ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -118,5 +129,15 @@ class QuizHeader extends StatelessWidget {
       examInfo += quiz.examType!;
     }
     return examInfo.isNotEmpty ? examInfo : '기출문제';
+  }
+
+  Color _getAccuracyColor(double accuracy) {
+    if (accuracy >= 0.85) {
+      return Colors.green;
+    } else if (accuracy >= 0.60) {
+      return Colors.yellow;
+    } else {
+      return Colors.red;
+    }
   }
 }

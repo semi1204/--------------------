@@ -1,5 +1,6 @@
 // quiz_type_page.dart
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/pages/subject_page.dart';
 import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
 import '../models/subject.dart';
@@ -8,9 +9,9 @@ import 'quiz_page.dart';
 import 'package:logger/logger.dart';
 import '../widgets/close_button.dart'; // CustomCloseButton import
 import '../providers/user_provider.dart';
-import '../utils/constants.dart';
+import '../widgets/linked_title.dart'; // Add this import
 
-// TODO : 리스트 정렬은 23년도 기출부터 최신순으로 정렬해야 함
+//  : 리스트 정렬은 23년도 기출부터 최신순으로 정렬해야 함
 // 리스트에 기존에 풀었던 문제들을 산정해서, 각 tpye에 대한 진행률을 보여줘야 함
 class QuizTypePage extends StatelessWidget {
   final Subject subject;
@@ -29,9 +30,17 @@ class QuizTypePage extends StatelessWidget {
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight / 1.4),
         child: AppBar(
-          title: Text(
-            subject.name,
-            style: getAppTextStyle(context, fontSize: 18),
+          title: LinkedTitle(
+            titles: [subject.name],
+            onTap: (index) {
+              if (index == 0) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const SubjectPage(),
+                  ),
+                );
+              }
+            },
           ),
           centerTitle: true,
           elevation: 0,
@@ -116,8 +125,8 @@ class QuizTypePage extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (context) => QuizPage(
-                              subjectId: subject.id,
-                              quizTypeId: quizType.id,
+                              subject: subject,
+                              quizType: quizType,
                             ),
                           ),
                         );

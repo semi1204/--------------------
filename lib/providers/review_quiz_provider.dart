@@ -93,4 +93,10 @@ class ReviewQuizzesProvider with ChangeNotifier {
         orElse: () => Subject(id: '', name: '알 수 없는 과목'));
     return subject.name;
   }
+
+  void removeQuizFromReview(String quizId) {
+    _quizzesForReview.removeWhere((quiz) => quiz.id == quizId);
+    _checkAllQuizzesCompleted();
+    notifyListeners();
+  }
 }

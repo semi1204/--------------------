@@ -69,6 +69,7 @@ class ReviewPageCard extends BaseQuizCard {
   final Function(int) onAnswerSelected;
   final VoidCallback? onDeleteReview;
   final Function(Quiz, bool) onFeedbackGiven;
+  final Function(String) onRemoveCard;
 
   const ReviewPageCard({
     super.key,
@@ -83,6 +84,7 @@ class ReviewPageCard extends BaseQuizCard {
     required this.onAnswerSelected,
     this.onDeleteReview,
     required this.onFeedbackGiven,
+    required this.onRemoveCard,
   });
 
   @override
@@ -344,6 +346,8 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                         quizTypeId: widget.quizTypeId,
                         rebuildTrigger: false,
                         feedbackButtons: _buildFeedbackButtons(),
+                        isReviewPage: true,
+                        onRemoveCard: widget.onRemoveCard,
                       ),
                     ],
                     if (widget.isAdmin)
@@ -431,9 +435,20 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
   void _giveFeedback(bool isUnderstandingImproved) async {
     _logger.i(
         'Giving feedback: quizId=${widget.quiz.id}, isUnderstandingImproved=$isUnderstandingImproved');
+
+    // 데이터 존재 여부 확인 및 로깅
     final userData = _userProvider.getUserQuizData();
-    final userAnswer = userData[widget.subjectId]?[widget.quizTypeId]
-        ?[widget.quiz.id]?['selectedOptionIndex'] as int?;
+    final quizData =
+        userData[widget.subjectId]?[widget.quizTypeId]?[widget.quiz.id];
+
+    if (quizData == null) {
+      _logger.w(
+          'Quiz data not found. Subject: ${widget.subjectId}, Type: ${widget.quizTypeId}, Quiz: ${widget.quiz.id}');
+      // 여기서 필요하다면 데이터를 다시 초기화하거나 오류 처리를 할 수 있습니다.
+      return;
+    }
+
+    final userAnswer = quizData['selectedOptionIndex'] as int?;
 
     if (userAnswer != null) {
       final isCorrect = widget.quiz.correctOptionIndex == userAnswer;
@@ -468,6 +483,10 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
       }
     } else {
       _logger.w('No user answer found for quiz: ${widget.quiz.id}');
+      // 사용자에게 먼저 퀴즈에 답변하라는 메시지를 표시
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('먼저 퀴즈에 답변해주세요.')),
+      );
     }
   }
 }

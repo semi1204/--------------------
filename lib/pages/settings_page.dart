@@ -32,11 +32,11 @@ class SettingsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Preview',
+                      Text('미리보기',
                           style: getAppTextStyle(context,
                               fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      Text('This is how your text will look.',
+                      Text('실제 문제에서 보이는 크기',
                           style: getAppTextStyle(context,
                               fontSize: 16 * themeProvider.textScaleFactor)),
                     ],
@@ -46,7 +46,7 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(height: 24),
 
               // Text size adjustment
-              Text('Text Size',
+              Text('텍스트 크기',
                   style: getAppTextStyle(context,
                       fontSize: 18, fontWeight: FontWeight.bold)),
               Slider(
@@ -60,15 +60,15 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(height: 24),
 
               // Review period information and adjustment
-              Text('Review Period',
+              Text('복습 주기',
                   style: getAppTextStyle(context,
                       fontSize: 18, fontWeight: FontWeight.bold)),
               Text(
-                'Next review: ${_formatDuration(Duration(days: adjustedReviewPeriod))}',
+                '사용자 복습 주기: ${_formatDuration(Duration(days: adjustedReviewPeriod))}',
                 style: getAppTextStyle(context, fontSize: 14),
               ),
               Text(
-                'Original review period: 1 day',
+                '기본 복습 주기: 1 day',
                 style: getAppTextStyle(context, fontSize: 14),
               ),
               const SizedBox(height: 8),

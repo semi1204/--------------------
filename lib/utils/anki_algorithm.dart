@@ -20,9 +20,10 @@ class AnkiAlgorithm {
     int? mistakeCount,
     bool isUnderstandingImproved = false,
     required bool markForReview,
-    required double reviewPeriodMultiplier,
+    double? reviewPeriodMultiplier, // 사용자가 설정한 복습주기 계수 (기본값: 1.0)
   }) {
     easeFactor ??= defaultEaseFactor;
+    reviewPeriodMultiplier ??= 1.0; // 기본값 설정
     _logger.i('복습 계산 시작: interval=$interval, easeFactor=$easeFactor, ...');
 
     if (isUnderstandingImproved) {

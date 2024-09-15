@@ -74,6 +74,14 @@ class SubjectReviewPage extends StatelessWidget {
                 DateTime.now().toIso8601String(),
             onFeedbackGiven: (quiz, isUnderstandingImproved) {
               provider.addCompletedQuizId(quiz.id);
+            }, // DONE : 복습 카드 제거를 누르면, reviewpage에서 카드가 곧바로 제거
+            onRemoveCard: (quizId) {
+              userProvider.removeFromReviewList(
+                provider.selectedSubjectId!,
+                quiz.typeId,
+                quizId,
+              );
+              provider.removeQuizFromReview(quizId);
             },
           );
         },

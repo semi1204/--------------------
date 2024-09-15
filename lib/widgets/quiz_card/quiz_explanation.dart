@@ -17,6 +17,8 @@ class QuizExplanation extends StatefulWidget {
   final String quizTypeId;
   final bool rebuildTrigger;
   final Widget? feedbackButtons; // New property added
+  final bool isReviewPage;
+  final Function(String)? onRemoveCard; // New property added
 
   const QuizExplanation({
     super.key,
@@ -28,6 +30,8 @@ class QuizExplanation extends StatefulWidget {
     required this.quizTypeId,
     required this.rebuildTrigger,
     this.feedbackButtons, // Added to the constructor
+    this.isReviewPage = false,
+    this.onRemoveCard,
   });
 
   @override
@@ -124,7 +128,6 @@ class _QuizExplanationState extends State<QuizExplanation> {
     _reviewToggleBloc.add(TriggerAnyAnimatedButtonEvent(isInReviewList));
 
     String message;
-    String? reviewTimeString;
 
     if (isInReviewList) {
       // 복습목록에서 제거
@@ -135,6 +138,12 @@ class _QuizExplanationState extends State<QuizExplanation> {
       );
       logger.d('퀴즈가 복습 목록에서 제거됨: quizId=${widget.quizId}');
       message = '복습 목록에서 제거되었습니다.';
+
+      // Immediately remove the card from the review page
+      if (widget.isReviewPage && widget.onRemoveCard != null) {
+        widget.onRemoveCard!(widget.quizId);
+        return; // return => 복습카드라면, reviewPage에서 곧바로 카드를 제거함
+      }
     } else {
       // 복습목록에 추가
       await userProvider.addToReviewList(
@@ -143,13 +152,12 @@ class _QuizExplanationState extends State<QuizExplanation> {
         widget.quizId,
       );
       logger.d('퀴즈가 복습 목록에 추가됨: quizId=${widget.quizId}');
-      // 복습목록에 추가하는 순간 다음 복습 시간을 가져옴
-      reviewTimeString = userProvider.formatNextReviewDate(
+      String? reviewTimeString = userProvider.formatNextReviewDate(
         widget.subjectId,
         widget.quizTypeId,
         widget.quizId,
       );
-      message = '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $reviewTimeString 후';
+      message = '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $reviewTimeString ';
     }
 
     ScaffoldMessenger.of(context).showSnackBar(

@@ -8,6 +8,7 @@ import 'review_quizzes_page.dart';
 import 'add_quiz_page.dart';
 import '../widgets/drawer/app_drawer.dart';
 import '../utils/constants.dart';
+import '../widgets/linked_title.dart'; // Add this import
 
 class SubjectPage extends StatefulWidget {
   const SubjectPage({super.key});
@@ -33,9 +34,9 @@ class _SubjectPageState extends State<SubjectPage> {
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(kToolbarHeight / 1.4),
             child: AppBar(
-              title: Text(
-                '과목',
-                style: getAppTextStyle(context, fontSize: 19),
+              title: LinkedTitle(
+                titles: ['과목'],
+                onTap: (_) {}, // No action needed for the root page
               ),
               centerTitle: true,
               elevation: 0,

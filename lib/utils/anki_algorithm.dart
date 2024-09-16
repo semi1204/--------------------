@@ -34,8 +34,8 @@ class AnkiAlgorithm {
     return isCorrect
         ? _handleCorrectAnswer(interval, easeFactor, consecutiveCorrect,
             qualityOfRecall, mistakeCount, isUnderstandingImproved)
-        : _handleIncorrectAnswer(
-            interval, easeFactor, mistakeCount, isUnderstandingImproved);
+        : _handleIncorrectAnswer(interval, easeFactor, consecutiveCorrect,
+            mistakeCount, isUnderstandingImproved);
   }
 
   static Map<String, dynamic> _handleImprovedUnderstanding(int interval,
@@ -55,20 +55,23 @@ class AnkiAlgorithm {
     };
   }
 
-  static Map<String, dynamic> _handleIncorrectAnswer(int interval,
-      double easeFactor, int? mistakeCount, bool isUnderstandingImproved) {
+  static Map<String, dynamic> _handleIncorrectAnswer(
+      int interval,
+      double easeFactor,
+      int consecutiveCorrect,
+      int? mistakeCount,
+      bool isUnderstandingImproved) {
     _logger.d('오답 처리 중');
 
-    // 이해도 향상 시 용이성 계수 감소를 더 작게 조정
+    int newInterval = _calculateNewInterval(
+        interval, isUnderstandingImproved, mistakeCount, consecutiveCorrect,
+        isCorrect: false);
+
     double newEaseFactor = max(
         _minEaseFactor,
         easeFactor -
             (isUnderstandingImproved ? 0.05 : 0.2) *
                 (mistakeCount ?? 1)); // 0.1에서 0.05로 감소
-
-    // 이해도 향상 시 간격 감소를 더 작게 조정
-    int newInterval =
-        max(5, (interval * (isUnderstandingImproved ? 0.8 : 0.5)).round());
 
     return {
       'interval': newInterval,
@@ -88,7 +91,7 @@ class AnkiAlgorithm {
     _logger.d('정답 처리 중');
 
     int newInterval = _calculateNewInterval(
-        interval, isUnderstandingImproved, mistakeCount,
+        interval, isUnderstandingImproved, mistakeCount, consecutiveCorrect,
         isCorrect: true);
     double newEaseFactor = _calculateNewEaseFactor(
         easeFactor, qualityOfRecall, mistakeCount, isUnderstandingImproved);
@@ -101,13 +104,42 @@ class AnkiAlgorithm {
     };
   }
 
-  static int _calculateNewInterval(
-      int interval, bool isUnderstandingImproved, int? mistakeCount,
+  static int _calculateNewInterval(int interval, bool isUnderstandingImproved,
+      int? mistakeCount, int consecutiveCorrect,
       {bool isCorrect = false}) {
     // 이해도 향상 시 간격 증가를 더 크게 조정
-    double multiplier = isCorrect
-        ? (isUnderstandingImproved ? 3.0 : 2.0) // 2.5에서 3.0으로 증가
-        : (isUnderstandingImproved ? 0.8 : 0.5); // 0.7에서 0.8로 증가
+    double multiplier;
+
+    if (isCorrect) {
+      if (isUnderstandingImproved) {
+        // Understanding improved intervals: 1d, 4d, 9d, 20d
+        if (consecutiveCorrect == 0) {
+          multiplier = 1.0; // Initial interval
+        } else if (consecutiveCorrect == 1) {
+          multiplier = 4.0; // From 1d to 4d
+        } else if (consecutiveCorrect == 2) {
+          multiplier = 2.25; // From 4d to 9d
+        } else if (consecutiveCorrect == 3) {
+          multiplier = 2.22; // From 9d to 20d
+        } else {
+          multiplier = 2.0; // Subsequent reviews
+        }
+      } else {
+        // Understanding not improved intervals: 1d, 2d, 3d
+        if (consecutiveCorrect == 0) {
+          multiplier = 1.0; // Initial interval
+        } else if (consecutiveCorrect == 1) {
+          multiplier = 2.0; // From 1d to 2d
+        } else if (consecutiveCorrect == 2) {
+          multiplier = 1.5; // From 2d to 3d
+        } else {
+          multiplier = 1.5; // Subsequent reviews
+        }
+      }
+    } else {
+      // Incorrect answers
+      multiplier = isUnderstandingImproved ? 0.8 : 0.5;
+    }
 
     int newInterval = (interval * multiplier).round();
 

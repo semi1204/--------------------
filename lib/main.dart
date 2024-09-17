@@ -49,6 +49,7 @@ class MyApp extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, _) {
         return MaterialApp(
+          debugShowCheckedModeBanner: false,
           title: 'Nursing Quiz App',
           theme: themeProvider.currentTheme,
           home: const AuthWrapper(),

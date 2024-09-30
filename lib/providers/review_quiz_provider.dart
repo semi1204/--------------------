@@ -16,7 +16,9 @@ class ReviewQuizzesProvider with ChangeNotifier {
   bool _isAllQuizzesCompleted = false;
   List<Subject> _subjects = [];
 
-  ReviewQuizzesProvider(this._quizService, this._logger, this.userId);
+  ReviewQuizzesProvider(this._quizService, this._logger, this.userId) {
+    loadSubjects(); // Moved to constructor for initial loading
+  }
 
   String? get selectedSubjectId => _selectedSubjectId;
   List<Quiz> get quizzesForReview => _quizzesForReview;
@@ -28,11 +30,20 @@ class ReviewQuizzesProvider with ChangeNotifier {
   void setSelectedSubjectId(String? subjectId) {
     _selectedSubjectId = subjectId;
     notifyListeners();
+    if (subjectId != null) {
+      loadQuizzesForReview(); // Automatically load quizzes when subject is selected
+    }
   }
 
   Future<void> loadSubjects() async {
-    _subjects = await _quizService.getSubjects();
-    notifyListeners();
+    _logger.i('과목 로드 시작');
+    try {
+      _subjects = await _quizService.getSubjects();
+      _logger.i('과목 로드 완료: ${_subjects.length}개');
+      notifyListeners();
+    } catch (e) {
+      _logger.e('과목을 로드하는 중 오류 발생: $e');
+    }
   }
 
   Future<void> loadQuizzesForReview() async {
@@ -45,11 +56,6 @@ class ReviewQuizzesProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      if (userId == null) {
-        _logger.w('사용자 ID가 없습니다. 복습 카드를 로드할 수 없음');
-        return;
-      }
-
       _logger.d('복습 퀴즈 로드 시작: userId=$userId, subjectId=$_selectedSubjectId');
       _quizzesForReview = await _quizService.getQuizzesForReview(
         userId!,
@@ -72,6 +78,7 @@ class ReviewQuizzesProvider with ChangeNotifier {
   // 새로운 메서드: 선택된 과목의 복습 퀴즈를 로드하고 페이지 전환을 준비
   Future<bool> prepareReviewQuizzes(String subjectId) async {
     _selectedSubjectId = subjectId;
+    notifyListeners();
     await loadQuizzesForReview();
     return _quizzesForReview.isNotEmpty;
   }
@@ -98,5 +105,10 @@ class ReviewQuizzesProvider with ChangeNotifier {
     _quizzesForReview.removeWhere((quiz) => quiz.id == quizId);
     _checkAllQuizzesCompleted();
     notifyListeners();
+
+    // Added: Trigger synchronization after removing a quiz from review
+    if (userId != null) {
+      _quizService.syncUserData(userId!, _quizService.getUserQuizData(userId!));
+    }
   }
 }

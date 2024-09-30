@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/pages/login_page.dart';
+import 'package:nursing_quiz_app_6/pages/subject_page.dart';
 import 'package:provider/provider.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
-import 'package:nursing_quiz_app_6/pages/home_page.dart' show DraggablePage;
 import 'package:logger/logger.dart';
 
 class AuthWrapper extends StatelessWidget {
@@ -31,7 +31,7 @@ class AuthWrapper extends StatelessWidget {
           } else {
             logger.i('유저 로그인 성공, 하지만 유저 정보가 없음');
           }
-          return const DraggablePage();
+          return const SubjectPage();
         } else {
           logger.i('유저 로그인 실패, LoginPage 표시');
           return const LoginPage();

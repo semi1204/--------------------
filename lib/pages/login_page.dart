@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/pages/signup_page.dart';
+import 'package:nursing_quiz_app_6/pages/subject_page.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
 import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:nursing_quiz_app_6/widgets/%08login_button_state.dart';
@@ -7,7 +8,6 @@ import 'package:nursing_quiz_app_6/widgets/custom_login_button.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:nursing_quiz_app_6/pages/home_page.dart' show DraggablePage;
 import 'dart:io' show Platform;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ionicons/ionicons.dart';
@@ -44,7 +44,7 @@ class _LoginPageState extends State<LoginPage> {
     } else {
       logger.i('Login successful, navigating to DraggablePage');
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const DraggablePage()),
+        MaterialPageRoute(builder: (context) => const SubjectPage()),
         (Route<dynamic> route) => false,
       );
     }

@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../utils/anki_algorithm.dart';
+import 'dart:async';
 
 // TODO : 무조건 firebase에서 데이터 파싱하지 말고, 로컬스토리지에서 가져오도록 수정해야함
 // TODO : 로컬스토리지에서 가져오는 방법 찾아보기
@@ -34,8 +35,8 @@ class QuizService {
       _userQuizData = {};
 
   QuizService._internal();
-
   // 로컬 스토리지에서 사용자 퀴즈 데이터를 로드하는 메소드
+
   Future<void> loadUserQuizData(String userId) async {
     _logger.i('사용자 $userId의 퀴즈 데이터를 로드하는 중');
     try {
@@ -238,8 +239,11 @@ class QuizService {
       }
     }
 
-    await saveUserQuizData(userId);
+    await saveUserQuizData(userId); // Ensure data is saved locally
     _logger.d('사용자 퀴즈 데이터 업데이트 완료');
+
+    // Added: Trigger synchronization after updating quiz data
+    await syncUserData(userId, getUserQuizData(userId));
   }
 
   // 복습리스트에 복습카드를 추가하는 메소드

@@ -104,7 +104,7 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // service에 업데이트된 데이터를 보내는 메소드
+  // Service에 업데이트된 데이터를 보내는 메소드
   Future<void> updateUserQuizData(
     String subjectId,
     String quizTypeId,
@@ -132,7 +132,8 @@ class UserProvider with ChangeNotifier {
       isUnderstandingImproved: isUnderstandingImproved,
       toggleReviewStatus: toggleReviewStatus,
     );
-    await _quizService.saveUserQuizData(_user!.uid);
+    // Removed redundant saveUserQuizData call as it's handled within updateUserQuizData
+    // await _quizService.saveUserQuizData(_user!.uid);
     _logger.d('사용자 퀴즈 데이터 업데이트 성공');
     notifyListeners();
   }
@@ -151,6 +152,9 @@ class UserProvider with ChangeNotifier {
     await _quizService.addToReviewList(
         _user!.uid, subjectId, quizTypeId, quizId);
     notifyListeners();
+
+    // Added: Trigger synchronization after adding to review list
+    await syncUserData();
   }
 
   // 복습 리스트에서 퀴즈를 제거하는 메소드
@@ -169,6 +173,9 @@ class UserProvider with ChangeNotifier {
     await _quizService.resetUserQuizData(
         _user!.uid, subjectId, quizTypeId, quizId);
     notifyListeners();
+
+    // Added: Trigger synchronization after removing from review list
+    await syncUserData();
   }
 
   // 복습 리스트에 복습 퀴즈가 존재하는지 확인하는 메소드
@@ -215,19 +222,6 @@ class UserProvider with ChangeNotifier {
     return _formatTimeDifference(difference);
   }
 
-  // 서비스로부터 리뷰할 퀴즈를 받는 메소드
-  // 복습리스트에 존재하는 것과, 복습카드가 나오는 것을 구분해야 함.
-  // getQuizzesForReview의 역할을 명확하게 해야함.
-  // Future<List<Quiz>> getQuizzesForReview(
-  //     String subjectId, String quizTypeId) async {
-  //   if (_user == null) {
-  //     _logger.w('Cannot get quizzes for review: No user logged in');
-  //     return [];
-  //   }
-  //   return await _quizService.getQuizzesForReview(
-  //       _user!.uid, subjectId, quizTypeId);
-  // }
-
   Map<String, dynamic> getUserQuizData() {
     if (_user == null) {
       _logger.w('Cannot get user quiz data: No user logged in');
@@ -263,6 +257,9 @@ class UserProvider with ChangeNotifier {
         _user!.uid, subjectId, quizTypeId, quizId);
     _logger.d('사용자 퀴즈 데이터 초기화 완료');
     // notifyListeners();
+
+    // Added: Trigger synchronization after resetting quiz data
+    await syncUserData();
   }
 
   double getQuizAccuracy(String subjectId, String quizTypeId, String quizId) {

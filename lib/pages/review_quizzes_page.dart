@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
 import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
+import '../widgets/charts/review_progress_chart.dart';
+import 'dart:async';
 
 class ReviewQuizzesPage extends StatelessWidget {
   final String? initialSubjectId;
@@ -33,7 +35,7 @@ class ReviewQuizzesPage extends StatelessWidget {
   }
 }
 
-class _ReviewQuizzesPageContent extends StatelessWidget {
+class _ReviewQuizzesPageContent extends StatefulWidget {
   final String? initialSubjectId;
   final String? initialQuizId;
 
@@ -44,45 +46,108 @@ class _ReviewQuizzesPageContent extends StatelessWidget {
   });
 
   @override
+  _ReviewQuizzesPageContentState createState() =>
+      _ReviewQuizzesPageContentState();
+}
+
+class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
+  late Timer _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Consumer<ReviewQuizzesProvider>(
       builder: (context, provider, child) {
-        return Column(
-          children: [
-            const SizedBox(height: 20), // 상단 여백 추가
-            Center(
-              child: SizedBox(
-                width: MediaQuery.of(context).size.width * 0.8, // 화면 너비의 80%
-                child: UnifiedSubjectDropdown(
-                  selectedSubjectId: provider.selectedSubjectId,
-                  onSubjectSelected: (String? newSubjectId) {
-                    if (newSubjectId != null) {
-                      provider.setSelectedSubjectId(newSubjectId);
-                      provider.loadQuizzesForReview().then((_) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ChangeNotifierProvider<
-                                ReviewQuizzesProvider>.value(
-                              value: provider,
-                              child: SubjectReviewPage(subjectId: newSubjectId),
-                            ),
-                          ),
-                        );
-                      });
-                    }
-                  },
+        return SingleChildScrollView(
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              Center(
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  child: UnifiedSubjectDropdown(
+                    selectedSubjectId: provider.selectedSubjectId,
+                    onSubjectSelected: (String? newSubjectId) {
+                      if (newSubjectId != null) {
+                        provider.setSelectedSubjectId(newSubjectId);
+                        provider.loadQuizzesForReview();
+                      }
+                    },
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10), // 간격 추가
-            const Text(
-              '과목을 선택하세요! \n오늘의 복습문제를 확인할 수 있어요',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+              const SizedBox(height: 60),
+              if (provider.selectedSubjectId != null) ...[
+                FutureBuilder<Map<String, int>>(
+                  future:
+                      provider.getReviewProgress(provider.selectedSubjectId!),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const CircularProgressIndicator();
+                    }
+                    if (snapshot.hasData) {
+                      return SizedBox(
+                        width: MediaQuery.of(context).size.width * 0.8,
+                        child: ReviewProgressChart(
+                          totalQuizzes: snapshot.data!['total'] ?? 0,
+                          completedQuizzes: snapshot.data!['completed'] ?? 0,
+                        ),
+                      );
+                    }
+                    return const Text('데이터를 불러올 수 없습니다.');
+                  },
+                ),
+                const SizedBox(height: 40),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ChangeNotifierProvider<ReviewQuizzesProvider>.value(
+                          value: provider,
+                          child: SubjectReviewPage(
+                              subjectId: provider.selectedSubjectId!),
+                        ),
+                      ),
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                  ),
+                  child: const Text(
+                    '복습 시작하기',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ] else
+                const Text(
+                  '과목을 선택하세요! \n오늘의 복습문제를 확인할 수 있어요',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+            ],
+          ),
         );
       },
     );

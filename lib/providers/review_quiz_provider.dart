@@ -111,4 +111,38 @@ class ReviewQuizzesProvider with ChangeNotifier {
       _quizService.syncUserData(userId!, _quizService.getUserQuizData(userId!));
     }
   }
+
+  Future<Map<String, int>> getReviewProgress(String subjectId) async {
+    final total = await getQuizzesToReviewToday(subjectId);
+    final completed = await getCompletedReviewsToday(subjectId);
+    return {
+      'total': total,
+      'completed': completed,
+    };
+  }
+
+  Future<int> getQuizzesToReviewToday(String subjectId) async {
+    if (userId == null) return 0;
+    final quizzes = await _quizService.getQuizzesForReview(
+      userId!,
+      subjectId,
+      null,
+      date: DateTime.now(),
+    );
+    return quizzes.length;
+  }
+
+  Future<int> getCompletedReviewsToday(String subjectId) async {
+    if (userId == null) return 0;
+    return _quizService.getCompletedReviewsCount(
+        userId!, subjectId, DateTime.now());
+  }
+
+  Future<void> markQuizAsReviewed(
+      String subjectId, String quizTypeId, String quizId) async {
+    if (userId == null) return;
+    await _quizService.markQuizAsReviewed(
+        userId!, subjectId, quizTypeId, quizId);
+    notifyListeners();
+  }
 }

@@ -6,11 +6,16 @@ import '../providers/review_quiz_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/quiz_card.dart';
 
-class SubjectReviewPage extends StatelessWidget {
+class SubjectReviewPage extends StatefulWidget {
   final String subjectId;
 
   const SubjectReviewPage({super.key, required this.subjectId});
 
+  @override
+  State<SubjectReviewPage> createState() => _SubjectReviewPageState();
+}
+
+class _SubjectReviewPageState extends State<SubjectReviewPage> {
   @override
   Widget build(BuildContext context) {
     return Consumer2<ReviewQuizzesProvider, UserProvider>(
@@ -72,8 +77,11 @@ class SubjectReviewPage extends StatelessWidget {
                     )
                     ?.toIso8601String() ??
                 DateTime.now().toIso8601String(),
-            onFeedbackGiven: (quiz, isUnderstandingImproved) {
-              provider.addCompletedQuizId(quiz.id);
+            onFeedbackGiven: (quiz, isUnderstandingImproved) async {
+              await provider.markQuizAsReviewed(
+                  provider.selectedSubjectId!, quiz.typeId, quiz.id);
+              // Refresh the progress chart
+              setState(() {});
             }, // DONE : 복습 카드 제거를 누르면, reviewpage에서 카드가 곧바로 제거
             onRemoveCard: (quizId) {
               userProvider.removeFromReviewList(

@@ -13,6 +13,7 @@ class QuizUserData {
   int? selectedOptionIndex;
   bool isUnderstandingImproved;
   bool markedForReview;
+  bool isReviewCompleted;
 
   QuizUserData({
     this.correct = 0,
@@ -27,6 +28,7 @@ class QuizUserData {
     this.selectedOptionIndex,
     this.isUnderstandingImproved = false,
     this.markedForReview = false,
+    this.isReviewCompleted = false,
   });
 
   Map<String, dynamic> toJson() => {

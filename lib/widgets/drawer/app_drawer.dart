@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/pages/%08admin_inquiries_page.dart';
 import 'package:nursing_quiz_app_6/pages/login_page.dart';
 import 'package:nursing_quiz_app_6/pages/settings_page.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import 'drawer_header.dart';
 import 'package:logger/logger.dart';
 import '../common_widgets.dart';
 import '../../providers/theme_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -75,8 +77,89 @@ class AppDrawer extends StatelessWidget {
               Navigator.pop(context);
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.email),
+            title: const Text('개발팀에게 문의하기'),
+            onTap: () {
+              logger.i('Contact developer button tapped');
+              _showContactDialog(context, userProvider.user?.email);
+            },
+          ),
+          if (userProvider.isAdmin)
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings),
+              title: const Text('문의사항 관리'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const AdminInquiriesPage()),
+                );
+              },
+            ),
         ],
       ),
     );
+  }
+
+  void _showContactDialog(BuildContext context, String? userEmail) {
+    final TextEditingController _controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: TextField(
+            controller: _controller,
+            decoration: const InputDecoration(hintText: "요청사항을 입력해주세요"),
+            maxLines: 5,
+          ),
+          actions: <Widget>[
+            TextButton.icon(
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('취소'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.send_outlined),
+              label: const Text('보내기'),
+              onPressed: () {
+                _submitInquiry(context, _controller.text, userEmail);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _submitInquiry(
+      BuildContext context, String body, String? userEmail) async {
+    try {
+      await FirebaseFirestore.instance.collection('inquiries').add({
+        'body': body,
+        'userEmail': userEmail,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('문의사항이 성공적으로 제출되었습니다.')),
+      );
+    } catch (error) {
+      print('Error submitting inquiry: $error');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('문의사항을 제출할 수 없습니다: $error')),
+      );
+    }
+    Navigator.of(context).pop(); // Close the dialog
+  }
+
+  String? encodeQueryParameters(Map<String, String> params) {
+    return params.entries
+        .map((e) =>
+            '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+        .join('&');
   }
 }

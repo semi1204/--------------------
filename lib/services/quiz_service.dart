@@ -140,7 +140,7 @@ class QuizService {
         _logger.i('Firebase에서 사용자 $userId의 데이터를 받아왔습니다');
         return data;
       } else {
-        _logger.w('Firebase에 사용자 $userId의 데이터가 없습니다');
+        _logger.w('Firebase에 사용자 $userId의 데이터�� 없습니다');
         return {};
       }
     } catch (e) {
@@ -246,7 +246,7 @@ class QuizService {
     await syncUserData(userId, getUserQuizData(userId));
   }
 
-  // 복습리스트에 복습카드를 추가하는 메소드
+  // 복습리스트에 복습카드��� 추가하는 메소드
   Future<void> addToReviewList(
       String userId, String subjectId, String quizTypeId, String quizId) async {
     _logger.i(
@@ -307,17 +307,18 @@ class QuizService {
   }
 
   Future<List<Quiz>> getQuizzesForReview(
-      String userId, String subjectId, String? quizTypeId) async {
+      String userId, String subjectId, String? quizTypeId,
+      {DateTime? date}) async {
     _logger.i(
-        'Getting quizzes for review: user=$userId, subject=$subjectId, quizType=$quizTypeId');
+        '복습해야할 퀴즈를 가져오고 있습니다.: user=$userId, subject=$subjectId, quizType=$quizTypeId, date=$date');
 
     List<Quiz> reviewQuizzes = [];
-    final now = DateTime.now();
+    final now = date ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
     final subjectData = _userQuizData[userId]?[subjectId];
     if (subjectData == null) {
-      _logger
-          .w('Subject data not found for user $userId and subject $subjectId');
+      _logger.w('사용자 $userId와 과목 $subjectId에 대한 데이터가 없습니다');
       return reviewQuizzes;
     }
 
@@ -333,7 +334,9 @@ class QuizService {
 
         if (quizData.markedForReview &&
             quizData.nextReviewDate != null &&
-            quizData.nextReviewDate!.isBefore(now)) {
+            quizData.nextReviewDate!.isBefore(now) &&
+            quizData.nextReviewDate!.isAfter(today)) {
+          // Add this condition
           final quiz = await _getQuizById(subjectId, typeId, quizId);
           if (quiz != null) {
             reviewQuizzes.add(quiz);
@@ -342,8 +345,52 @@ class QuizService {
       }
     }
 
-    _logger.d('복습 퀴즈를 찾았습니다: ${reviewQuizzes.length}');
+    _logger.d('복습해야할 퀴즈를 찾았습니다: ${reviewQuizzes.length}');
     return reviewQuizzes;
+  }
+
+  Future<int> getQuizzesToReviewToday(
+      String userId, String subjectId, DateTime date) async {
+    int count = 0;
+    final subjectData = _userQuizData[userId]?[subjectId];
+    if (subjectData != null) {
+      subjectData.forEach((quizTypeId, quizzes) {
+        quizzes.forEach((quizId, quizData) {
+          if (quizData.nextReviewDate != null &&
+              quizData.nextReviewDate!.year == date.year &&
+              quizData.nextReviewDate!.month == date.month &&
+              quizData.nextReviewDate!.day == date.day) {
+            count++;
+          }
+        });
+      });
+    }
+    return count;
+  }
+
+  int getCompletedReviewsCount(String userId, String subjectId, DateTime date) {
+    int count = 0;
+    final subjectData = _userQuizData[userId]?[subjectId];
+    if (subjectData != null) {
+      subjectData.forEach((quizTypeId, quizzes) {
+        quizzes.forEach((quizId, quizData) {
+          if (quizData.lastAnswered.year == date.year &&
+              quizData.lastAnswered.month == date.month &&
+              quizData.lastAnswered.day == date.day &&
+              quizData.isReviewCompleted) {
+            count++;
+          }
+        });
+      });
+    }
+    return count;
+  }
+
+  Future<void> markQuizAsReviewed(
+      String userId, String subjectId, String quizTypeId, String quizId) async {
+    _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId]?.isReviewCompleted =
+        true;
+    await saveUserQuizData(userId);
   }
 
   // 퀴즈 ID로 퀴즈를 가져오는 메소드

@@ -192,7 +192,7 @@ class UserProvider with ChangeNotifier {
   DateTime? getNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
     if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 다음 복습 날짜를 확인할 수 없음');
+      _logger.w('사용자 ID가 없습니다. 다음 복습 날짜��� 확인할 수 없음');
       return null;
     }
     return _quizService.getNextReviewDate(
@@ -310,5 +310,28 @@ class UserProvider with ChangeNotifier {
   UserProvider() {
     _loadUserData();
     _loadReviewPeriodMultiplier();
+  }
+
+  int getReviewedQuizzesCount(String subjectId, DateTime date) {
+    if (_user == null) return 0;
+
+    int count = 0;
+    final userData = _quizService.getUserQuizData(_user!.uid);
+    final subjectData = userData[subjectId] as Map<String, dynamic>?;
+
+    if (subjectData != null) {
+      subjectData.forEach((quizTypeId, quizzes) {
+        (quizzes as Map<String, dynamic>).forEach((quizId, quizData) {
+          final lastAnswered = DateTime.parse(quizData['lastAnswered']);
+          if (lastAnswered.year == date.year &&
+              lastAnswered.month == date.month &&
+              lastAnswered.day == date.day) {
+            count++;
+          }
+        });
+      });
+    }
+
+    return count;
   }
 }

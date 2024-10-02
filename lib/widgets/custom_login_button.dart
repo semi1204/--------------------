@@ -9,12 +9,12 @@ class CustomLoginButton extends StatelessWidget {
   final String label;
 
   const CustomLoginButton({
-    Key? key,
+    super.key,
     required this.onTap,
     required this.isLoading,
     required this.icon,
     required this.label,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

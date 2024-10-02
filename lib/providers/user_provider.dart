@@ -192,7 +192,7 @@ class UserProvider with ChangeNotifier {
   DateTime? getNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
     if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 다음 복습 날짜��� 확인할 수 없음');
+      _logger.w('사용자 ID가 없습니다. 다음 복습 날짜 확인할 수 없음');
       return null;
     }
     return _quizService.getNextReviewDate(

@@ -337,7 +337,7 @@ class QuizService {
             quizData.nextReviewDate!.isBefore(now) &&
             quizData.nextReviewDate!.isAfter(today)) {
           // Add this condition
-          final quiz = await _getQuizById(subjectId, typeId, quizId);
+          final quiz = await getQuizById(subjectId, typeId, quizId);
           if (quiz != null) {
             reviewQuizzes.add(quiz);
           }
@@ -394,7 +394,7 @@ class QuizService {
   }
 
   // 퀴즈 ID로 퀴즈를 가져오는 메소드
-  Future<Quiz?> _getQuizById(
+  Future<Quiz?> getQuizById(
       String subjectId, String quizTypeId, String quizId) async {
     try {
       final docSnapshot = await _firestore

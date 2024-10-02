@@ -178,4 +178,9 @@ class QuizProvider with ChangeNotifier {
     _currentSortOption = SortOption.all;
     _filterQuizzes();
   }
+
+  Future<Quiz?> getQuizById(
+      String subjectId, String quizTypeId, String quizId) async {
+    return await _quizService.getQuizById(subjectId, quizTypeId, quizId);
+  }
 }

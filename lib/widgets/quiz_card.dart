@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
+import 'package:nursing_quiz_app_6/widgets/quiz_card/error_report_dialog.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_admin_actions.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_explanation.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_header.dart';
@@ -168,6 +169,18 @@ class _QuizPageCardState extends State<QuizPageCard> {
                         });
                         widget.onResetQuiz?.call();
                       },
+                      onReportError: () {
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return ErrorReportDialog(
+                              quiz: widget.quiz,
+                              subjectId: widget.subjectId,
+                              quizTypeId: widget.quizTypeId,
+                            );
+                          },
+                        );
+                      },
                       logger: _logger,
                     ),
                     const SizedBox(height: 16),
@@ -318,6 +331,18 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                       subjectId: widget.subjectId,
                       quizTypeId: widget.quizTypeId,
                       onResetQuiz: () {}, // ReviewPageCard에서는 리셋 기능을 제공하지 않습니다.
+                      onReportError: () {
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return ErrorReportDialog(
+                              quiz: widget.quiz,
+                              subjectId: widget.subjectId,
+                              quizTypeId: widget.quizTypeId,
+                            );
+                          },
+                        );
+                      },
                       logger: _logger,
                     ),
                     const SizedBox(height: 16),

@@ -5,12 +5,14 @@ import 'package:nursing_quiz_app_6/providers/quiz_provider.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/accuracy_display.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
+import 'package:ionicons/ionicons.dart';
 
 class QuizHeader extends StatelessWidget {
   final Quiz quiz;
   final String subjectId;
   final String quizTypeId;
   final VoidCallback onResetQuiz;
+  final VoidCallback onReportError;
   final Logger logger;
 
   const QuizHeader({
@@ -19,6 +21,7 @@ class QuizHeader extends StatelessWidget {
     required this.subjectId,
     required this.quizTypeId,
     required this.onResetQuiz,
+    required this.onReportError,
     required this.logger,
   });
 
@@ -44,6 +47,39 @@ class QuizHeader extends StatelessWidget {
     }
   }
 
+  // 각 퀴즈ID에 대한 메뉴화면
+  void _showQuizMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Ionicons.refresh),
+                title: const Text('문제 초기화'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showResetConfirmationDialog(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.report_problem),
+                title: const Text('문제 오류 보고'),
+                onTap: () {
+                  Navigator.pop(context);
+                  onReportError();
+                },
+              ),
+              // Add more menu items as needed
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // 문제의 가장 상단엔, 기출, accuracy, reset button이 Row로 표시
   @override
   Widget build(BuildContext context) {
@@ -58,7 +94,7 @@ class QuizHeader extends StatelessWidget {
 
         return Row(
           // 우측: 정답률과 초기화 버튼
-          // TODO : 정답률 표시와 Row를 이루는 왼쪽에 빨색, 노란색, 초록색, 으로 작은 원으로 불빛이 들어오게 함.정답률이 85% 이상이면 초록색, 60% 이상이면 노란색, 60% 미만이면 빨간색으로 표시
+          // DONE : 정답률 표시와 Row를 이루는 왼쪽에 빨색, 노란색, 초록색, 으로 작은 원으로 불빛이 들어오게 함.정답률이 85% 이상이면 초록색, 60% 이상이면 노란색, 60% 미만이면 빨간색으로 표시
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
@@ -83,9 +119,9 @@ class QuizHeader extends StatelessWidget {
                 AccuracyDisplay(accuracy: accuracy),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.refresh, size: 20),
-                  onPressed: () => _showResetConfirmationDialog(context),
-                  tooltip: 'Reset Quiz',
+                  icon: const Icon(Ionicons.ellipsis_vertical, size: 20),
+                  onPressed: () => _showQuizMenu(context),
+                  tooltip: 'Quiz Menu',
                 ),
               ],
             ),

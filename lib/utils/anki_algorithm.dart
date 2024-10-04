@@ -3,7 +3,11 @@ import 'dart:math';
 import 'package:logger/logger.dart';
 import 'package:flutter/foundation.dart';
 
-final _logger = Logger();
+final _logger = Logger(
+  printer: PrettyPrinter(),
+  level:
+      kDebugMode ? Level.debug : Level.error, // Adjust log level based on build
+);
 
 class AnkiAlgorithm {
   static const int initialInterval =

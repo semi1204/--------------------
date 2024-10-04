@@ -159,6 +159,7 @@ class QuizService {
     int? selectedOptionIndex,
     bool isUnderstandingImproved = false,
     bool? toggleReviewStatus,
+    double reviewPeriodMultiplier = 1.0, // Add this parameter
   }) async {
     _logger.i(
         '사용자 퀴즈 데이터 업데이트 중: user=$userId, subject=$subjectId, quizType=$quizTypeId, quiz=$quizId, correct=$isCorrect');
@@ -197,6 +198,7 @@ class QuizService {
         mistakeCount: quizData.mistakeCount,
         isUnderstandingImproved: isUnderstandingImproved,
         markForReview: true,
+        reviewPeriodMultiplier: reviewPeriodMultiplier, // Add this parameter
       );
 
       quizData.interval = ankiResult['interval'] as int;
@@ -205,7 +207,7 @@ class QuizService {
       quizData.mistakeCount = ankiResult['mistakeCount'] as int;
       quizData.nextReviewDate = AnkiAlgorithm.calculateNextReviewDate(
         quizData.interval,
-        quizData.easeFactor,
+        reviewPeriodMultiplier, // Pass the multiplier here
       );
       _logger
           .d('다음 복습 날짜: ${quizData.nextReviewDate}, 간격: ${quizData.interval}');
@@ -227,8 +229,9 @@ class QuizService {
       quizData.markedForReview = toggleReviewStatus;
       if (toggleReviewStatus) {
         // 복습 리스트에 추가될 때 nextReviewDate 설정
-        quizData.nextReviewDate = DateTime.now()
-            .add(const Duration(minutes: AnkiAlgorithm.initialInterval));
+        quizData.nextReviewDate = DateTime.now().add(Duration(
+            minutes: (AnkiAlgorithm.initialInterval * reviewPeriodMultiplier)
+                .round()));
       } else {
         // 복습 리스트에서 제거될 때 Anki 관련 데이터 초기화
         quizData.interval = AnkiAlgorithm.initialInterval;

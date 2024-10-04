@@ -131,6 +131,7 @@ class UserProvider with ChangeNotifier {
       selectedOptionIndex: selectedOptionIndex,
       isUnderstandingImproved: isUnderstandingImproved,
       toggleReviewStatus: toggleReviewStatus,
+      reviewPeriodMultiplier: _reviewPeriodMultiplier,
     );
     // Removed redundant saveUserQuizData call as it's handled within updateUserQuizData
     // await _quizService.saveUserQuizData(_user!.uid);

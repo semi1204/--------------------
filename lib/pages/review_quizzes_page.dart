@@ -7,6 +7,7 @@ import '../services/quiz_service.dart';
 import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
 import '../widgets/charts/review_progress_chart.dart';
+import '../widgets/review_period_settings_dialog.dart'; // New import
 
 class ReviewQuizzesPage extends StatelessWidget {
   final String? initialSubjectId;
@@ -72,14 +73,25 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
               Center(
                 child: SizedBox(
                   width: MediaQuery.of(context).size.width * 0.8,
-                  child: UnifiedSubjectDropdown(
-                    selectedSubjectId: provider.selectedSubjectId,
-                    onSubjectSelected: (String? newSubjectId) {
-                      if (newSubjectId != null) {
-                        provider.setSelectedSubjectId(newSubjectId);
-                        provider.loadQuizzesForReview();
-                      }
-                    },
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: UnifiedSubjectDropdown(
+                          selectedSubjectId: provider.selectedSubjectId,
+                          onSubjectSelected: (String? newSubjectId) {
+                            if (newSubjectId != null) {
+                              provider.setSelectedSubjectId(newSubjectId);
+                              provider.loadQuizzesForReview();
+                            }
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.settings),
+                        onPressed: () =>
+                            _showReviewPeriodSettingsDialog(context),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -144,6 +156,15 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
             ],
           ),
         );
+      },
+    );
+  }
+
+  void _showReviewPeriodSettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return const ReviewPeriodSettingsDialog();
       },
     );
   }

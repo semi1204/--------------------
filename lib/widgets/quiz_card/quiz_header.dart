@@ -6,6 +6,7 @@ import 'package:nursing_quiz_app_6/widgets/quiz_card/accuracy_display.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:ionicons/ionicons.dart';
+import '../../widgets/font_size_adjuster.dart'; // Import the new widget
 
 class QuizHeader extends StatelessWidget {
   final Quiz quiz;
@@ -70,6 +71,19 @@ class QuizHeader extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   onReportError();
+                },
+              ),
+              // Add Font Size Adjustment menu item
+              ListTile(
+                leading: const Icon(Icons.font_download),
+                title: const Text('글자 크기 조정'),
+                onTap: () {
+                  Navigator.pop(context);
+                  logger.i('Navigating to Font Size Adjuster from Quiz Menu');
+                  showDialog(
+                    context: context,
+                    builder: (context) => FontSizeAdjuster(logger: logger),
+                  );
                 },
               ),
               // Add more menu items as needed

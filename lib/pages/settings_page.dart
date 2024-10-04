@@ -5,12 +5,16 @@ import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/user_provider.dart';
 import '../utils/constants.dart';
+import '../widgets/font_size_adjuster.dart'; // Import the new widget
+import 'package:logger/logger.dart'; // Ensure Logger is available
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final Logger logger = Provider.of<Logger>(context, listen: false);
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Settings', style: getAppTextStyle(context, fontSize: 20)),
@@ -45,17 +49,19 @@ class SettingsPage extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Text size adjustment
+              // Replace the existing font size slider with a button to open the FontSizeAdjuster
               Text('텍스트 크기',
                   style: getAppTextStyle(context,
                       fontSize: 18, fontWeight: FontWeight.bold)),
-              Slider(
-                value: themeProvider.textScaleFactor,
-                min: 0.8,
-                max: 1.5,
-                divisions: 7,
-                label: themeProvider.textScaleFactor.toStringAsFixed(2),
-                onChanged: (value) => themeProvider.setTextScaleFactor(value),
+              ElevatedButton(
+                onPressed: () {
+                  logger.i('Navigating to Font Size Adjuster from Settings');
+                  showDialog(
+                    context: context,
+                    builder: (context) => FontSizeAdjuster(logger: logger),
+                  );
+                },
+                child: const Text('Adjust Font Size'),
               ),
               const SizedBox(height: 24),
 

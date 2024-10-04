@@ -7,7 +7,6 @@ import '../services/quiz_service.dart';
 import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
 import '../widgets/charts/review_progress_chart.dart';
-import 'dart:async';
 
 class ReviewQuizzesPage extends StatelessWidget {
   final String? initialSubjectId;
@@ -51,19 +50,14 @@ class _ReviewQuizzesPageContent extends StatefulWidget {
 }
 
 class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
-  late Timer _timer;
-
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
-      setState(() {});
-    });
+    setState(() {});
   }
 
   @override
   void dispose() {
-    _timer.cancel();
     super.dispose();
   }
 
@@ -102,6 +96,7 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
                       return SizedBox(
                         width: MediaQuery.of(context).size.width * 0.8,
                         child: ReviewProgressChart(
+                          initialTotalQuizzes: snapshot.data!['total'] ?? 0,
                           totalQuizzes: snapshot.data!['total'] ?? 0,
                           completedQuizzes: snapshot.data!['completed'] ?? 0,
                         ),

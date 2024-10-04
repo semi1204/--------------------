@@ -3,6 +3,8 @@ import 'package:nursing_quiz_app_6/models/quiz.dart';
 import 'package:nursing_quiz_app_6/models/subject.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class ReviewQuizzesProvider with ChangeNotifier {
   final QuizService _quizService;
@@ -15,9 +17,13 @@ class ReviewQuizzesProvider with ChangeNotifier {
   List<String> _completedQuizIds = [];
   bool _isAllQuizzesCompleted = false;
   List<Subject> _subjects = [];
+  Map<String, int> _initialTotalQuizzesPerSubject = {};
+  Map<String, int> _currentTotalQuizzesPerSubject = {};
+  DateTime _lastResetDate = DateTime.now();
 
   ReviewQuizzesProvider(this._quizService, this._logger, this.userId) {
-    loadSubjects(); // Moved to constructor for initial loading
+    loadSubjects();
+    _loadInitialTotalQuizzes();
   }
 
   String? get selectedSubjectId => _selectedSubjectId;
@@ -26,6 +32,8 @@ class ReviewQuizzesProvider with ChangeNotifier {
   List<String> get completedQuizIds => _completedQuizIds;
   bool get isAllQuizzesCompleted => _isAllQuizzesCompleted;
   List<Subject> get subjects => _subjects;
+  int get initialTotalQuizzes =>
+      _initialTotalQuizzesPerSubject[_selectedSubjectId] ?? 0;
 
   void setSelectedSubjectId(String? subjectId) {
     _selectedSubjectId = subjectId;
@@ -46,6 +54,44 @@ class ReviewQuizzesProvider with ChangeNotifier {
     }
   }
 
+  Future<void> _loadInitialTotalQuizzes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? storedData = prefs.getString('initial_total_quizzes');
+    final String? lastResetDateString = prefs.getString('last_reset_date');
+
+    if (storedData != null && lastResetDateString != null) {
+      final Map<String, dynamic> decodedData = json.decode(storedData);
+      _initialTotalQuizzesPerSubject = Map<String, int>.from(decodedData);
+      _lastResetDate = DateTime.parse(lastResetDateString);
+
+      // Check if it's a new day
+      if (!_isSameDay(_lastResetDate, DateTime.now())) {
+        _resetInitialTotalQuizzes();
+      }
+    } else {
+      _resetInitialTotalQuizzes();
+    }
+  }
+
+  Future<void> _saveInitialTotalQuizzes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String encodedData = json.encode(_initialTotalQuizzesPerSubject);
+    await prefs.setString('initial_total_quizzes', encodedData);
+    await prefs.setString('last_reset_date', _lastResetDate.toIso8601String());
+  }
+
+  void _resetInitialTotalQuizzes() {
+    _initialTotalQuizzesPerSubject.clear();
+    _lastResetDate = DateTime.now();
+    _saveInitialTotalQuizzes();
+  }
+
+  bool _isSameDay(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
+  }
+
   Future<void> loadQuizzesForReview() async {
     if (_selectedSubjectId == null || userId == null) {
       _logger.w('과목 또는 사용자 ID가 선택되지 않았습니다.');
@@ -63,8 +109,23 @@ class ReviewQuizzesProvider with ChangeNotifier {
         null,
       );
 
+      // Update the initial and current total quizzes for the selected subject
+      if (!_initialTotalQuizzesPerSubject.containsKey(_selectedSubjectId) ||
+          !_isSameDay(_lastResetDate, DateTime.now())) {
+        _initialTotalQuizzesPerSubject[_selectedSubjectId!] =
+            _quizzesForReview.length;
+        _lastResetDate = DateTime.now();
+        await _saveInitialTotalQuizzes();
+      }
+      _currentTotalQuizzesPerSubject[_selectedSubjectId!] =
+          _quizzesForReview.length;
+
+      // Load completed quiz IDs for the current subject
+      await _loadCompletedQuizIds();
+
       _logger.i('복습 카드 ${_quizzesForReview.length}개 로드 완료');
       _logger.d('로드된 퀴즈: ${_quizzesForReview.map((q) => q.id).toList()}');
+      _logger.d('완료된 퀴즈: $_completedQuizIds');
 
       _checkAllQuizzesCompleted();
     } catch (e) {
@@ -75,23 +136,25 @@ class ReviewQuizzesProvider with ChangeNotifier {
     }
   }
 
-  // 새로운 메서드: 선택된 과목의 복습 퀴즈를 로드하고 페이지 전환을 준비
-  Future<bool> prepareReviewQuizzes(String subjectId) async {
-    _selectedSubjectId = subjectId;
-    notifyListeners();
-    await loadQuizzesForReview();
-    return _quizzesForReview.isNotEmpty;
+  Future<void> _loadCompletedQuizIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'completed_quizzes_${userId}_${_selectedSubjectId}';
+    _completedQuizIds = prefs.getStringList(key) ?? [];
   }
 
-  void _checkAllQuizzesCompleted() {
-    _isAllQuizzesCompleted = _quizzesForReview.isEmpty ||
-        _quizzesForReview.every((quiz) => _completedQuizIds.contains(quiz.id));
-    notifyListeners();
+  Future<void> _saveCompletedQuizIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'completed_quizzes_${userId}_${_selectedSubjectId}';
+    await prefs.setStringList(key, _completedQuizIds);
   }
 
   void addCompletedQuizId(String quizId) {
-    _completedQuizIds.add(quizId);
-    _checkAllQuizzesCompleted();
+    if (!_completedQuizIds.contains(quizId)) {
+      _completedQuizIds.add(quizId);
+      _saveCompletedQuizIds();
+      _checkAllQuizzesCompleted();
+      notifyListeners();
+    }
   }
 
   String getSubjectName(String? subjectId) {
@@ -113,36 +176,31 @@ class ReviewQuizzesProvider with ChangeNotifier {
   }
 
   Future<Map<String, int>> getReviewProgress(String subjectId) async {
-    final total = await getQuizzesToReviewToday(subjectId);
-    final completed = await getCompletedReviewsToday(subjectId);
-    return {
-      'total': total,
-      'completed': completed,
-    };
+    if (userId == null) {
+      return {'total': 0, 'completed': 0};
+    }
+
+    try {
+      await _loadCompletedQuizIds();
+      return {
+        'total': _currentTotalQuizzesPerSubject[subjectId] ?? 0,
+        'completed': _completedQuizIds.length,
+      };
+    } catch (e) {
+      _logger.e('복습 진행 상황을 가져오는 중 오류 발생: $e');
+      return {'total': 0, 'completed': 0};
+    }
   }
 
-  Future<int> getQuizzesToReviewToday(String subjectId) async {
-    if (userId == null) return 0;
-    final quizzes = await _quizService.getQuizzesForReview(
-      userId!,
-      subjectId,
-      null,
-      date: DateTime.now(),
-    );
-    return quizzes.length;
+  void _checkAllQuizzesCompleted() {
+    _isAllQuizzesCompleted = _quizzesForReview.isNotEmpty &&
+        _completedQuizIds.length >= _quizzesForReview.length;
+    notifyListeners();
   }
 
-  Future<int> getCompletedReviewsToday(String subjectId) async {
-    if (userId == null) return 0;
-    return _quizService.getCompletedReviewsCount(
-        userId!, subjectId, DateTime.now());
-  }
-
-  Future<void> markQuizAsReviewed(
-      String subjectId, String quizTypeId, String quizId) async {
-    if (userId == null) return;
-    await _quizService.markQuizAsReviewed(
-        userId!, subjectId, quizTypeId, quizId);
+  // Add this method to update the current total quizzes
+  void updateCurrentTotalQuizzes(String subjectId, int newTotal) {
+    _currentTotalQuizzesPerSubject[subjectId] = newTotal;
     notifyListeners();
   }
 }

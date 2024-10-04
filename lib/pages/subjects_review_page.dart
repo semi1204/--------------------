@@ -78,9 +78,7 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
                     ?.toIso8601String() ??
                 DateTime.now().toIso8601String(),
             onFeedbackGiven: (quiz, isUnderstandingImproved) async {
-              await provider.markQuizAsReviewed(
-                  provider.selectedSubjectId!, quiz.typeId, quiz.id);
-              // Refresh the progress chart
+              provider.addCompletedQuizId(quiz.id);
               setState(() {});
             }, // DONE : 복습 카드 제거를 누르면, reviewpage에서 카드가 곧바로 제거
             onRemoveCard: (quizId) {
@@ -90,6 +88,8 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
                 quizId,
               );
               provider.removeQuizFromReview(quizId);
+              provider.addCompletedQuizId(quizId);
+              setState(() {});
             },
           );
         },
@@ -120,7 +120,7 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
 
   Future<void> _handleAnswerSelected(Quiz quiz, int answerIndex,
       ReviewQuizzesProvider provider, UserProvider userProvider) async {
-    final logger = Provider.of<Logger>(provider as BuildContext, listen: false);
+    final logger = Provider.of<Logger>(context, listen: false);
     logger.i('복습 페이지 답변 선택: quizId=${quiz.id}, answerIndex=$answerIndex');
     final isCorrect = quiz.correctOptionIndex == answerIndex;
 
@@ -133,7 +133,7 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
     );
 
     provider.addCompletedQuizId(quiz.id);
-
     logger.d('복습 페이지 답변 업데이트: isCorrect=$isCorrect');
+    setState(() {});
   }
 }

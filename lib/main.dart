@@ -10,6 +10,7 @@ import 'package:logger/logger.dart';
 import 'firebase_options.dart';
 import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
 import 'package:nursing_quiz_app_6/providers/subject_provider.dart';
+import 'package:nursing_quiz_app_6/providers/review_quiz_provider.dart'; // 추가
 
 final logger = Logger();
 
@@ -19,20 +20,30 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  final quizService = QuizService();
+  final userProvider = UserProvider();
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         Provider<Logger>.value(value: logger),
         Provider<AuthService>(create: (_) => AuthService()),
-        ChangeNotifierProvider(create: (_) => UserProvider()),
-        Provider<QuizService>(create: (_) => QuizService()),
+        ChangeNotifierProvider.value(value: userProvider),
+        Provider<QuizService>.value(value: quizService),
         ChangeNotifierProvider(create: (_) => SubjectProvider()),
         ChangeNotifierProvider(
           create: (context) => QuizProvider(
             context.read<QuizService>(),
             context.read<UserProvider>(),
             context.read<Logger>(),
+          ),
+        ),
+        ProxyProvider<UserProvider, ReviewQuizzesProvider>(
+          update: (context, userProvider, previous) => ReviewQuizzesProvider(
+            quizService,
+            logger,
+            userProvider.user?.uid,
           ),
         ),
       ],

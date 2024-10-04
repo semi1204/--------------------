@@ -7,7 +7,7 @@ import '../services/quiz_service.dart';
 import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
 import '../widgets/charts/review_progress_chart.dart';
-import '../widgets/review_period_settings_dialog.dart'; // New import
+import '../widgets/review_period_settings_dialog.dart';
 
 class ReviewQuizzesPage extends StatelessWidget {
   final String? initialSubjectId;
@@ -54,12 +54,13 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
   @override
   void initState() {
     super.initState();
-    setState(() {});
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider =
+          Provider.of<ReviewQuizzesProvider>(context, listen: false);
+      if (widget.initialSubjectId != null) {
+        provider.setSelectedSubjectId(widget.initialSubjectId);
+      }
+    });
   }
 
   @override
@@ -81,7 +82,6 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
                           onSubjectSelected: (String? newSubjectId) {
                             if (newSubjectId != null) {
                               provider.setSelectedSubjectId(newSubjectId);
-                              provider.loadQuizzesForReview();
                             }
                           },
                         ),
@@ -97,25 +97,9 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
               ),
               const SizedBox(height: 60),
               if (provider.selectedSubjectId != null) ...[
-                FutureBuilder<Map<String, int>>(
-                  future:
-                      provider.getReviewProgress(provider.selectedSubjectId!),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const CircularProgressIndicator();
-                    }
-                    if (snapshot.hasData) {
-                      return SizedBox(
-                        width: MediaQuery.of(context).size.width * 0.8,
-                        child: ReviewProgressChart(
-                          initialTotalQuizzes: snapshot.data!['total'] ?? 0,
-                          totalQuizzes: snapshot.data!['total'] ?? 0,
-                          completedQuizzes: snapshot.data!['completed'] ?? 0,
-                        ),
-                      );
-                    }
-                    return const Text('데이터를 불러올 수 없습니다.');
-                  },
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  child: const ReviewProgressChart(),
                 ),
                 const SizedBox(height: 40),
                 FilledButton(
@@ -139,9 +123,17 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 24, vertical: 12),
                   ),
-                  child: const Text(
-                    '복습 시작하기',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.play_arrow),
+                      SizedBox(width: 8),
+                      Text(
+                        '복습 시작하기',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
                 ),
               ] else

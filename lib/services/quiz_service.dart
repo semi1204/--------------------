@@ -371,31 +371,6 @@ class QuizService {
     return count;
   }
 
-  int getCompletedReviewsCount(String userId, String subjectId, DateTime date) {
-    int count = 0;
-    final subjectData = _userQuizData[userId]?[subjectId];
-    if (subjectData != null) {
-      subjectData.forEach((quizTypeId, quizzes) {
-        quizzes.forEach((quizId, quizData) {
-          if (quizData.lastAnswered.year == date.year &&
-              quizData.lastAnswered.month == date.month &&
-              quizData.lastAnswered.day == date.day &&
-              quizData.isReviewCompleted) {
-            count++;
-          }
-        });
-      });
-    }
-    return count;
-  }
-
-  Future<void> markQuizAsReviewed(
-      String userId, String subjectId, String quizTypeId, String quizId) async {
-    _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId]?.isReviewCompleted =
-        true;
-    await saveUserQuizData(userId);
-  }
-
   // 퀴즈 ID로 퀴즈를 가져오는 메소드
   Future<Quiz?> getQuizById(
       String subjectId, String quizTypeId, String quizId) async {

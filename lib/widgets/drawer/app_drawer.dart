@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/pages/%08admin_inquiries_page.dart';
 import 'package:nursing_quiz_app_6/pages/login_page.dart';
-import 'package:nursing_quiz_app_6/pages/settings_page.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/auth_service.dart';
@@ -10,6 +9,7 @@ import 'package:logger/logger.dart';
 import '../common_widgets.dart';
 import '../../providers/theme_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:ionicons/ionicons.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -56,20 +56,8 @@ class AppDrawer extends StatelessWidget {
               },
             ),
           ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('설정'),
-            onTap: () {
-              logger.i('Settings menu item tapped');
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsPage()),
-              );
-            },
-          ),
-          ListTile(
-            leading: Icon(
-                themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            leading:
+                Icon(themeProvider.isDarkMode ? Ionicons.sunny : Ionicons.moon),
             title: Text(themeProvider.isDarkMode ? '라이트 모드' : '다크 모드'),
             onTap: () {
               logger.i('Theme toggle button tapped');

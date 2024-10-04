@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/user_provider.dart';
+import '../providers/theme_provider.dart'; // 추가
 
 class ReviewPeriodSettingsDialog extends StatefulWidget {
   const ReviewPeriodSettingsDialog({super.key});
@@ -31,8 +32,12 @@ class _ReviewPeriodSettingsDialogState
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context); // 추가
+
     return AlertDialog(
-      title: const Text('복습 주기 설정'),
+      backgroundColor: themeProvider.currentTheme.dialogBackgroundColor, // 추가
+      title: Text('복습 주기 설정',
+          style: TextStyle(color: themeProvider.textColor)), // 수정
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -48,7 +53,9 @@ class _ReviewPeriodSettingsDialogState
                     horizontalInterval: 5,
                     getDrawingHorizontalLine: (value) {
                       return FlLine(
-                        color: Colors.grey[300],
+                        color: themeProvider.isDarkMode
+                            ? Colors.grey[700]
+                            : Colors.grey[300], // 수정
                         strokeWidth: 1,
                       );
                     },
@@ -68,8 +75,8 @@ class _ReviewPeriodSettingsDialogState
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
                                 '${index + 1}회차',
-                                style: const TextStyle(
-                                  color: Color(0xff68737d),
+                                style: TextStyle(
+                                  color: themeProvider.textColor, // 수정
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
                                 ),
@@ -88,8 +95,8 @@ class _ReviewPeriodSettingsDialogState
                         getTitlesWidget: (value, meta) {
                           return Text(
                             '${value.toInt()}일',
-                            style: const TextStyle(
-                              color: Color(0xff68737d),
+                            style: TextStyle(
+                              color: themeProvider.textColor, // 수정
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -98,15 +105,15 @@ class _ReviewPeriodSettingsDialogState
                         },
                       ),
                     ),
-                    topTitles:
-                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles:
-                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
                   ),
                   borderData: FlBorderData(
                     show: true,
-                    border:
-                        Border.all(color: const Color(0xff37434d), width: 1),
+                    border: Border.all(
+                        color: themeProvider.textColor, width: 1), // 수정
                   ),
                   minX: 0,
                   maxX: 3,
@@ -162,18 +169,23 @@ class _ReviewPeriodSettingsDialogState
             ),
             Text(
               '복습 주기 배수: ${_reviewPeriodMultiplier.toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: themeProvider.textColor, // 수정
+              ),
             ),
           ],
         ),
       ),
       actions: [
         TextButton(
-          child: const Text('취소'),
+          child: Text('취소',
+              style: TextStyle(color: themeProvider.textColor)), // 수정
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: const Text('저장'),
+          child: Text('저장',
+              style: TextStyle(color: themeProvider.textColor)), // 수정
           onPressed: () {
             Provider.of<UserProvider>(context, listen: false)
                 .setReviewPeriodMultiplier(_reviewPeriodMultiplier);

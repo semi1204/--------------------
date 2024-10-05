@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../../utils/image_utils.dart';
-import 'markdown_widgets.dart';
+import 'markdown_widgets.dart'; // Updated import
 
 class MarkdownField extends StatefulWidget {
   final TextEditingController controller;

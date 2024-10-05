@@ -36,12 +36,12 @@ class ReviewProgressChart extends StatelessWidget {
               return Center(child: Text('Error: ${snapshot.error}'));
             }
 
-            final currentTotalQuizzes = snapshot.data!['total'] ?? 0;
+            final totalQuizzes = snapshot.data!['total'] ?? 0;
             final completedQuizzes = snapshot.data!['completed'] ?? 0;
+            final remainingQuizzes = snapshot.data!['remaining'] ?? 0;
 
-            final double progress = currentTotalQuizzes > 0
-                ? completedQuizzes / currentTotalQuizzes
-                : 0;
+            final double progress =
+                totalQuizzes > 0 ? completedQuizzes / totalQuizzes : 0;
 
             return Padding(
               padding: EdgeInsets.symmetric(
@@ -66,7 +66,7 @@ class ReviewProgressChart extends StatelessWidget {
                         child: PieChart(
                           PieChartData(
                             sections: _buildChartSections(
-                                completedQuizzes, currentTotalQuizzes),
+                                completedQuizzes, remainingQuizzes),
                             sectionsSpace: 0,
                             centerSpaceRadius:
                                 MediaQuery.of(context).size.width * 0.1,
@@ -91,7 +91,7 @@ class ReviewProgressChart extends StatelessWidget {
                               height:
                                   MediaQuery.of(context).size.height * 0.01),
                           Text(
-                            '$completedQuizzes / $currentTotalQuizzes',
+                            '$completedQuizzes / $totalQuizzes',
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium
@@ -104,7 +104,7 @@ class ReviewProgressChart extends StatelessWidget {
                     ],
                   ),
                   SizedBox(height: MediaQuery.of(context).size.height * 0.04),
-                  _buildLegend(context),
+                  _buildLegend(context, completedQuizzes, remainingQuizzes),
                 ],
               ),
             );
@@ -114,7 +114,7 @@ class ReviewProgressChart extends StatelessWidget {
     );
   }
 
-  List<PieChartSectionData> _buildChartSections(int completed, int total) {
+  List<PieChartSectionData> _buildChartSections(int completed, int remaining) {
     return [
       PieChartSectionData(
         color: Colors.blue,
@@ -125,7 +125,7 @@ class ReviewProgressChart extends StatelessWidget {
       ),
       PieChartSectionData(
         color: Colors.grey.shade300,
-        value: (total - completed).toDouble(),
+        value: remaining.toDouble(),
         title: '',
         radius: 45,
         showTitle: false,
@@ -133,12 +133,12 @@ class ReviewProgressChart extends StatelessWidget {
     ];
   }
 
-  Widget _buildLegend(BuildContext context) {
+  Widget _buildLegend(BuildContext context, int completed, int remaining) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildLegendItem(context, '완료한 문제', Colors.blue),
-        _buildLegendItem(context, '남은 문제', Colors.grey.shade300),
+        _buildLegendItem(context, '완료한 문제 ($completed)', Colors.blue),
+        _buildLegendItem(context, '남은 문제 ($remaining)', Colors.grey.shade300),
       ],
     );
   }

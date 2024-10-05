@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/review_quiz_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/quiz_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SubjectReviewPage extends StatefulWidget {
   final String subjectId;
@@ -16,17 +17,24 @@ class SubjectReviewPage extends StatefulWidget {
 }
 
 class _SubjectReviewPageState extends State<SubjectReviewPage> {
-  final logger = Logger();
+  Set<String> _reviewedQuizIds = {};
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider =
-          Provider.of<ReviewQuizzesProvider>(context, listen: false);
-      provider.setSelectedSubjectId(widget.subjectId);
-      provider.loadQuizzesForReview();
+    _loadReviewedQuizIds();
+  }
+
+  Future<void> _loadReviewedQuizIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _reviewedQuizIds = prefs.getStringList('reviewedQuizIds')?.toSet() ?? {};
     });
+  }
+
+  Future<void> _saveReviewedQuizIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('reviewedQuizIds', _reviewedQuizIds.toList());
   }
 
   @override
@@ -63,16 +71,13 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
       return const SliverFillRemaining(
           child: Center(child: CircularProgressIndicator()));
     }
-    if (provider.isAllQuizzesCompleted) {
+    if (provider.quizzesForReview.isEmpty) {
       return SliverFillRemaining(child: _buildEmptyState(context, provider));
     }
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
           final quiz = provider.quizzesForReview[index];
-          if (provider.completedQuizIds.contains(quiz.id)) {
-            return const SizedBox.shrink();
-          }
           return ReviewPageCard(
             key: ValueKey(quiz.id),
             quiz: quiz,
@@ -91,7 +96,8 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
                     ?.toIso8601String() ??
                 DateTime.now().toIso8601String(),
             onFeedbackGiven: (quiz, isUnderstandingImproved) async {
-              provider.addCompletedQuizId(quiz.id);
+              _reviewedQuizIds.add(quiz.id);
+              await _saveReviewedQuizIds();
               setState(() {});
             }, // DONE : 복습 카드 제거를 누르면, reviewpage에서 카드가 곧바로 제거
             onRemoveCard: (quizId) {
@@ -101,7 +107,8 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
                 quizId,
               );
               provider.removeQuizFromReview(quizId);
-              provider.addCompletedQuizId(quizId);
+              _reviewedQuizIds.add(quizId);
+              _saveReviewedQuizIds();
               setState(() {});
             },
           );
@@ -145,7 +152,8 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
       selectedOptionIndex: answerIndex,
     );
 
-    provider.addCompletedQuizId(quiz.id);
+    _reviewedQuizIds.add(quiz.id);
+    await _saveReviewedQuizIds();
     logger.d('복습 페이지 답변 업데이트: isCorrect=$isCorrect');
     setState(() {});
   }

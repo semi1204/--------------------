@@ -313,8 +313,12 @@ class UserProvider with ChangeNotifier {
     _loadReviewPeriodMultiplier();
   }
 
+  /// Counts the number of quizzes reviewed on a specific date for a given subject.
   int getReviewedQuizzesCount(String subjectId, DateTime date) {
-    if (_user == null) return 0;
+    if (_user == null) {
+      _logger.w('사용자 ID가 없습니다. 복습된 퀴즈 개수를 세는 중 오류 발생');
+      return 0;
+    }
 
     int count = 0;
     final userData = _quizService.getUserQuizData(_user!.uid);
@@ -332,6 +336,8 @@ class UserProvider with ChangeNotifier {
         });
       });
     }
+
+    _logger.d('복습된 퀴즈 개수: $subjectId on ${date.toIso8601String()}: $count');
 
     return count;
   }

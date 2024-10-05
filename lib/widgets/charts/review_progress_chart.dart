@@ -9,19 +9,24 @@ class ReviewProgressChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context); // 추가
-    // 디바이스 크기에 따른 동적 패딩 계산
-    final deviceSize = MediaQuery.of(context).size;
-    final horizontalPadding = deviceSize.width * 0.05; // 화면 너비의 5%
-    final verticalPadding = deviceSize.height * 0.02; // 화면 높이의 2%
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
+    // Use Consumer to listen to ReviewQuizzesProvider changes
     return Consumer<ReviewQuizzesProvider>(
       builder: (context, provider, child) {
-        final currentProgress =
-            provider.getReviewProgress(provider.selectedSubjectId!);
+        if (provider.selectedSubjectId == null) {
+          return Center(
+            child: Text(
+              '과목을 선택해주세요.',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: themeProvider.textColor,
+                  ),
+            ),
+          );
+        }
 
         return FutureBuilder<Map<String, int>>(
-          future: currentProgress,
+          future: provider.getReviewProgress(provider.selectedSubjectId!),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -40,8 +45,8 @@ class ReviewProgressChart extends StatelessWidget {
 
             return Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: verticalPadding,
+                horizontal: MediaQuery.of(context).size.width * 0.05,
+                vertical: MediaQuery.of(context).size.height * 0.02,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -49,24 +54,22 @@ class ReviewProgressChart extends StatelessWidget {
                   Text(
                     '오늘의 복습 진행률',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          // Changed from titleLarge to titleMedium
-                          color: themeProvider.textColor, // 수정
+                          color: themeProvider.textColor,
                         ),
                   ),
-                  SizedBox(height: verticalPadding),
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.02),
                   Stack(
                     alignment: Alignment.center,
                     children: [
                       SizedBox(
-                        height:
-                            deviceSize.height * 0.2, // Changed from 0.3 to 0.2
+                        height: MediaQuery.of(context).size.height * 0.2,
                         child: PieChart(
                           PieChartData(
                             sections: _buildChartSections(
                                 completedQuizzes, currentTotalQuizzes),
                             sectionsSpace: 0,
-                            centerSpaceRadius: deviceSize.width *
-                                0.1, // Changed from 0.15 to 0.1
+                            centerSpaceRadius:
+                                MediaQuery.of(context).size.width * 0.1,
                             startDegreeOffset: -90,
                           ),
                         ),
@@ -78,24 +81,29 @@ class ReviewProgressChart extends StatelessWidget {
                             '${(progress * 100).toStringAsFixed(1)}%',
                             style: Theme.of(context)
                                 .textTheme
-                                .titleLarge // Changed from headlineMedium to titleLarge
+                                .titleLarge
                                 ?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: Theme.of(context).primaryColor,
                                 ),
                           ),
-                          SizedBox(height: verticalPadding / 2),
+                          SizedBox(
+                              height:
+                                  MediaQuery.of(context).size.height * 0.01),
                           Text(
                             '$completedQuizzes / $currentTotalQuizzes',
                             style: Theme.of(context)
                                 .textTheme
-                                .bodyMedium, // Changed from titleMedium to bodyMedium
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: themeProvider.textColor,
+                                ),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  SizedBox(height: verticalPadding * 2),
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.04),
                   _buildLegend(context),
                 ],
               ),
@@ -112,14 +120,14 @@ class ReviewProgressChart extends StatelessWidget {
         color: Colors.blue,
         value: completed.toDouble(),
         title: '',
-        radius: 50, // Changed from 70 to 50
+        radius: 50,
         showTitle: false,
       ),
       PieChartSectionData(
         color: Colors.grey.shade300,
         value: (total - completed).toDouble(),
         title: '',
-        radius: 45, // Changed from 60 to 45
+        radius: 45,
         showTitle: false,
       ),
     ];
@@ -136,7 +144,7 @@ class ReviewProgressChart extends StatelessWidget {
   }
 
   Widget _buildLegendItem(BuildContext context, String label, Color color) {
-    final themeProvider = Provider.of<ThemeProvider>(context); // 추가
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     return Row(
       children: [
         Container(
@@ -151,7 +159,7 @@ class ReviewProgressChart extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: themeProvider.textColor, // 수정
+                color: themeProvider.textColor,
               ),
         ),
       ],

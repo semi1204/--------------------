@@ -54,7 +54,7 @@ class _QuizPageState extends State<QuizPage> {
         preferPosition: AutoScrollPosition.begin,
       );
 
-      // 상태 업데이트를 위해 setState 호출
+      // 상태 업데이트를 위해 setState 호
       setState(() {});
     });
   }
@@ -88,7 +88,7 @@ class _QuizPageState extends State<QuizPage> {
                       SliverAppBar(
                         title: LinkedTitle(
                           //  selceted subject(이름) > selected quizType(이름)
-                          // TODO : subjectName, quizTypeName 변수 사용
+                          // Done : subjectName, quizTypeName 변수 사용
                           titles: [widget.subject.name, widget.quizType.name],
                           onTap: (index) {
                             if (index == 0) {

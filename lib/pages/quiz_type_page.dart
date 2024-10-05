@@ -110,12 +110,12 @@ class QuizTypePage extends StatelessWidget {
                           LinearProgressIndicator(
                             value: progress,
                             backgroundColor: Colors.grey[300],
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.blue),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color.fromARGB(255, 144, 202, 250)),
                           ),
                           const SizedBox(height: 4),
                           Text('$answeredCount / $totalCount 완료',
-                              style: TextStyle(fontSize: 12)),
+                              style: const TextStyle(fontSize: 12)),
                         ],
                       ),
                       trailing: Text('${(progress * 100).toStringAsFixed(1)}%'),
@@ -146,18 +146,14 @@ class QuizTypePage extends StatelessWidget {
       UserProvider userProvider, String subjectId, String quizTypeId) async {
     final quizData = userProvider.getUserQuizData();
     final subjectData = quizData[subjectId] as Map<String, dynamic>?;
-    if (subjectData == null)
-      return {'progress': 0.0, 'answeredCount': 0, 'totalCount': 0};
-
-    final quizTypeData = subjectData[quizTypeId] as Map<String, dynamic>?;
-    if (quizTypeData == null)
-      return {'progress': 0.0, 'answeredCount': 0, 'totalCount': 0};
+    final quizTypeData = subjectData?[quizTypeId] as Map<String, dynamic>?;
 
     int totalQuizzes =
         await quizService.getTotalQuizCount(subjectId, quizTypeId);
-    int answeredQuizzes = quizTypeData.values
-        .where((quiz) => (quiz as Map<String, dynamic>)['total'] > 0)
-        .length;
+    int answeredQuizzes = quizTypeData?.values
+            .where((quiz) => (quiz as Map<String, dynamic>)['total'] > 0)
+            .length ??
+        0;
 
     double progress = totalQuizzes > 0 ? answeredQuizzes / totalQuizzes : 0.0;
     return {

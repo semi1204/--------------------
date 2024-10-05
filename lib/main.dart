@@ -21,7 +21,6 @@ void main() async {
   );
 
   final quizService = QuizService();
-  final userProvider = UserProvider();
 
   runApp(
     MultiProvider(
@@ -29,7 +28,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         Provider<Logger>.value(value: logger),
         Provider<AuthService>(create: (_) => AuthService()),
-        ChangeNotifierProvider.value(value: userProvider),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
         Provider<QuizService>.value(value: quizService),
         ChangeNotifierProvider(create: (_) => SubjectProvider()),
         ChangeNotifierProvider(
@@ -39,11 +38,11 @@ void main() async {
             context.read<Logger>(),
           ),
         ),
-        ProxyProvider<UserProvider, ReviewQuizzesProvider>(
-          update: (context, userProvider, previous) => ReviewQuizzesProvider(
+        ChangeNotifierProvider(
+          create: (context) => ReviewQuizzesProvider(
             quizService,
-            logger,
-            userProvider.user?.uid,
+            Logger(),
+            context.read<UserProvider>().user?.uid,
           ),
         ),
       ],
@@ -57,6 +56,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Trigger data synchronization on app start
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    userProvider.syncUserData();
+
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, _) {
         return MaterialApp(

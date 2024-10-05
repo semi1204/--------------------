@@ -46,7 +46,7 @@ class _SubjectPageState extends State<SubjectPage> {
           body: IndexedStack(
             index: subjectProvider.selectedIndex,
             children: [
-              _buildSubjectList(subjectProvider),
+              _buildSubjectList(subjectProvider, themeProvider),
               const ReviewQuizzesPage(),
               if (Provider.of<UserProvider>(context, listen: false).isAdmin)
                 const AddQuizPage(),
@@ -59,7 +59,8 @@ class _SubjectPageState extends State<SubjectPage> {
     );
   }
 
-  Widget _buildSubjectList(SubjectProvider subjectProvider) {
+  Widget _buildSubjectList(
+      SubjectProvider subjectProvider, ThemeProvider themeProvider) {
     if (subjectProvider.subjects.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -78,9 +79,21 @@ class _SubjectPageState extends State<SubjectPage> {
             padding: const EdgeInsets.all(
                 2.0), // Adjusted padding value for better spacing between cards
             child: ListTile(
-              title: Text(subject.name,
-                  style: getAppTextStyle(context,
-                      fontSize: 17)), // Updated font size to 16
+              title: Consumer<ThemeProvider>(
+                builder: (context, themeProvider, child) {
+                  return Text(
+                    subject.name,
+                    style: getAppTextStyle(
+                      context,
+                      fontSize: 17,
+                    ).copyWith(
+                      color: themeProvider.isDarkMode
+                          ? Colors.white
+                          : Colors.black,
+                    ),
+                  );
+                },
+              ),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(

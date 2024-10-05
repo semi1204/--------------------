@@ -16,6 +16,19 @@ class SubjectReviewPage extends StatefulWidget {
 }
 
 class _SubjectReviewPageState extends State<SubjectReviewPage> {
+  final logger = Logger();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider =
+          Provider.of<ReviewQuizzesProvider>(context, listen: false);
+      provider.setSelectedSubjectId(widget.subjectId);
+      provider.loadQuizzesForReview();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer2<ReviewQuizzesProvider, UserProvider>(

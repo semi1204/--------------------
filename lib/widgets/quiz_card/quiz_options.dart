@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/models/quiz.dart';
 import 'package:logger/logger.dart';
-import 'package:markdown_widget/markdown_widget.dart';
 import 'package:nursing_quiz_app_6/utils/constants.dart';
+import 'package:nursing_quiz_app_6/widgets/quiz_card/markdown_widgets.dart';
 
 class QuizOptions extends StatelessWidget {
   final Quiz quiz;
@@ -54,37 +54,9 @@ class QuizOptions extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: MarkdownWidget(
+                  child: MarkdownRenderer(
                     data: optionText,
-                    config: MarkdownConfig(
-                      configs: [
-                        PConfig(
-                          textStyle: TextStyle(
-                            color: _getOptionTextColor(
-                                showSelection, isSelected, isCorrect),
-                          ),
-                        ),
-                      ],
-                    ),
-                    markdownGenerator: MarkdownGenerator(
-                      generators: [
-                        SpanNodeGeneratorWithTag(
-                          tag: 'p',
-                          generator: (e, config, visitor) {
-                            return ParagraphNode(
-                              PConfig(
-                                textStyle: TextStyle(
-                                  color: _getOptionTextColor(
-                                      showSelection, isSelected, isCorrect),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
+                    logger: logger,
                   ),
                 ),
               ],

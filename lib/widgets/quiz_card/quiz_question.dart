@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
-import 'package:markdown_widget/markdown_widget.dart';
+import 'markdown_widgets.dart';
 
 class QuizQuestion extends StatelessWidget {
   final String question;
@@ -14,10 +14,9 @@ class QuizQuestion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MarkdownWidget(
+    return MarkdownRenderer(
       data: question,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      logger: logger,
     );
   }
 }

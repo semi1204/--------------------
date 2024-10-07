@@ -1,9 +1,9 @@
 import 'package:any_animated_button/any_animated_button.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
-import 'package:markdown_widget/markdown_widget.dart';
 import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
+import 'package:nursing_quiz_app_6/widgets/quiz_card/markdown_widgets.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/review_toggle_bloc.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
@@ -105,10 +105,9 @@ class _QuizExplanationState extends State<QuizExplanation> {
               ],
             ),
             const SizedBox(height: 8),
-            MarkdownWidget(
+            MarkdownRenderer(
               data: widget.explanation,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
+              logger: widget.logger,
             ),
             const SizedBox(height: 16),
             if (widget.feedbackButtons != null) ...[

@@ -1,135 +1,125 @@
-// lib/widgets/quiz_card/markdown_widgets.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown_widget/markdown_widget.dart';
 import 'package:markdown/markdown.dart' as md;
-import 'package:logger/logger.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
-import 'package:nursing_quiz_app_6/widgets/quiz_card/network_image_with_loader.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
+import 'package:nursing_quiz_app_6/widgets/quiz_card/network_image_with_loader.dart';
 
-//TODO : 마크다운 에디터 내에 있는 글자의 크기를 키우고, 글씨체를 궁서체로 변경해야 함.
 class MarkdownRenderer extends StatelessWidget {
   final String data;
   final Logger logger;
-  final MarkdownStyleSheet? styleSheet;
 
   const MarkdownRenderer({
     super.key,
     required this.data,
     required this.logger,
-    this.styleSheet,
   });
 
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
-        final defaultStyle = DefaultTextStyle.of(context).style;
         final scaleFactor = themeProvider.textScaleFactor;
 
-        final mergedStyleSheet =
-            (styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context)))
-                .copyWith(
-          p: TextStyle(fontSize: defaultStyle.fontSize! * scaleFactor),
-          h1: TextStyle(
-              fontSize: defaultStyle.fontSize! * 2 * scaleFactor,
-              fontWeight: FontWeight.bold),
-          h2: TextStyle(
-              fontSize: defaultStyle.fontSize! * 1.5 * scaleFactor,
-              fontWeight: FontWeight.bold),
-          h3: TextStyle(
-              fontSize: defaultStyle.fontSize! * 1.17 * scaleFactor,
-              fontWeight: FontWeight.bold),
-          h4: TextStyle(
-              fontSize: defaultStyle.fontSize! * 1 * scaleFactor,
-              fontWeight: FontWeight.bold),
-          h5: TextStyle(
-              fontSize: defaultStyle.fontSize! * 0.83 * scaleFactor,
-              fontWeight: FontWeight.bold),
-          h6: TextStyle(
-              fontSize: defaultStyle.fontSize! * 0.67 * scaleFactor,
-              fontWeight: FontWeight.bold),
-          listBullet: TextStyle(fontSize: defaultStyle.fontSize! * scaleFactor),
+        final config = MarkdownConfig(
+          configs: [
+            PConfig(textStyle: TextStyle(fontSize: 16 * scaleFactor)),
+            H1Config(
+                style: TextStyle(
+                    fontSize: 32 * scaleFactor, fontWeight: FontWeight.bold)),
+            H2Config(
+                style: TextStyle(
+                    fontSize: 24 * scaleFactor, fontWeight: FontWeight.bold)),
+            H3Config(
+                style: TextStyle(
+                    fontSize: 18.72 * scaleFactor,
+                    fontWeight: FontWeight.bold)),
+            H4Config(
+                style: TextStyle(
+                    fontSize: 16 * scaleFactor, fontWeight: FontWeight.bold)),
+            H5Config(
+                style: TextStyle(
+                    fontSize: 13.28 * scaleFactor,
+                    fontWeight: FontWeight.bold)),
+            H6Config(
+                style: TextStyle(
+                    fontSize: 10.72 * scaleFactor,
+                    fontWeight: FontWeight.bold)),
+            ListConfig(
+              marker: (isOrdered, depth, index) {
+                return Text(
+                  isOrdered ? '${index + 1}.' : '•',
+                  style: TextStyle(fontSize: 16 * scaleFactor),
+                );
+              },
+            ),
+            ImgConfig(
+              builder: (url, attributes) {
+                return FittedBox(
+                  fit: BoxFit.fitWidth,
+                  child: NetworkImageWithLoader(
+                    imageUrl: url,
+                    fit: BoxFit.contain,
+                    logger: logger,
+                    width: MediaQuery.of(context).size.width,
+                  ),
+                );
+              },
+            ),
+          ],
         );
 
-        return MarkdownBody(
-          data: data,
-          selectable: true,
-          styleSheet: mergedStyleSheet,
-          builders: {
-            'math': MathBuilder(logger: logger, scaleFactor: scaleFactor),
-            'img': ImageBuilder(logger: logger, context: context),
-          },
-          extensionSet: md.ExtensionSet([
-            const md.TableSyntax(),
-          ], [
-            ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
-            InlineMathSyntax(),
-            KoreanFractionSyntax(),
-          ]),
+        final markdownGenerator = MarkdownGenerator(
+          generators: [
+            SpanNodeGeneratorWithTag(
+              tag: 'math',
+              generator: (e, config, visitor) {
+                return MathNode(e.textContent, scaleFactor);
+              },
+            ),
+          ],
+          inlineSyntaxList: [
+            CustomInlineMathSyntax(),
+            CustomKoreanFractionSyntax(),
+          ],
+        );
+
+        final List<Widget> markdownWidgets = markdownGenerator.buildWidgets(
+          data,
+          config: config,
+        );
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: markdownWidgets,
         );
       },
     );
   }
 }
 
-class MathBuilder extends MarkdownElementBuilder {
-  final Logger logger;
+class MathNode extends SpanNode {
+  final String mathText;
   final double scaleFactor;
 
-  MathBuilder({required this.logger, required this.scaleFactor});
+  MathNode(this.mathText, this.scaleFactor);
 
   @override
-  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
-    if (element.tag == 'math') {
-      logger.d('Rendering math: ${element.textContent}');
-      return Math.tex(
-        element.textContent,
+  InlineSpan build() {
+    return WidgetSpan(
+      child: Math.tex(
+        mathText,
         mathStyle: MathStyle.display,
-        textStyle: preferredStyle?.copyWith(
-            fontSize: preferredStyle.fontSize! * scaleFactor),
-      );
-    }
-    return null;
+        textStyle: TextStyle(fontSize: 16 * scaleFactor),
+      ),
+    );
   }
 }
 
-// TODO : 퀴즈카드가 빌드 될 때, 캐시나, provider로 이미지를 효율적으로 가져와야함
-class ImageBuilder extends MarkdownElementBuilder {
-  final Logger logger;
-  final BuildContext context;
-
-  ImageBuilder({required this.logger, required this.context});
-
-  @override
-  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
-    if (element.tag == 'img') {
-      final src = element.attributes['src'];
-      if (src != null) {
-        logger.d('Rendering image: $src');
-        return LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) {
-            return FittedBox(
-              fit: BoxFit.fitWidth,
-              child: NetworkImageWithLoader(
-                imageUrl: src,
-                fit: BoxFit.contain,
-                logger: logger,
-                width: constraints.maxWidth,
-              ),
-            );
-          },
-        );
-      }
-    }
-    return null;
-  }
-}
-
-// 추가: 기존 markdown_field.dart에서 가져온 구문 분석기 클래스들
-class InlineMathSyntax extends md.InlineSyntax {
-  InlineMathSyntax() : super(r'\$([^$\n]+)\$');
+class CustomInlineMathSyntax extends md.InlineSyntax {
+  CustomInlineMathSyntax() : super(r'\$([^$\n]+)\$');
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
@@ -138,8 +128,8 @@ class InlineMathSyntax extends md.InlineSyntax {
   }
 }
 
-class KoreanFractionSyntax extends md.InlineSyntax {
-  KoreanFractionSyntax()
+class CustomKoreanFractionSyntax extends md.InlineSyntax {
+  CustomKoreanFractionSyntax()
       : super(r'\{([\p{Hangul}\s]+)\s*/\s*([\p{Hangul}\s]+)\}');
 
   @override

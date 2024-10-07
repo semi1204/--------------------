@@ -42,18 +42,9 @@ class _MarkdownFieldState extends State<MarkdownField> {
   }
 
   Widget _buildMarkdownPreview() {
-    return Container(
-      height: 200,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: SingleChildScrollView(
-        child: MarkdownRenderer(
-          data: widget.controller.text,
-          logger: widget.logger,
-        ),
-      ),
+    return MarkdownRenderer(
+      data: widget.controller.text,
+      logger: widget.logger,
     );
   }
 

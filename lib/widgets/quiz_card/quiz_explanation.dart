@@ -1,8 +1,8 @@
 import 'package:any_animated_button/any_animated_button.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
+import 'package:markdown_widget/markdown_widget.dart';
 import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
-import 'package:nursing_quiz_app_6/widgets/quiz_card/markdown_widgets.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/review_toggle_bloc.dart';
 import 'package:provider/provider.dart';
@@ -35,7 +35,7 @@ class QuizExplanation extends StatefulWidget {
   });
 
   @override
-  _QuizExplanationState createState() => _QuizExplanationState();
+  State createState() => _QuizExplanationState();
 }
 
 class _QuizExplanationState extends State<QuizExplanation> {
@@ -68,7 +68,7 @@ class _QuizExplanationState extends State<QuizExplanation> {
       builder: (context, themeProvider, child) {
         final textColor =
             themeProvider.isDarkMode ? Colors.white : Colors.black;
-
+        // SingleChildScroolVeiw 없이 Column을 유지해 위젯내부의 스크롤이 없게 해야함
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -105,9 +105,10 @@ class _QuizExplanationState extends State<QuizExplanation> {
               ],
             ),
             const SizedBox(height: 8),
-            MarkdownRenderer(
+            MarkdownWidget(
               data: widget.explanation,
-              logger: widget.logger,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
             ),
             const SizedBox(height: 16),
             if (widget.feedbackButtons != null) ...[

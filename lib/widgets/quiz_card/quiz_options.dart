@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/models/quiz.dart';
 import 'package:logger/logger.dart';
-import 'package:flutter_markdown/flutter_markdown.dart'; // Add this import
+import 'package:markdown_widget/markdown_widget.dart';
 import 'package:nursing_quiz_app_6/utils/constants.dart';
-import 'markdown_widgets.dart'; // Add this import
 
-//옵션도 마크다운을 사용할 수 있음.
 class QuizOptions extends StatelessWidget {
   final Quiz quiz;
   final int? selectedOptionIndex;
@@ -30,24 +28,14 @@ class QuizOptions extends StatelessWidget {
       children: quiz.options.asMap().entries.map((entry) {
         final index = entry.key;
         final option = entry.value;
-        final isSelected = selectedOptionIndex == index; // 사용자가 선택한 옵션값을 받고
-        final isCorrect = index == quiz.correctOptionIndex; // 정답인지 확인
-        final bool showSelection =
-            isQuizPage ? isSelected : false; // 퀴즈페이지일 때만 선택된 옵션을 보여줌
-        // final bool isSelectable =
-        //     !isQuizPage || hasAnswered; // 퀴즈 페이지가 아니거나 이미 답변한 경우 선택 가능
+        final isSelected = selectedOptionIndex == index;
+        final isCorrect = index == quiz.correctOptionIndex;
+        final bool showSelection = isQuizPage ? isSelected : false;
 
-        // 로그 추가
-        // logger.d(
-        //     '옵션 $index: 선택됨=$isSelected, 정답=$isCorrect, 표시=$showSelection, 선택가능=$isSelectable');
-
-        // Apply strikethrough in Markdown if necessary
-        final optionText = (hasAnswered && isSelected && !isCorrect)
-            ? '~~$option~~'
-            : option; // 오답이면 옵션에 줄긋기
+        final optionText =
+            (hasAnswered && isSelected && !isCorrect) ? '~~$option~~' : option;
 
         return InkWell(
-          // 퀴즈 페이지가 아니거나 아직 답변하지 않은 경우 선택 가능
           onTap: (!isQuizPage || !hasAnswered)
               ? () => onSelectOption(index)
               : null,
@@ -66,16 +54,37 @@ class QuizOptions extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  // Replace Text widget with MarkdownRenderer
-                  child: MarkdownRenderer(
+                  child: MarkdownWidget(
                     data: optionText,
-                    logger: logger,
-                    styleSheet: MarkdownStyleSheet(
-                      p: TextStyle(
-                        color: _getOptionTextColor(
-                            showSelection, isSelected, isCorrect),
-                      ),
+                    config: MarkdownConfig(
+                      configs: [
+                        PConfig(
+                          textStyle: TextStyle(
+                            color: _getOptionTextColor(
+                                showSelection, isSelected, isCorrect),
+                          ),
+                        ),
+                      ],
                     ),
+                    markdownGenerator: MarkdownGenerator(
+                      generators: [
+                        SpanNodeGeneratorWithTag(
+                          tag: 'p',
+                          generator: (e, config, visitor) {
+                            return ParagraphNode(
+                              PConfig(
+                                textStyle: TextStyle(
+                                  color: _getOptionTextColor(
+                                      showSelection, isSelected, isCorrect),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
                   ),
                 ),
               ],

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
-import 'package:nursing_quiz_app_6/widgets/quiz_card/markdown_widgets.dart';
+import 'package:markdown_widget/markdown_widget.dart';
 
 class QuizQuestion extends StatelessWidget {
   final String question;
@@ -14,9 +14,10 @@ class QuizQuestion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MarkdownRenderer(
+    return MarkdownWidget(
       data: question,
-      logger: logger,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
     );
   }
 }

@@ -11,11 +11,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io' show Platform;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ionicons/ionicons.dart';
+import 'email_verification_page.dart';
 
 class LoginPage extends StatefulWidget {
   final bool isFromDrawer;
 
-  const LoginPage({Key? key, this.isFromDrawer = false}) : super(key: key);
+  const LoginPage({super.key, this.isFromDrawer = false});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -65,9 +66,20 @@ class _LoginPageState extends State<LoginPage> {
         if (!mounted) return;
 
         if (user != null) {
-          Provider.of<UserProvider>(context, listen: false).setUser(user);
+          final userProvider =
+              Provider.of<UserProvider>(context, listen: false);
+          userProvider.setUser(user);
           logger.i('User ${user.email} signed in with email');
-          _navigateAfterLogin();
+
+          bool isVerified = await userProvider.isEmailVerified();
+          if (isVerified) {
+            _navigateAfterLogin();
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => EmailVerificationPage()),
+            );
+          }
         }
       } on FirebaseAuthException catch (e) {
         _handleFirebaseAuthError(e);
@@ -125,15 +137,13 @@ class _LoginPageState extends State<LoginPage> {
   void _handleFirebaseAuthError(FirebaseAuthException e) {
     final logger = Provider.of<Logger>(context, listen: false);
     logger.e('Firebase Auth Error during sign in: ${e.code} - ${e.message}');
-    String errorMessage =
-        'An error occurred during sign in. Please try again later.';
+    String errorMessage = '해당 계정이 존재하지 않습니다. 이메일 또는 비밀번호를 확인해주세요.';
     switch (e.code) {
       case 'user-not-found':
-        errorMessage =
-            'No user found for that email. Please check your email or sign up.';
+        errorMessage = '해당 계정이 존재하지 않습니다. 이메일 또는 비밀번호를 확인해주세요.';
         break;
       case 'wrong-password':
-        errorMessage = 'Wrong password provided. Please try again.';
+        errorMessage = '비밀번호가 틀렸습니다. 다시 시도해주세요.';
         break;
     }
     _showErrorSnackBar(errorMessage);
@@ -142,7 +152,7 @@ class _LoginPageState extends State<LoginPage> {
   void _handleGenericError(dynamic e) {
     final logger = Provider.of<Logger>(context, listen: false);
     logger.e('Error during sign in: $e');
-    _showErrorSnackBar('An unexpected error occurred. Please try again later.');
+    _showErrorSnackBar('예기치 못한 오류가 발생했습니다. 다시 시도해주세요.');
   }
 
   void _showErrorSnackBar(String message) {
@@ -155,7 +165,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Login'),
+        title: const Text('로그인'),
       ),
       body: BlocProvider(
         create: (context) => _loginButtonBloc,
@@ -193,14 +203,14 @@ class _LoginPageState extends State<LoginPage> {
     return TextFormField(
       controller: _emailController,
       decoration: InputDecoration(
-        labelText: 'Email',
+        labelText: '이메일',
         prefixIcon: const Icon(Icons.email),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       ),
       keyboardType: TextInputType.emailAddress,
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'Please enter your email';
+          return '이메일을 입력해주세요.';
         }
         return null;
       },
@@ -211,7 +221,7 @@ class _LoginPageState extends State<LoginPage> {
     return TextFormField(
       controller: _passwordController,
       decoration: InputDecoration(
-        labelText: 'Password',
+        labelText: '비밀번호',
         prefixIcon: const Icon(Icons.lock),
         suffixIcon: IconButton(
           icon: Icon(_isObscure ? Icons.visibility : Icons.visibility_off),
@@ -226,7 +236,7 @@ class _LoginPageState extends State<LoginPage> {
       obscureText: _isObscure,
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'Please enter your password';
+          return '비밀번호를 입력해주세요.';
         }
         return null;
       },
@@ -237,7 +247,7 @@ class _LoginPageState extends State<LoginPage> {
     return _buildAnimatedButton(
       onTap: _handleEmailSignIn,
       icon: Icons.email,
-      label: 'Sign in with Email',
+      label: '이메일 로그인',
     );
   }
 
@@ -245,7 +255,7 @@ class _LoginPageState extends State<LoginPage> {
     return _buildAnimatedButton(
       onTap: _handleGoogleSignIn,
       icon: Ionicons.logo_google,
-      label: 'Sign in with Google',
+      label: '구글 로그인',
     );
   }
 
@@ -253,7 +263,7 @@ class _LoginPageState extends State<LoginPage> {
     return _buildAnimatedButton(
       onTap: _handleAppleSignIn,
       icon: Ionicons.logo_apple,
-      label: 'Sign in with Apple',
+      label: '애플 로그인',
     );
   }
 
@@ -265,7 +275,7 @@ class _LoginPageState extends State<LoginPage> {
           MaterialPageRoute(builder: (context) => const SignUpPage()),
         );
       },
-      child: const Text('Don\'t have an account? Sign up'),
+      child: const Text('계정이 없으신가요? 회원가입'),
     );
   }
 

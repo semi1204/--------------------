@@ -8,6 +8,7 @@ import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
 import '../widgets/charts/review_progress_chart.dart';
 import '../widgets/review_period_settings_dialog.dart';
+import 'package:nursing_quiz_app_6/pages/login_page.dart'; // Add this import
 
 class ReviewQuizzesPage extends StatelessWidget {
   final String? initialSubjectId;
@@ -104,16 +105,22 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
                 const SizedBox(height: 40),
                 FilledButton(
                   onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ChangeNotifierProvider<ReviewQuizzesProvider>.value(
-                          value: provider,
-                          child: SubjectReviewPage(
-                              subjectId: provider.selectedSubjectId!),
+                    final userProvider =
+                        Provider.of<UserProvider>(context, listen: false);
+                    if (userProvider.user == null) {
+                      _showLoginPrompt(context);
+                    } else {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChangeNotifierProvider<
+                              ReviewQuizzesProvider>.value(
+                            value: provider,
+                            child: SubjectReviewPage(
+                                subjectId: provider.selectedSubjectId!),
+                          ),
                         ),
-                      ),
-                    );
+                      );
+                    }
                   },
                   style: FilledButton.styleFrom(
                     elevation: 0,
@@ -158,6 +165,22 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
       builder: (BuildContext context) {
         return const ReviewPeriodSettingsDialog();
       },
+    );
+  }
+
+  void _showLoginPrompt(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('로그인이 필요합니다.'),
+        action: SnackBarAction(
+          label: '로그인',
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const LoginPage()),
+            );
+          },
+        ),
+      ),
     );
   }
 }

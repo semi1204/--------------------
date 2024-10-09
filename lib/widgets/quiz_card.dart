@@ -12,6 +12,7 @@ import '../models/quiz.dart';
 import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
 import '../providers/theme_provider.dart';
+import 'package:nursing_quiz_app_6/pages/login_page.dart';
 
 abstract class BaseQuizCard extends StatefulWidget {
   final Quiz quiz;
@@ -229,6 +230,11 @@ class _QuizPageCardState extends State<QuizPageCard> {
   // 퀴즈카드의 옵션을 선택했을 때 실행되는 함수
   void _selectOption(int index, UserProvider userProvider) {
     _logger.i('퀴즈 페이지 카드: 옵션 $index 선택: quizId=${widget.quiz.id}');
+    if (userProvider.user == null) {
+      _showLoginPrompt(context);
+      return;
+    }
+
     if (_selectedOptionIndex == null) {
       setState(() {
         _selectedOptionIndex = index;
@@ -281,6 +287,22 @@ class _QuizPageCardState extends State<QuizPageCard> {
     );
 
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
+  }
+
+  void _showLoginPrompt(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('로그인이 필요합니다.'),
+        action: SnackBarAction(
+          label: '로그인',
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const LoginPage()),
+            );
+          },
+        ),
+      ),
+    );
   }
 }
 

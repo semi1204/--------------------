@@ -22,6 +22,14 @@ class UserProvider with ChangeNotifier {
     _saveReviewPeriodMultiplier();
   }
 
+  Future<bool> isEmailVerified() async {
+    return await _authService.isEmailVerified();
+  }
+
+  Future<void> sendEmailVerification() async {
+    await _authService.sendEmailVerification();
+  }
+
   void _loadReviewPeriodMultiplier() async {
     final prefs = await SharedPreferences.getInstance();
     _reviewPeriodMultiplier = prefs.getDouble('reviewPeriodMultiplier') ?? 1.0;
@@ -340,5 +348,16 @@ class UserProvider with ChangeNotifier {
     _logger.d('복습된 퀴즈 개수: $subjectId on ${date.toIso8601String()}: $count');
 
     return count;
+  }
+
+  Future<void> deleteAccount(String password) async {
+    try {
+      await _authService.deleteAccount(password);
+      await signOut();
+      _logger.i('User account deleted and signed out');
+    } catch (e) {
+      _logger.e('Error during account deletion: $e');
+      rethrow;
+    }
   }
 }

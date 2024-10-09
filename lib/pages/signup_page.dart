@@ -4,12 +4,13 @@ import '../providers/user_provider.dart';
 import '../services/auth_service.dart';
 import 'package:logger/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'email_verification_page.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
   @override
-  _SignUpPageState createState() => _SignUpPageState();
+  State<SignUpPage> createState() => _SignUpPageState();
 }
 
 class _SignUpPageState extends State<SignUpPage> {
@@ -29,20 +30,20 @@ class _SignUpPageState extends State<SignUpPage> {
 
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Please enter your email';
+      return '이메일을 입력해주세요.';
     }
     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-      return 'Please enter a valid email address';
+      return '올바른 이메일 주소를 입력해주세요.';
     }
     return null;
   }
 
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Please enter your password';
+      return '비밀번호를 입력해주세요.';
     }
     if (value.length < 6) {
-      return 'Password must be at least 6 characters long';
+      return '비밀번호는 최소 6자 이상이어야 합니다.';
     }
     return null;
   }
@@ -65,7 +66,11 @@ class _SignUpPageState extends State<SignUpPage> {
           if (!mounted) return;
           Provider.of<UserProvider>(context, listen: false).setUser(user);
           logger.i('User ${user.email} signed up successfully');
-          Navigator.pop(context);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const EmailVerificationPage()),
+          );
         }
       } on FirebaseAuthException catch (e) {
         logger
@@ -73,16 +78,13 @@ class _SignUpPageState extends State<SignUpPage> {
         String errorMessage;
         switch (e.code) {
           case 'email-already-in-use':
-            errorMessage =
-                'This email is already registered. Please use a different email or try logging in.';
+            errorMessage = '이미 가입된 이메일입니다. 다른 이메일을 사용하거나 로그인해주세요.';
             break;
           case 'weak-password':
-            errorMessage =
-                'The password provided is too weak. Please choose a stronger password.';
+            errorMessage = '비밀번호가 약합니다. 더 강한 비밀번호를 선택해주세요.';
             break;
           default:
-            errorMessage =
-                'An error occurred during sign up. Please try again later.';
+            errorMessage = '회원가입 중 오류가 발생했습니다. 다시 시도해주세요.';
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMessage)),
@@ -90,9 +92,7 @@ class _SignUpPageState extends State<SignUpPage> {
       } catch (e) {
         logger.e('Error during sign up: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'An unexpected error occurred. Please try again later.')),
+          const SnackBar(content: Text('회원가입 중 오류가 발생했습니다. 다시 시도해주세요.')),
         );
       } finally {
         if (mounted) {
@@ -108,7 +108,7 @@ class _SignUpPageState extends State<SignUpPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign Up'),
+        title: const Text('회원가입'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -120,7 +120,7 @@ class _SignUpPageState extends State<SignUpPage> {
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(
-                  labelText: 'Email',
+                  labelText: '이메일',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
@@ -130,7 +130,7 @@ class _SignUpPageState extends State<SignUpPage> {
               TextFormField(
                 controller: _passwordController,
                 decoration: const InputDecoration(
-                  labelText: 'Password',
+                  labelText: '비밀번호',
                   border: OutlineInputBorder(),
                 ),
                 obscureText: true,
@@ -140,13 +140,13 @@ class _SignUpPageState extends State<SignUpPage> {
               TextFormField(
                 controller: _confirmPasswordController,
                 decoration: const InputDecoration(
-                  labelText: 'Confirm Password',
+                  labelText: '비밀번호 확인',
                   border: OutlineInputBorder(),
                 ),
                 obscureText: true,
                 validator: (value) {
                   if (value != _passwordController.text) {
-                    return 'Passwords do not match';
+                    return '비밀번호가 일치하지 않습니다.';
                   }
                   return null;
                 },
@@ -156,7 +156,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 onPressed: _isLoading ? null : _handleSignUp,
                 child: _isLoading
                     ? const CircularProgressIndicator()
-                    : const Text('Sign Up'),
+                    : const Text('회원가입'),
               ),
             ],
           ),

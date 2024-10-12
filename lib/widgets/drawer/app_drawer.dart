@@ -36,8 +36,8 @@ class AppDrawer extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const LoginPage(
-                          isFromDrawer: true)), // Add isFromDrawer parameter
+                      builder: (context) =>
+                          const LoginPage(isFromDrawer: true)),
                 );
               },
             )
@@ -55,14 +55,6 @@ class AppDrawer extends StatelessWidget {
                 );
               },
             ),
-          ListTile(
-            leading: const Icon(Icons.delete_forever),
-            title: const Text('회원탈퇴'),
-            onTap: () {
-              logger.i('Delete account button tapped');
-              _showDeleteAccountDialog(context, userProvider, authService);
-            },
-          ),
           ListTile(
             leading:
                 Icon(themeProvider.isDarkMode ? Ionicons.sunny : Ionicons.moon),
@@ -157,60 +149,5 @@ class AppDrawer extends StatelessWidget {
         .map((e) =>
             '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
         .join('&');
-  }
-
-  void _showDeleteAccountDialog(BuildContext context, UserProvider userProvider,
-      AuthService authService) {
-    final TextEditingController passwordController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('회원탈퇴'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('정말로 회원탈퇴를 하시겠습니까? 이 작업은 되돌릴 수 없습니다.'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: '비밀번호',
-                  hintText: '계정 삭제를 위해 비밀번호를 입력해주세요',
-                ),
-              ),
-            ],
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('취소'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: const Text('탈퇴'),
-              onPressed: () async {
-                try {
-                  await userProvider.deleteAccount(passwordController.text);
-                  Navigator.of(context).pop(); // Close the dialog
-                  Navigator.of(context).pop(); // Close the drawer
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('회원탈퇴가 완료되었습니다.')),
-                  );
-                } catch (e) {
-                  Navigator.of(context).pop(); // Close the dialog
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('회원탈퇴 중 오류가 발생했습니다: $e')),
-                  );
-                }
-              },
-            ),
-          ],
-        );
-      },
-    );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/pages/subjects_review_page.dart';
 import 'package:nursing_quiz_app_6/providers/review_quiz_provider.dart';
+import 'package:nursing_quiz_app_6/services/payment_service.dart';
 import 'package:nursing_quiz_app_6/widgets/add_quiz/subject_dropdown_with_add_button.dart';
 import 'package:provider/provider.dart';
 import '../services/quiz_service.dart';
@@ -182,5 +183,10 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
         ),
       ),
     );
+  }
+
+  void _showSubscriptionPrompt(BuildContext context) {
+    final paymentService = Provider.of<PaymentService>(context, listen: false);
+    paymentService.showSubscriptionDialog(context);
   }
 }

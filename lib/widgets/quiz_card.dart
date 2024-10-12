@@ -13,6 +13,7 @@ import '../providers/user_provider.dart';
 import 'package:logger/logger.dart';
 import '../providers/theme_provider.dart';
 import 'package:nursing_quiz_app_6/pages/login_page.dart';
+import '../services/payment_service.dart';
 
 abstract class BaseQuizCard extends StatefulWidget {
   final Quiz quiz;
@@ -303,6 +304,11 @@ class _QuizPageCardState extends State<QuizPageCard> {
         ),
       ),
     );
+  }
+
+  void _showSubscriptionPrompt(BuildContext context) {
+    final paymentService = Provider.of<PaymentService>(context, listen: false);
+    paymentService.showSubscriptionDialog(context);
   }
 }
 

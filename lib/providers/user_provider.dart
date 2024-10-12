@@ -5,13 +5,16 @@ import 'package:logger/logger.dart';
 import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
+import 'package:nursing_quiz_app_6/services/payment_service.dart'; // Add this import
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProvider with ChangeNotifier {
   User? _user;
+  bool _isSubscribed = false; // Add this line
   final Logger _logger = Logger();
   final AuthService _authService = AuthService();
   final QuizService _quizService = QuizService();
+  final PaymentService _paymentService = PaymentService(); // Add this line
 
   double _reviewPeriodMultiplier = 1.0;
   double get reviewPeriodMultiplier => _reviewPeriodMultiplier;
@@ -53,13 +56,26 @@ class UserProvider with ChangeNotifier {
     return adminStatus;
   }
 
+  bool get isSubscribed => _isSubscribed; // Add this getter
+
   Future<void> setUser(User? user) async {
     _logger.i('유저 이메일: ${user?.email ?? 'No user'}');
     if (_user?.uid != user?.uid) {
       _user = user;
       if (user != null) {
         await _loadUserData();
+        await checkAndUpdateSubscriptionStatus(); // Add this line
+      } else {
+        _isSubscribed = false; // Reset subscription status on logout
       }
+      notifyListeners();
+    }
+  }
+
+  // Add this method
+  Future<void> checkAndUpdateSubscriptionStatus() async {
+    if (_user != null) {
+      _isSubscribed = await _paymentService.checkSubscriptionStatus(_user!.uid);
       notifyListeners();
     }
   }

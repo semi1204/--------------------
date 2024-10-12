@@ -5,6 +5,7 @@ import 'package:nursing_quiz_app_6/utils/auth_wrapper.dart';
 import 'package:provider/provider.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
 import 'package:nursing_quiz_app_6/services/auth_service.dart';
+import 'package:nursing_quiz_app_6/services/payment_service.dart'; // Add this import
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
 import 'package:logger/logger.dart';
 import 'firebase_options.dart';
@@ -21,6 +22,7 @@ void main() async {
   );
 
   final quizService = QuizService();
+  final paymentService = PaymentService(); // Add this line
 
   runApp(
     MultiProvider(
@@ -28,6 +30,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         Provider<Logger>.value(value: logger),
         Provider<AuthService>(create: (_) => AuthService()),
+        Provider<PaymentService>.value(value: paymentService), // Add this line
         ChangeNotifierProvider(create: (_) => UserProvider()),
         Provider<QuizService>.value(value: quizService),
         ChangeNotifierProvider(create: (_) => SubjectProvider()),

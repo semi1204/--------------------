@@ -113,11 +113,12 @@ class MarkdownRenderer extends StatelessWidget {
   }
 
   String _preProcessHtml(String input) {
-    // <br> 태그를 Markdown 줄바꿈으로 변환 (테이블 내부 제외)
-    input = _processBrTags(input);
-
     // 테이블 처리
     input = _processTables(input);
+
+    // <br> 태그 처리
+    input =
+        input.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '{{br}}');
 
     // 다른 HTML 태그를 처리
     final document = htmlparser.parse(input);
@@ -126,9 +127,9 @@ class MarkdownRenderer extends StatelessWidget {
     void _processNode(dom.Node node) {
       if (node is dom.Element) {
         if (node.localName == 'table') {
-          processedHtml += node.outerHtml;
+          processedHtml += '{{html}}${node.outerHtml}{{/html}}';
         } else {
-          processedHtml += '<html>${node.outerHtml}</html>';
+          processedHtml += '{{html}}${node.outerHtml}{{/html}}';
         }
         if (node.localName != 'table') {
           node.nodes.forEach(_processNode);
@@ -136,7 +137,6 @@ class MarkdownRenderer extends StatelessWidget {
       } else if (node is dom.Text) {
         processedHtml += node.text;
       } else {
-        // Handle other types of nodes if necessary
         node.nodes.forEach(_processNode);
       }
     }
@@ -159,13 +159,13 @@ class MarkdownRenderer extends StatelessWidget {
     int lastEnd = 0;
 
     for (final match in matches) {
-      // 테이블 앞부분 처리
+      // 테이 앞부분 처리
       if (match.start > lastEnd) {
         parts.add(input
             .substring(lastEnd, match.start)
             .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n'));
       }
-      // 테이블 부분은 그대로 추가
+      // 테이블 부분은 그대로 추가 (br 태그 보존)
       parts.add(match.group(0)!);
       lastEnd = match.end;
     }
@@ -185,9 +185,7 @@ class MarkdownRenderer extends StatelessWidget {
         multiLine: true, caseSensitive: false);
     return input.replaceAllMapped(tableRegExp, (match) {
       final table = match.group(0)!;
-      final processedTable =
-          table.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '<br>');
-      return '<html>$processedTable</html>';
+      return '<html>$table</html>';
     });
   }
 }
@@ -201,9 +199,18 @@ class HtmlNode extends SpanNode {
 
   @override
   InlineSpan build() {
+    // {{br}} 태그를 직접 처리
+    if (htmlContent.trim() == '{{br}}') {
+      return const TextSpan(text: '\n');
+    }
+
+    // {{html}} 태그 제거
+    String processedContent =
+        htmlContent.replaceAll('{{html}}', '').replaceAll('{{/html}}', '');
+
     return WidgetSpan(
       child: HtmlWidget(
-        htmlContent,
+        processedContent,
         textStyle: TextStyle(fontSize: 16 * scaleFactor),
         customWidgetBuilder: (dom.Element element) {
           if (element.localName == 'img') {
@@ -224,10 +231,16 @@ class HtmlNode extends SpanNode {
             return {'border-collapse': 'collapse', 'width': '100%'};
           }
           if (element.localName == 'td' || element.localName == 'th') {
-            return {'border': '1px solid black', 'padding': '8px'};
+            return {
+              'border': '1px solid black',
+              'padding': '8px',
+              'white-space': 'pre-wrap',
+            };
           }
           return null;
         },
+        onTapUrl: (url) => false,
+        renderMode: RenderMode.column,
       ),
     );
   }
@@ -282,7 +295,8 @@ class CustomKoreanFractionSyntax extends md.InlineSyntax {
 
 class CustomHtmlSyntax extends md.InlineSyntax {
   CustomHtmlSyntax()
-      : super(r'<(table|p|div|h[1-6])[\s\S]*?<\/\1>', caseSensitive: false);
+      : super(r'\{\{html\}\}[\s\S]*?\{\{/html\}\}|\{\{br\}\}',
+            caseSensitive: false);
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {

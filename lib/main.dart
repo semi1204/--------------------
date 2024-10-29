@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:nursing_quiz_app_6/providers/quiz_provider.dart';
+import 'package:nursing_quiz_app_6/providers/quiz_view_mode_provider.dart';
 import 'package:nursing_quiz_app_6/utils/auth_wrapper.dart';
 import 'package:provider/provider.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
@@ -48,6 +49,7 @@ void main() async {
             context.read<UserProvider>().user?.uid,
           ),
         ),
+        ChangeNotifierProvider(create: (_) => QuizViewModeProvider()),
       ],
       child: const MyApp(),
     ),

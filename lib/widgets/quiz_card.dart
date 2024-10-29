@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/utils/constants.dart';
-import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/error_report_dialog.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_admin_actions.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/quiz_explanation.dart';
@@ -244,9 +243,10 @@ class _QuizPageCardState extends State<QuizPageCard> {
 
       final endTime = DateTime.now();
       final answerTime = endTime.difference(_startTime!);
-      final isCorrect = index == widget.quiz.correctOptionIndex;
+      final isCorrect = widget.quiz.isOX
+          ? index == (widget.quiz.correctOptionIndex == 0 ? 0 : 1)
+          : index == widget.quiz.correctOptionIndex;
 
-      //데이터를 updateUserQuizData에 전달
       userProvider.updateUserQuizData(
         widget.subjectId,
         widget.quizTypeId,
@@ -258,36 +258,10 @@ class _QuizPageCardState extends State<QuizPageCard> {
 
       widget.onAnswerSelected?.call(index);
 
-      _showAnswerSnackBar(isCorrect);
-
       _logger.i('퀴즈 페이지 카드: 유저가 옵션 $index 선택. 정답: $isCorrect.');
     } else {
       _logger.i('퀴즈 페이지 카드: 옵션이 이미 선택되었습니다. 새로운 선택을 무시합니다.');
     }
-  }
-
-  void _showAnswerSnackBar(bool isCorrect) {
-    String message = isCorrect ? '정답입니다! 🎉' : '오답입니다. 다시 도전해보세요! 💪';
-    Color backgroundColor = isCorrect
-        ? const Color.fromRGBO(196, 251, 199, 1)
-        : const Color.fromRGBO(255, 196, 199, 1);
-
-    final snackBar = SnackBar(
-      content: Text(
-        message,
-        style: const TextStyle(
-          color: Colors.black,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      backgroundColor: backgroundColor,
-      duration: const Duration(seconds: 3),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-    );
-
-    ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
   void _showLoginPrompt(BuildContext context) {
@@ -358,7 +332,8 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                       quiz: widget.quiz,
                       subjectId: widget.subjectId,
                       quizTypeId: widget.quizTypeId,
-                      onResetQuiz: () {}, // ReviewPageCard에서는 리셋 기능을 제공하지 않습니다.
+                      onResetQuiz:
+                          () {}, // ReviewPageCard에서는 리셋 기능을 제��하지 않습니다.
                       onReportError: () {
                         showDialog(
                           context: context,
@@ -451,32 +426,74 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
       builder: (context, themeProvider, child) {
         final textColor =
             themeProvider.isDarkMode ? Colors.white : Colors.black;
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+
+        // 다음 복습 시간 계산
+        final nextReviewDates = _userProvider.formatNextReviewDate(
+          widget.subjectId,
+          widget.quizTypeId,
+          widget.quiz.id,
+        );
+
+        return Column(
           children: [
-            ElevatedButton(
-              onPressed: () => _giveFeedback(false),
-              child: Text('어려움 🤔', style: TextStyle(color: textColor)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: INCORRECT_OPTION_COLOR,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                minimumSize: const Size(100, 36),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => _giveFeedback(true),
-              child: Text('알겠음 😊', style: TextStyle(color: textColor)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: CORRECT_OPTION_COLOR,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                minimumSize: const Size(100, 36),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: () => _giveFeedback(false),
+                  child: Column(
+                    children: [
+                      Text(
+                        '어려움 🤔',
+                        style: TextStyle(
+                          color: textColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        nextReviewDates['notUnderstood'] ?? '',
+                        style: TextStyle(fontSize: 16, color: textColor),
+                      ),
+                    ],
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: INCORRECT_OPTION_COLOR,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    minimumSize: const Size(100, 50),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => _giveFeedback(true),
+                  child: Column(
+                    children: [
+                      Text(
+                        '알겠음 😊',
+                        style: TextStyle(
+                          color: textColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        nextReviewDates['understood'] ?? '',
+                        style: TextStyle(fontSize: 16, color: textColor),
+                      ),
+                    ],
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: CORRECT_OPTION_COLOR,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    minimumSize: const Size(100, 50),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+              ],
             ),
           ],
         );
@@ -484,12 +501,10 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
     );
   }
 
-  // ---- DONE : 피드백 버튼을 누르면 앱 전체가 재빌드 되는 현상이 발생하고 있음 ---------//
   void _giveFeedback(bool isUnderstandingImproved) async {
     _logger.i(
         'Giving feedback: quizId=${widget.quiz.id}, isUnderstandingImproved=$isUnderstandingImproved');
 
-    // 데이터 존재 여부 확인 및 로깅
     final userData = _userProvider.getUserQuizData();
     final quizData =
         userData[widget.subjectId]?[widget.quizTypeId]?[widget.quiz.id];
@@ -497,7 +512,6 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
     if (quizData == null) {
       _logger.w(
           'Quiz data not found. Subject: ${widget.subjectId}, Type: ${widget.quizTypeId}, Quiz: ${widget.quiz.id}');
-      // 여기서 필요하다면 데이터를 다시 초기화하거나 오류 처리를 할 수 있습니다.
       return;
     }
 
@@ -515,28 +529,11 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
         selectedOptionIndex: userAnswer,
       );
 
-      // UI 즉시 업데이트
       setState(() {});
 
       widget.onFeedbackGiven(widget.quiz, isUnderstandingImproved);
-
-      // 다음 복습 시간을 가져와 Snackbar로 표시
-      final nextReviewDate = _userProvider.formatNextReviewDate(
-        widget.subjectId,
-        widget.quizTypeId,
-        widget.quiz.id,
-      );
-
-      if (nextReviewDate != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          CommonSnackBar(
-            message: '다음 복습은 $nextReviewDate 후입니다.',
-          ),
-        );
-      }
     } else {
       _logger.w('No user answer found for quiz: ${widget.quiz.id}');
-      // 사용자에게 먼저 퀴즈에 답변하라는 메시지를 표시
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('먼저 퀴즈에 답변해주세요.')),
       );

@@ -119,15 +119,10 @@ class _MarkdownFieldState extends State<MarkdownField> {
 
   void _insertImageMarkdown(String imageUrl) {
     final currentText = widget.controller.text;
-    final cursorPosition = widget.controller.selection.base.offset;
     final markdownImage = '![image]($imageUrl)';
-    final newText = currentText.substring(0, cursorPosition) +
-        markdownImage +
-        currentText.substring(cursorPosition);
-    widget.controller.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(
-          offset: cursorPosition + markdownImage.length),
-    );
+    widget.controller.text =
+        currentText.isEmpty ? markdownImage : '$currentText\n$markdownImage';
+    widget.controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: widget.controller.text.length));
   }
 }

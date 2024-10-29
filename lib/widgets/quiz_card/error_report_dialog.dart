@@ -15,7 +15,7 @@ class ErrorReportDialog extends StatefulWidget {
   });
 
   @override
-  _ErrorReportDialogState createState() => _ErrorReportDialogState();
+  State<ErrorReportDialog> createState() => _ErrorReportDialogState();
 }
 
 class _ErrorReportDialogState extends State<ErrorReportDialog> {

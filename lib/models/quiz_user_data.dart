@@ -13,14 +13,13 @@ class QuizUserData {
   int? selectedOptionIndex;
   bool isUnderstandingImproved;
   bool markedForReview;
-  double reviewPeriodMultiplier; // 추가된 필드
 
   QuizUserData({
     this.correct = 0,
     this.total = 0,
     this.accuracy = 0.0,
     this.interval = AnkiAlgorithm.initialInterval,
-    this.easeFactor = AnkiAlgorithm.defaultEaseFactor,
+    this.easeFactor = 2.5,
     this.consecutiveCorrect = 0,
     required this.lastAnswered,
     this.nextReviewDate,
@@ -28,7 +27,6 @@ class QuizUserData {
     this.selectedOptionIndex,
     this.isUnderstandingImproved = false,
     this.markedForReview = false,
-    this.reviewPeriodMultiplier = 1.0, // 기본값 1.0으로 설정
   });
 
   Map<String, dynamic> toJson() => {
@@ -44,7 +42,6 @@ class QuizUserData {
         'selectedOptionIndex': selectedOptionIndex,
         'isUnderstandingImproved': isUnderstandingImproved,
         'markedForReview': markedForReview,
-        'reviewPeriodMultiplier': reviewPeriodMultiplier, // 추가
       };
 
   factory QuizUserData.fromJson(Map<String, dynamic> json) => QuizUserData(
@@ -52,7 +49,7 @@ class QuizUserData {
         total: json['total'] ?? 0,
         accuracy: json['accuracy'] ?? 0.0,
         interval: json['interval'] ?? AnkiAlgorithm.initialInterval,
-        easeFactor: json['easeFactor'] ?? AnkiAlgorithm.defaultEaseFactor,
+        easeFactor: json['easeFactor'] ?? 2.5,
         consecutiveCorrect: json['consecutiveCorrect'] ?? 0,
         nextReviewDate: json['nextReviewDate'] != null
             ? DateTime.parse(json['nextReviewDate'])
@@ -63,6 +60,5 @@ class QuizUserData {
         selectedOptionIndex: json['selectedOptionIndex'],
         isUnderstandingImproved: json['isUnderstandingImproved'] ?? false,
         markedForReview: json['markedForReview'] ?? false,
-        reviewPeriodMultiplier: json['reviewPeriodMultiplier'] ?? 1.0, // 추가
       );
 }

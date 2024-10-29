@@ -11,21 +11,29 @@ class QuizProvider with ChangeNotifier {
   final UserProvider _userProvider;
   final Logger _logger;
 
-  List<Quiz> _quizzes = [];
+  List<Quiz> _allQuizzes = [];
+  List<Quiz> _filteredQuizzes = [];
+  bool _isLoading = true;
   final Map<String, int?> _selectedAnswers = {};
   bool _rebuildExplanation = false;
   int _lastScrollIndex = 0;
   SortOption _currentSortOption = SortOption.all;
   bool _isFilterEmpty = true;
-  bool get isFilterEmpty => _isFilterEmpty;
+  bool _showOXOnly = false;
+
+  String? _selectedSubjectId;
+  String? _selectedQuizTypeId;
 
   QuizProvider(this._quizService, this._userProvider, this._logger);
 
-  List<Quiz> get quizzes => _quizzes;
+  List<Quiz> get quizzes => _filteredQuizzes;
   Map<String, int?> get selectedAnswers => _selectedAnswers;
   bool get rebuildExplanation => _rebuildExplanation;
   int get lastScrollIndex => _lastScrollIndex;
   SortOption get currentSortOption => _currentSortOption;
+  bool get isFilterEmpty => _isFilterEmpty;
+  bool get showOXOnly => _showOXOnly;
+  bool get isLoading => _isLoading;
 
   void setSortOption(SortOption option) {
     _currentSortOption = option;
@@ -34,84 +42,75 @@ class QuizProvider with ChangeNotifier {
   }
 
   void _filterQuizzes() {
-    switch (_currentSortOption) {
-      case SortOption.all:
-        _quizzes = List.from(_quizzes);
-        _isFilterEmpty = false;
-        break;
-      case SortOption.low:
-        filterQuizzesByAccuracy(0, 0.6);
-        _isFilterEmpty = _quizzes.isEmpty;
-        break;
-      case SortOption.medium:
-        filterQuizzesByAccuracy(0.6, 0.85);
-        _isFilterEmpty = _quizzes.isEmpty;
-        break;
-      case SortOption.high:
-        filterQuizzesByAccuracy(0.85, 1.0);
-        _isFilterEmpty = _quizzes.isEmpty;
-        break;
-    }
+    _filteredQuizzes = _allQuizzes.where((quiz) {
+      // Filter based on quiz type (OX or math)
+      if (_showOXOnly != quiz.isOX) {
+        return false;
+      }
+
+      // Apply additional filters (if any)
+      switch (_currentSortOption) {
+        case SortOption.all:
+          return true;
+        case SortOption.low:
+          return _getQuizAccuracy(quiz) < 0.6;
+        case SortOption.medium:
+          final accuracy = _getQuizAccuracy(quiz);
+          return accuracy >= 0.6 && accuracy < 0.85;
+        case SortOption.high:
+          return _getQuizAccuracy(quiz) >= 0.85;
+      }
+    }).toList();
+    _isFilterEmpty = _filteredQuizzes.isEmpty;
+  }
+
+  double _getQuizAccuracy(Quiz quiz) {
+    return _userProvider.getQuizAccuracy(
+      _selectedSubjectId!,
+      _selectedQuizTypeId!,
+      quiz.id,
+    );
+  }
+
+  void filterQuizzes({bool? showOXOnly}) {
+    if (showOXOnly != null) _showOXOnly = showOXOnly;
+    _filterQuizzes();
     notifyListeners();
   }
 
-  void filterQuizzesByAccuracy(double minAccuracy, double maxAccuracy) {
-    _logger
-        .i('Filtering quizzes by accuracy: min=$minAccuracy, max=$maxAccuracy');
-
-    if (_selectedSubjectId == null || _selectedQuizTypeId == null) {
-      _logger.w('Cannot filter quizzes: Subject or QuizType not selected');
-      return;
-    }
-
-    _quizzes = _quizzes.where((quiz) {
-      double accuracy = _userProvider.getQuizAccuracy(
-        _selectedSubjectId!,
-        _selectedQuizTypeId!,
-        quiz.id,
-      );
-
-      _logger.d('Quiz ${quiz.id} accuracy: $accuracy');
-
-      // 정확도가 1.0인 경우를 포함하도록 수정
-      return accuracy >= minAccuracy && accuracy <= maxAccuracy;
-    }).toList();
-
-    _logger.i('Quizzes filtered. New count: ${_quizzes.length}');
-    _isFilterEmpty = _quizzes.isEmpty;
-  }
-
-  // 퀴즈를 로딩하고, 초기 화면 위치를 설정
-  // 초기 화면의 위치는 마지막으로 푼 퀴즈의 다음 퀴즈로 설정
   Future<void> loadQuizzesAndSetInitialScroll(
       String subjectId, String quizTypeId) async {
-    //_logger.i('퀴즈 로딩 및 초기 스크롤 위치 설정 시작');
+    _isLoading = true;
+    notifyListeners();
+
     try {
-      _quizzes = await _quizService.getQuizzes(subjectId, quizTypeId);
+      _allQuizzes = await _quizService.getQuizzes(subjectId, quizTypeId,
+          forceRefresh: true);
       _loadSavedAnswers(subjectId, quizTypeId);
       _lastScrollIndex = _findLastAnsweredQuizIndex(subjectId, quizTypeId);
-      notifyListeners();
-      //_logger.i(
-      //    'Loaded ${_quizzes.length} quizzes, initial scroll index: $_lastScrollIndex');
+      _filterQuizzes();
     } catch (e) {
       _logger.e('Error loading quizzes: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
   int _findLastAnsweredQuizIndex(String subjectId, String quizTypeId) {
     final userData = _userProvider.getUserQuizData();
-    for (int i = 0; i < _quizzes.length; i++) {
-      final quizData = userData[subjectId]?[quizTypeId]?[_quizzes[i].id];
+    for (int i = 0; i < _allQuizzes.length; i++) {
+      final quizData = userData[subjectId]?[quizTypeId]?[_allQuizzes[i].id];
       if (quizData == null || quizData['selectedOptionIndex'] == null) {
-        return i; // 첫 번째 미응답 퀴즈의 인덱스 반환
+        return i;
       }
     }
-    return _quizzes.length; // 모든 퀴즈에 응답했다면 마지막 인덱스 반환
+    return _allQuizzes.length;
   }
 
   void _loadSavedAnswers(String subjectId, String quizTypeId) {
     final userData = _userProvider.getUserQuizData();
-    for (var quiz in _quizzes) {
+    for (var quiz in _allQuizzes) {
       final quizData = userData[subjectId]?[quizTypeId]?[quiz.id];
       if (quizData != null && quizData is Map<String, dynamic>) {
         _selectedAnswers[quiz.id] = quizData['selectedOptionIndex'] as int?;
@@ -125,41 +124,27 @@ class QuizProvider with ChangeNotifier {
 
   void selectAnswer(
       String subjectId, String quizTypeId, String quizId, int answerIndex) {
-    //_logger.i('퀴즈 정답 선택: $quizId, 정답: $answerIndex');
     _selectedAnswers[quizId] = answerIndex;
     _userProvider.updateUserQuizData(
       subjectId,
       quizTypeId,
       quizId,
       answerIndex ==
-          _quizzes.firstWhere((q) => q.id == quizId).correctOptionIndex,
+          _allQuizzes.firstWhere((q) => q.id == quizId).correctOptionIndex,
       selectedOptionIndex: answerIndex,
     );
     updateQuizAccuracy(subjectId, quizTypeId, quizId);
     notifyListeners();
   }
 
-  void resetQuiz(String subjectId, String quizTypeId, String quizId) {
-    _selectedAnswers[quizId] = null;
-    _rebuildExplanation = !_rebuildExplanation;
-    _userProvider.resetUserAnswers(subjectId, quizTypeId, quizId);
-    notifyListeners();
-    _logger.i('퀴즈 리셋: $quizId');
-  }
-
   Future<void> deleteQuiz(
       String subjectId, String quizTypeId, String quizId) async {
     await _quizService.deleteQuiz(subjectId, quizTypeId, quizId);
-    _quizzes.removeWhere((q) => q.id == quizId);
+    _allQuizzes.removeWhere((q) => q.id == quizId);
     notifyListeners();
     _logger.i('퀴즈 삭제: $quizId');
   }
 
-  // Add these properties if they don't exist
-  String? _selectedSubjectId;
-  String? _selectedQuizTypeId;
-
-  // Add these methods if they don't exist
   void setSelectedSubjectId(String subjectId) {
     _selectedSubjectId = subjectId;
     notifyListeners();
@@ -167,6 +152,9 @@ class QuizProvider with ChangeNotifier {
 
   void setSelectedQuizTypeId(String quizTypeId) {
     _selectedQuizTypeId = quizTypeId;
+    _showOXOnly = quizTypeId ==
+        'ox_quiz_type_id'; // Replace with your actual OX quiz type ID
+    _filterQuizzes();
     notifyListeners();
   }
 
@@ -176,11 +164,54 @@ class QuizProvider with ChangeNotifier {
 
   void resetSortOption() {
     _currentSortOption = SortOption.all;
+    _showOXOnly = false;
     _filterQuizzes();
+    notifyListeners();
   }
 
   Future<Quiz?> getQuizById(
       String subjectId, String quizTypeId, String quizId) async {
     return await _quizService.getQuizById(subjectId, quizTypeId, quizId);
+  }
+
+  void toggleQuizType(bool showOXOnly) {
+    _showOXOnly = showOXOnly;
+    _filterQuizzes();
+    notifyListeners();
+  }
+
+  // Add this method to reload specific quiz data
+  Future<void> reloadQuizData(
+      String subjectId, String quizTypeId, String quizId) async {
+    final userData = _userProvider.getUserQuizData();
+    final quizData = userData[subjectId]?[quizTypeId]?[quizId];
+    if (quizData != null && quizData is Map<String, dynamic>) {
+      _selectedAnswers[quizId] = quizData['selectedOptionIndex'] as int?;
+    } else {
+      _selectedAnswers.remove(quizId);
+    }
+    notifyListeners();
+  }
+
+  Future<void> resetSelectedOption(
+      String subjectId, String quizTypeId, String quizId) async {
+    try {
+      _selectedAnswers.remove(quizId);
+      _rebuildExplanation = !_rebuildExplanation;
+
+      if (_userProvider.user == null) {
+        _logger.w('Cannot reset option: No user logged in');
+        return;
+      }
+
+      await _quizService.resetSelectedOption(
+          _userProvider.user!.uid, subjectId, quizTypeId, quizId);
+
+      notifyListeners();
+      _logger.i('Quiz option reset completed: $quizId');
+    } catch (e) {
+      _logger.e('Error resetting quiz option: $e');
+      rethrow;
+    }
   }
 }

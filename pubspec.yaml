@@ -72,6 +72,7 @@ dependencies:
   flutter_widget_from_html_core: ^0.15.2
   html: ^0.15.4
   in_app_purchase: ^3.2.0
+  flutter_typeahead: ^5.2.0
 
 dev_dependencies:
   flutter_test:

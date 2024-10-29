@@ -14,7 +14,7 @@ class SubjectPage extends StatefulWidget {
   const SubjectPage({super.key});
 
   @override
-  _SubjectPageState createState() => _SubjectPageState();
+  State<SubjectPage> createState() => _SubjectPageState();
 }
 
 class _SubjectPageState extends State<SubjectPage> {
@@ -32,7 +32,7 @@ class _SubjectPageState extends State<SubjectPage> {
       builder: (context, subjectProvider, themeProvider, child) {
         return Scaffold(
           appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(kToolbarHeight / 1.4),
+            preferredSize: const Size.fromHeight(kToolbarHeight / 1.6),
             child: AppBar(
               title: LinkedTitle(
                 titles: ['과목'],

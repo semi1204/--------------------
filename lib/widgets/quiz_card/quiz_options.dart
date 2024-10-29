@@ -24,46 +24,70 @@ class QuizOptions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: quiz.options.asMap().entries.map((entry) {
+    // Add key to force rebuild when quiz is reset
+    return Container(
+      key: ValueKey('${quiz.id}_${selectedOptionIndex ?? "none"}'),
+      child: quiz.isOX
+          ? _buildOXOptions()
+          : Column(children: _buildRegularOptions()),
+    );
+  }
+
+  Widget _buildOXOptions() {
+    return Row(
+      children: ['O', 'X'].asMap().entries.map((entry) {
         final index = entry.key;
         final option = entry.value;
-        final isSelected = selectedOptionIndex == index;
-        final isCorrect = index == quiz.correctOptionIndex;
-        final bool showSelection = isQuizPage ? isSelected : false;
-
-        final optionText =
-            (hasAnswered && isSelected && !isCorrect) ? '~~$option~~' : option;
-
-        return InkWell(
-          onTap: (!isQuizPage || !hasAnswered)
-              ? () => onSelectOption(index)
-              : null,
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-            decoration: BoxDecoration(
-              color: _getOptionColor(showSelection, isSelected, isCorrect),
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _getOptionIcon(showSelection, isSelected, isCorrect),
-                  color: _getOptionIconColor(isSelected, isCorrect),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: MarkdownRenderer(
-                    data: optionText,
-                    logger: logger,
-                  ),
-                ),
-              ],
-            ),
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: _buildOptionButton(index, option),
           ),
         );
       }).toList(),
+    );
+  }
+
+  List<Widget> _buildRegularOptions() {
+    return quiz.options.asMap().entries.map((entry) {
+      final index = entry.key;
+      final option = entry.value;
+      return _buildOptionButton(index, option);
+    }).toList();
+  }
+
+  Widget _buildOptionButton(int index, String option) {
+    final isSelected = selectedOptionIndex == index;
+    final isCorrect = index == quiz.correctOptionIndex;
+    final bool showSelection = isQuizPage ? isSelected : false;
+
+    final optionText =
+        (hasAnswered && isSelected && !isCorrect) ? '~~$option~~' : option;
+
+    return InkWell(
+      onTap: (!isQuizPage || !hasAnswered) ? () => onSelectOption(index) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+        decoration: BoxDecoration(
+          color: _getOptionColor(showSelection, isSelected, isCorrect),
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _getOptionIcon(showSelection, isSelected, isCorrect),
+              color: _getOptionIconColor(isSelected, isCorrect),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: MarkdownRenderer(
+                data: optionText,
+                logger: logger,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -87,12 +111,5 @@ class QuizOptions extends StatelessWidget {
     if (isCorrect) return const Color.fromARGB(255, 134, 210, 137);
     if (isSelected) return const Color.fromARGB(255, 232, 105, 96);
     return Colors.grey;
-  }
-
-  Color _getOptionTextColor(
-      bool showSelection, bool isSelected, bool isCorrect) {
-    if (!hasAnswered && !showSelection) return Colors.black;
-    if (isCorrect && (hasAnswered || showSelection)) return Colors.black;
-    return Colors.black;
   }
 }

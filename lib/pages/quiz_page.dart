@@ -13,6 +13,8 @@ import '../providers/theme_provider.dart';
 import '../widgets/close_button.dart';
 import '../widgets/linked_title.dart';
 import '../utils/constants.dart';
+import '../providers/quiz_view_mode_provider.dart';
+import '../widgets/add_quiz/ox_toggle_button.dart';
 
 class QuizPage extends StatefulWidget {
   final Subject subject;
@@ -28,9 +30,10 @@ class QuizPage extends StatefulWidget {
   State<QuizPage> createState() => _QuizPageState();
 }
 
-class _QuizPageState extends State<QuizPage> {
+class _QuizPageState extends State<QuizPage>
+    with SingleTickerProviderStateMixin {
   final AutoScrollController _scrollController = AutoScrollController();
-  // Removed redundant subject and quizType declarations
+  bool _isDisposed = false; // 추가
 
   @override
   void initState() {
@@ -41,6 +44,10 @@ class _QuizPageState extends State<QuizPage> {
       // Set selected subject and quiz type IDs
       quizProvider.setSelectedSubjectId(widget.subject.id);
       quizProvider.setSelectedQuizTypeId(widget.quizType.id);
+      // Check if the quiz type is OX and set the toggle accordingly
+      bool isOXQuiz = widget.quizType.id ==
+          'ox_quiz_type_id'; // Replace with your actual OX quiz type ID
+      quizProvider.toggleQuizType(isOXQuiz);
 
       // Load quizzes and set initial scroll
       await quizProvider.loadQuizzesAndSetInitialScroll(
@@ -55,8 +62,9 @@ class _QuizPageState extends State<QuizPage> {
         preferPosition: AutoScrollPosition.begin,
       );
 
-      // Update the UI
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     });
   }
 
@@ -103,10 +111,31 @@ class _QuizPageState extends State<QuizPage> {
                       icon: const Icon(Icons.sort),
                       onPressed: () => _showFilterDialog(context, quizProvider),
                     ),
+                    IconButton(
+                      icon: Icon(
+                        context.select((QuizViewModeProvider p) => p.isOneByOne)
+                            ? Icons.view_agenda
+                            : Icons.view_list,
+                      ),
+                      onPressed: () =>
+                          context.read<QuizViewModeProvider>().toggleViewMode(),
+                    ),
+                    OXToggleButton(
+                      initialValue: quizProvider.showOXOnly,
+                      onChanged: (value) {
+                        quizProvider.toggleQuizType(value);
+                      },
+                    ),
                     const CustomCloseButton(),
                   ],
                 ),
-                if (quizProvider.quizzes.isEmpty)
+                if (quizProvider.isLoading)
+                  const SliverFillRemaining(
+                    child: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (quizProvider.quizzes.isEmpty)
                   SliverFillRemaining(
                     child: Center(
                       child: Text(
@@ -118,45 +147,53 @@ class _QuizPageState extends State<QuizPage> {
                     ),
                   )
                 else
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final quiz = quizProvider.quizzes[index];
-                        final selectedAnswer =
-                            quizProvider.selectedAnswers[quiz.id];
-                        return AutoScrollTag(
-                          key: ValueKey(index),
-                          controller: _scrollController,
-                          index: index,
-                          child: QuizPageCard(
-                            key: ValueKey(quiz.id),
-                            quiz: quiz,
-                            questionNumber: index + 1,
-                            isAdmin: userProvider.isAdmin,
-                            onEdit: () => _editQuiz(quiz),
-                            onDelete: () => _deleteQuiz(quiz),
-                            onAnswerSelected: (answerIndex) => _selectAnswer(
-                                quizProvider, quiz.id, answerIndex),
-                            onResetQuiz: () =>
-                                _resetQuiz(quizProvider, quiz.id),
-                            subjectId: widget.subject.id,
-                            quizTypeId: widget.quizType.id,
-                            selectedOptionIndex: selectedAnswer,
-                            isQuizPage: true,
-                            nextReviewDate: userProvider
-                                    .getNextReviewDate(
-                                      widget.subject.id,
-                                      widget.quizType.id,
-                                      quiz.id,
-                                    )
-                                    ?.toIso8601String() ??
-                                DateTime.now().toIso8601String(),
-                            rebuildExplanation: quizProvider.rebuildExplanation,
-                          ),
-                        );
-                      },
-                      childCount: quizProvider.quizzes.length,
-                    ),
+                  Consumer<QuizViewModeProvider>(
+                    builder: (context, viewMode, child) {
+                      return viewMode.isOneByOne
+                          ? _buildOneByOneView(
+                              quizProvider, userProvider, viewMode)
+                          : SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final quiz = quizProvider.quizzes[index];
+                                  return AutoScrollTag(
+                                    key: ObjectKey('${quiz.id}_$index'),
+                                    controller: _scrollController,
+                                    index: index,
+                                    child: QuizPageCard(
+                                      key: ObjectKey(quiz.id),
+                                      quiz: quiz,
+                                      questionNumber: index + 1,
+                                      isAdmin: userProvider.isAdmin,
+                                      onEdit: () => _editQuiz(quiz),
+                                      onDelete: () => _deleteQuiz(quiz),
+                                      onAnswerSelected: (answerIndex) =>
+                                          _selectAnswer(quizProvider, quiz.id,
+                                              answerIndex),
+                                      onResetQuiz: () =>
+                                          _resetQuiz(quizProvider, quiz.id),
+                                      subjectId: widget.subject.id,
+                                      quizTypeId: widget.quizType.id,
+                                      selectedOptionIndex:
+                                          quizProvider.selectedAnswers[quiz.id],
+                                      isQuizPage: true,
+                                      nextReviewDate: userProvider
+                                              .getNextReviewDate(
+                                                widget.subject.id,
+                                                widget.quizType.id,
+                                                quiz.id,
+                                              )
+                                              ?.toIso8601String() ??
+                                          DateTime.now().toIso8601String(),
+                                      rebuildExplanation:
+                                          quizProvider.rebuildExplanation,
+                                    ),
+                                  );
+                                },
+                                childCount: quizProvider.quizzes.length,
+                              ),
+                            );
+                    },
                   ),
               ],
             );
@@ -231,7 +268,8 @@ class _QuizPageState extends State<QuizPage> {
   }
 
   void _resetQuiz(QuizProvider quizProvider, String quizId) {
-    quizProvider.resetQuiz(widget.subject.id, widget.quizType.id, quizId);
+    quizProvider.resetSelectedOption(
+        widget.subject.id, widget.quizType.id, quizId);
     quizProvider.updateQuizAccuracy(
         widget.subject.id, widget.quizType.id, quizId);
   }
@@ -252,15 +290,15 @@ class _QuizPageState extends State<QuizPage> {
   void _deleteQuiz(Quiz quiz) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Delete Quiz'),
-          content: const Text('Are you sure you want to delete this quiz?'),
+          content: const Text('정말로 삭제하시겠습니까?'),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
               },
             ),
             TextButton(
@@ -269,12 +307,113 @@ class _QuizPageState extends State<QuizPage> {
                 final quizProvider = context.read<QuizProvider>();
                 await quizProvider.deleteQuiz(
                     widget.subject.id, widget.quizType.id, quiz.id);
-                Navigator.of(context).pop();
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
               },
             ),
           ],
         );
       },
+    );
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true; // 추가
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _safeSetState(VoidCallback fn) async {
+    if (!_isDisposed && mounted) {
+      setState(fn);
+    }
+  }
+
+  Widget _buildOneByOneView(QuizProvider quizProvider,
+      UserProvider userProvider, QuizViewModeProvider viewMode) {
+    if (quizProvider.quizzes.isEmpty)
+      return const SliverToBoxAdapter(child: SizedBox());
+
+    final currentQuiz = quizProvider.quizzes[viewMode.currentIndex];
+    final isLastQuiz = viewMode.currentIndex == quizProvider.quizzes.length - 1;
+
+    return SliverList(
+      delegate: SliverChildListDelegate([
+        AutoScrollTag(
+          key: ObjectKey('${currentQuiz.id}_${viewMode.currentIndex}'),
+          controller: _scrollController,
+          index: viewMode.currentIndex,
+          child: Column(
+            children: [
+              QuizPageCard(
+                key: ObjectKey(currentQuiz.id),
+                quiz: currentQuiz,
+                questionNumber: viewMode.currentIndex + 1,
+                isAdmin: userProvider.isAdmin,
+                onEdit: () => _editQuiz(currentQuiz),
+                onDelete: () => _deleteQuiz(currentQuiz),
+                onAnswerSelected: (answerIndex) =>
+                    _selectAnswer(quizProvider, currentQuiz.id, answerIndex),
+                onResetQuiz: () => _resetQuiz(quizProvider, currentQuiz.id),
+                subjectId: widget.subject.id,
+                quizTypeId: widget.quizType.id,
+                selectedOptionIndex:
+                    quizProvider.selectedAnswers[currentQuiz.id],
+                isQuizPage: true,
+                nextReviewDate: userProvider
+                        .getNextReviewDate(
+                          widget.subject.id,
+                          widget.quizType.id,
+                          currentQuiz.id,
+                        )
+                        ?.toIso8601String() ??
+                    DateTime.now().toIso8601String(),
+                rebuildExplanation: quizProvider.rebuildExplanation,
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: viewMode.currentIndex > 0
+                          ? () async {
+                              viewMode.previousQuiz();
+                              if (mounted) {
+                                await _scrollController.scrollToIndex(
+                                  viewMode.currentIndex,
+                                  preferPosition: AutoScrollPosition.begin,
+                                );
+                              }
+                            }
+                          : null,
+                    ),
+                    Text(
+                        '${viewMode.currentIndex + 1}/${quizProvider.quizzes.length}'),
+                    IconButton(
+                      icon: const Icon(Icons.arrow_forward),
+                      onPressed: !isLastQuiz
+                          ? () async {
+                              viewMode.nextQuiz();
+                              if (mounted) {
+                                await _scrollController.scrollToIndex(
+                                  viewMode.currentIndex,
+                                  preferPosition: AutoScrollPosition.begin,
+                                );
+                              }
+                            }
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ]),
     );
   }
 }

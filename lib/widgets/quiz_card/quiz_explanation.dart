@@ -1,6 +1,7 @@
 import 'package:any_animated_button/any_animated_button.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
+import 'package:nursing_quiz_app_6/models/keyword.dart';
 import 'package:nursing_quiz_app_6/widgets/common_widgets.dart';
 import 'package:nursing_quiz_app_6/providers/user_provider.dart';
 import 'package:nursing_quiz_app_6/widgets/quiz_card/markdown_widgets.dart';
@@ -10,15 +11,15 @@ import '../../providers/theme_provider.dart';
 
 class QuizExplanation extends StatefulWidget {
   final String explanation;
-  final List<String> keywords;
+  final List<Keyword> keywords;
   final Logger logger;
   final String quizId;
   final String subjectId;
   final String quizTypeId;
   final bool rebuildTrigger;
-  final Widget? feedbackButtons; // New property added
+  final Widget? feedbackButtons;
   final bool isReviewPage;
-  final Function(String)? onRemoveCard; // New property added
+  final Function(String)? onRemoveCard;
 
   const QuizExplanation({
     super.key,
@@ -29,7 +30,7 @@ class QuizExplanation extends StatefulWidget {
     required this.subjectId,
     required this.quizTypeId,
     required this.rebuildTrigger,
-    this.feedbackButtons, // Added to the constructor
+    this.feedbackButtons,
     this.isReviewPage = false,
     this.onRemoveCard,
   });
@@ -68,7 +69,6 @@ class _QuizExplanationState extends State<QuizExplanation> {
       builder: (context, themeProvider, child) {
         final textColor =
             themeProvider.isDarkMode ? Colors.white : Colors.black;
-        // SingleChildScroolVeiw 없이 Column을 유지해 위젯내부의 스크롤이 없게 해야함
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -82,12 +82,15 @@ class _QuizExplanationState extends State<QuizExplanation> {
                 spacing: 4.0,
                 runSpacing: 2.0,
                 children: widget.keywords
-                    .map((keyword) => Chip(label: Text(keyword)))
+                    .map((keyword) => Chip(
+                          label: Text(keyword.content),
+                          onDeleted: () =>
+                              _showKeywordDescription(context, keyword),
+                        ))
                     .toList(),
               ),
               const SizedBox(height: 16),
             ],
-            // Modified section to use Row for "해설" and review button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -120,7 +123,59 @@ class _QuizExplanationState extends State<QuizExplanation> {
     );
   }
 
-  // 복습상태를 토글하는 메소드
+  void _showKeywordDescription(BuildContext context, Keyword keyword) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.4,
+          minChildSize: 0.2,
+          maxChildSize: 0.75,
+          expand: false,
+          builder: (_, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2.5),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      keyword.content,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    MarkdownRenderer(
+                      data: keyword.description ?? '설명이 없습니다.',
+                      logger: widget.logger,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _toggleReviewStatus(
       BuildContext context, UserProvider userProvider, Logger logger) async {
     logger.i('Toggling review status for quiz: ${widget.quizId}');
@@ -156,7 +211,7 @@ class _QuizExplanationState extends State<QuizExplanation> {
         widget.subjectId,
         widget.quizTypeId,
         widget.quizId,
-      );
+      )['understood'];
       message = '복습 목록에 추가되었습니다!\n⏰ 다음 복습: $reviewTimeString ';
     }
 

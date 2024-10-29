@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../utils/anki_algorithm.dart';
 import 'dart:async';
+import 'keyword_service.dart';
 
 // TODO : 무조건 firebase에서 데이터 파싱하지 말고, 로컬스토리지에서 가져오도록 수정해야함
 // TODO : 로컬스토리지에서 가져오는 방법 찾아보기
@@ -22,6 +23,7 @@ class QuizService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Logger _logger = Logger();
   final Uuid _uuid = const Uuid();
+  final KeywordService _keywordService = KeywordService();
 
   static const String _subjectsKey = 'subjects'; // 과목 데이터 캐시 키
   static const String _quizTypesKey = 'quizTypes'; // 퀴즈 유형 데이터 캐시 키
@@ -69,7 +71,7 @@ class QuizService {
       if (docSnapshot.exists) {
         final data = docSnapshot.data() as Map<String, dynamic>;
         _userQuizData[userId] = _convertToQuizUserDataMap(data);
-        _logger.i('Firebase에서 사용자 $userId의 퀴즈 데이터를 로드했습니다');
+        _logger.i('Firebase에서 ��용자 $userId의 퀴즈 데이터를 로드했습니다');
       } else {
         _logger.w('Firebase에 사용자 $userId의 데이터가 없습니다');
       }
@@ -160,7 +162,6 @@ class QuizService {
     int? selectedOptionIndex,
     bool isUnderstandingImproved = false,
     bool? toggleReviewStatus,
-    double reviewPeriodMultiplier = 1.0,
   }) async {
     _logger.i(
         '사용자 퀴즈 데이터 업데이트 중: user=$userId, subject=$subjectId, quizType=$quizTypeId, quiz=$quizId, correct=$isCorrect');
@@ -191,19 +192,16 @@ class QuizService {
         mistakeCount: quizData.mistakeCount,
         isUnderstandingImproved: isUnderstandingImproved,
         markForReview: true,
-        reviewPeriodMultiplier: reviewPeriodMultiplier,
       );
 
       quizData.interval = ankiResult['interval'] as int;
       quizData.easeFactor = ankiResult['easeFactor'] as double;
       quizData.consecutiveCorrect = ankiResult['consecutiveCorrect'] as int;
       quizData.mistakeCount = ankiResult['mistakeCount'] as int;
-      quizData.nextReviewDate = AnkiAlgorithm.calculateNextReviewDate(
-        quizData.interval,
-        reviewPeriodMultiplier,
+      // targetRetention을 직접 사용
+      quizData.nextReviewDate = DateTime.now().add(
+        Duration(minutes: quizData.interval),
       );
-      _logger
-          .d('다음 복습 날짜: ${quizData.nextReviewDate}, 간격: ${quizData.interval}');
     }
 
     if (isCorrect) {
@@ -223,12 +221,14 @@ class QuizService {
       if (toggleReviewStatus) {
         // 복습 리스트에 추가될 때 nextReviewDate 설정
         quizData.nextReviewDate = DateTime.now().add(Duration(
-            minutes: (AnkiAlgorithm.initialInterval * reviewPeriodMultiplier)
-                .round()));
+            minutes:
+                (AnkiAlgorithm.initialInterval * quizData.easeFactor).round()));
       } else {
         // 복습 리스트에서 제거될 때 Anki 관련 데이터 초기화
         quizData.interval = AnkiAlgorithm.initialInterval;
-        quizData.easeFactor = AnkiAlgorithm.defaultEaseFactor;
+        // Comment: The 'defaultEaseFactor' getter is not defined in AnkiAlgorithm.
+        // We need to define it or use a default value.
+        quizData.easeFactor = 2.5; // Using a default value of 2.5
         quizData.consecutiveCorrect = 0;
         quizData.mistakeCount = 0;
         quizData.nextReviewDate = null;
@@ -259,8 +259,10 @@ class QuizService {
     var quizData = _userQuizData[userId]![subjectId]![quizTypeId]![quizId]!;
     // 퀴즈ID가 복습리스트에 존재하게
     quizData.markedForReview = true;
-    quizData.nextReviewDate = DateTime.now()
-        .add(const Duration(minutes: AnkiAlgorithm.initialInterval));
+    // targetRetention을 사용하여 초기 복습 간격 설정
+    quizData.nextReviewDate = DateTime.now().add(
+      Duration(minutes: AnkiAlgorithm.initialInterval),
+    );
 
     _logger.d('Added quiz to review list: quizId=$quizId');
 
@@ -275,18 +277,20 @@ class QuizService {
 
     var quizData = _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId];
     if (quizData != null) {
+      // 복습 관련 데이터만 초기화
       quizData.markedForReview = false;
-      quizData.interval = 0;
-      quizData.easeFactor = AnkiAlgorithm.defaultEaseFactor;
+      quizData.interval = AnkiAlgorithm.initialInterval;
+      quizData.easeFactor = 2.5;
       quizData.consecutiveCorrect = 0;
       quizData.mistakeCount = 0;
       quizData.nextReviewDate = null;
-      //_logger.d('Removed quiz from review list and reset data: quizId=$quizId');
-    } else {
-      //_logger.w('Cannot find quiz data for removal: quizId=$quizId');
+
+      // 기존 학습 데이터는 유지 (correct, total, accuracy 등)
+      _logger.d('Reset review data for quiz: $quizId');
     }
 
     await saveUserQuizData(userId);
+    await syncUserData(userId, getUserQuizData(userId));
   }
 
   bool isInReviewList(
@@ -297,10 +301,23 @@ class QuizService {
   }
 
   DateTime? getNextReviewDate(
-      String userId, String subjectId, String quizTypeId, String quizId) {
-    return _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId]
-        //`_userQuizData`에서 주어진 ID들로 접근하여 해당 퀴즈의 `nextReviewDate`를 가져옴.
-        ?.nextReviewDate;
+      String userId, String subjectId, String quizTypeId, String quizId,
+      {bool isUnderstandingImproved = true}) {
+    var quizData = _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId];
+    if (quizData == null) return null;
+
+    if (isUnderstandingImproved) {
+      quizData.interval = (quizData.interval * quizData.easeFactor).round();
+    } else {
+      quizData.interval = AnkiAlgorithm.initialInterval;
+    }
+
+    // targetRetention을 사용하여 다음 복습 날짜 계산
+    quizData.nextReviewDate = DateTime.now().add(
+      Duration(minutes: quizData.interval),
+    );
+
+    return quizData.nextReviewDate;
   }
 
   Future<List<Quiz>> getQuizzesForReview(
@@ -436,43 +453,39 @@ class QuizService {
       {bool forceRefresh = false}) async {
     _logger.i('과목 $subjectId에 대한 퀴즈 타입을 가져오는 중입니다');
     final key = '${_quizTypesKey}_$subjectId';
-    if (!forceRefresh &&
-        _cachedQuizTypes.containsKey(subjectId) &&
-        _cachedQuizTypes[subjectId]!.containsKey(key)) {
-      _logger.d('메모리 캐시에서 퀴즈 타입을 가져왔습니다: $subjectId');
-      return _cachedQuizTypes[subjectId]![key]!;
+
+    // 강제 새로고침이거나 캐시가 없을 때 Firestore에서 데이터를 가져옵니다
+    if (forceRefresh ||
+        !_cachedQuizTypes.containsKey(subjectId) ||
+        !_cachedQuizTypes[subjectId]!.containsKey(key)) {
+      try {
+        final snapshot = await _firestore
+            .collection('subjects')
+            .doc(subjectId)
+            .collection('quizTypes')
+            .get();
+
+        final quizTypes =
+            snapshot.docs.map((doc) => QuizType.fromFirestore(doc)).toList();
+
+        // 캐시 업데이트
+        _cachedQuizTypes[subjectId] = {key: quizTypes};
+
+        _logger.i(
+            '과목 $subjectId에 대한 퀴즈 타입을 Firestore에서 가져왔습니다: ${quizTypes.length}');
+        _logger.d(
+            'Retrieved quiz types: ${quizTypes.map((qt) => qt.name).join(', ')}');
+
+        return quizTypes;
+      } catch (e) {
+        _logger.e('과목 $subjectId에 대한 퀴즈 타입을 가져오는 중 오류가 발생했습니다: $e');
+        rethrow;
+      }
     }
 
-    try {
-      final quizTypes = await _getDataWithCache<List<QuizType>>(
-        key: key,
-        fetchFromFirestore: () async {
-          final snapshot = await _firestore
-              .collection('subjects')
-              .doc(subjectId)
-              .collection('quizTypes')
-              .get();
-          return snapshot.docs
-              .map((doc) => QuizType.fromFirestore(doc))
-              .toList();
-        },
-        parseData: (data) => (json.decode(data) as List)
-            .map((item) => QuizType.fromJson(item as Map<String, dynamic>))
-            .toList(),
-        encodeData: (quizTypes) =>
-            json.encode(quizTypes.map((qt) => qt.toJson()).toList()),
-        forceRefresh: forceRefresh,
-      );
-
-      _cachedQuizTypes[subjectId] = {key: quizTypes};
-      _logger.i('과목 $subjectId에 대한 퀴즈 타입을 가져왔습니다: ${quizTypes.length}');
-      _logger.d(
-          'Retrieved quiz types: ${quizTypes.map((qt) => qt.name).join(', ')}');
-      return quizTypes;
-    } catch (e) {
-      _logger.e('과목 $subjectId에 대한 퀴즈 타입을 가져오는 중 오류가 발생했습니다: $e');
-      rethrow;
-    }
+    // 캐시된 데이터 반환
+    _logger.d('메모리 캐시에서 퀴즈 타입을 가져왔습니다: $subjectId');
+    return _cachedQuizTypes[subjectId]![key]!;
   }
 
   // 수정: Stream 대신 Future를 반환하도록 변경
@@ -588,7 +601,11 @@ class QuizService {
       _cachedQuizTypes[subjectId] ??= {};
       _cachedQuizTypes[subjectId]!['${_quizTypesKey}_$subjectId'] ??= [];
       _cachedQuizTypes[subjectId]!['${_quizTypesKey}_$subjectId']!.add(
-        QuizType(id: quizTypeId, name: typeName, subjectId: subjectId),
+        QuizType(
+          id: quizTypeId,
+          name: typeName,
+          subjectId: subjectId,
+        ),
       );
 
       // SharedPreferences 업데이트
@@ -597,7 +614,7 @@ class QuizService {
       _logger.i('과목 $subjectId에 퀴즈 유형을 추가했습니다: $quizTypeId');
       return quizTypeId;
     } catch (e) {
-      _logger.e('과목 $subjectId에 퀴즈 유형을 추가하는 중 오류가 발생했습니다: $e');
+      _logger.e('과목 $subjectId에 퀴즈 유형을 추가하 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
@@ -622,17 +639,14 @@ class QuizService {
     _logger.i('과목 $subjectId에 퀴즈를 추가하는 중입니다: $quizTypeId');
     try {
       final quizData = quiz.toFirestore();
+      quizData['isOX'] = quiz.isOX;
 
-      // Store only the Firebase Storage path, not the full URL
+      // 이미지 URL 처리
       if (quiz.imageUrl != null) {
-        if (quiz.imageUrl!.startsWith('http')) {
-          final uri = Uri.parse(quiz.imageUrl!);
-          quizData['imageUrl'] =
-              uri.path.replaceFirst('/o/', '').split('?').first;
-        } else if (!quiz.imageUrl!.startsWith('quiz_images/')) {
-          quizData['imageUrl'] = 'quiz_images/${quiz.imageUrl}';
-        }
+        quizData['imageUrl'] = _processImageUrl(quiz.imageUrl!);
       }
+
+      // Firestore에 퀴즈 추가
       final docRef = await _firestore
           .collection('subjects')
           .doc(subjectId)
@@ -643,6 +657,11 @@ class QuizService {
 
       _logger.i('과목 $subjectId에 퀴즈를 추가했습니다: ${docRef.id}');
 
+      // KeywordService를 통한 키워드 처리
+      final processedKeywords =
+          await _keywordService.processQuizKeywords(quiz.keywords, docRef.id);
+
+      // 캐시를 위한 업데이트된 퀴즈 객체 생성
       final updatedQuiz = Quiz(
         id: docRef.id,
         question: quiz.question,
@@ -650,20 +669,14 @@ class QuizService {
         correctOptionIndex: quiz.correctOptionIndex,
         explanation: quiz.explanation,
         typeId: quiz.typeId,
-        keywords: quiz.keywords,
+        keywords: processedKeywords, // 처리된 키워드로 업데이트
         imageUrl: quizData['imageUrl'],
         year: quiz.year,
+        isOX: quiz.isOX,
       );
 
-      // 캐시 업데이트 로직 개선
-      final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
-      _cachedQuizzes[subjectId] ??= {};
-      _cachedQuizzes[subjectId]![quizTypeId] ??= {};
-      _cachedQuizzes[subjectId]![quizTypeId]![key] ??= [];
-      _cachedQuizzes[subjectId]![quizTypeId]![key]!.add(updatedQuiz);
-
-      // 캐시 데이터를 SharedPreferences에 저장
-      await _updateSharedPreferences(subjectId, quizTypeId);
+      // 캐시 업데이트
+      await _updateQuizCache(subjectId, quizTypeId, updatedQuiz);
     } catch (e) {
       _logger.e('과목 $subjectId에 퀴즈를 추가하는 중 오류가 발생했습니다: $e');
       rethrow;
@@ -673,6 +686,10 @@ class QuizService {
   Future<void> updateQuiz(
       String subjectId, String quizTypeId, Quiz quiz) async {
     try {
+      final quizData = quiz.toFirestore();
+      quizData['isOX'] = quiz.isOX;
+
+      // Firestore 업데이트
       await _firestore
           .collection('subjects')
           .doc(subjectId)
@@ -680,22 +697,19 @@ class QuizService {
           .doc(quizTypeId)
           .collection('quizzes')
           .doc(quiz.id)
-          .update(quiz.toFirestore());
+          .update(quizData);
 
-      // 수정: 캐시 업데이트 로직 개선
-      final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
-      if (_cachedQuizzes[subjectId]?[quizTypeId]?[key] != null) {
-        final index = _cachedQuizzes[subjectId]![quizTypeId]![key]!
-            .indexWhere((q) => q.id == quiz.id);
-        if (index != -1) {
-          _cachedQuizzes[subjectId]![quizTypeId]![key]![index] = quiz;
-        }
-      }
+      // KeywordService를 통한 키워드 업데이트
+      final processedKeywords =
+          await _keywordService.processQuizKeywords(quiz.keywords, quiz.id);
+
+      // 업데이트된 퀴즈 객체 생성
+      final updatedQuiz = quiz.copyWith(keywords: processedKeywords);
+
+      // 캐시 업데이트
+      await _updateQuizCache(subjectId, quizTypeId, updatedQuiz);
 
       _logger.i('과목 $subjectId에 퀴즈를 업데이트했습니다: ${quiz.id}');
-
-      // 캐시 데이터를 SharedPreferences에 저장
-      await _updateSharedPreferences(subjectId, quizTypeId);
     } catch (e) {
       _logger.e('과목 $subjectId에 퀴즈를 업데이트하는 중 오류가 발생했습니다: $e');
       rethrow;
@@ -714,6 +728,8 @@ class QuizService {
           .doc(quizId)
           .delete();
 
+      await _unlinkQuizFromKeywords(quizId);
+
       // 수정: 캐 업데이트 로직 개선
       final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
       _cachedQuizzes[subjectId]?[quizTypeId]?[key]
@@ -724,7 +740,20 @@ class QuizService {
       // 캐시 데이터를 SharedPreferences에 저장
       await _updateSharedPreferences(subjectId, quizTypeId);
     } catch (e) {
-      _logger.e('과목 $subjectId에 퀴즈를 삭제하는 중 오류가 발생했습니다: $e');
+      _logger.e('과목 $subjectId에 ��즈를 삭제하는 중 오류가 발생했습니다: $e');
+      rethrow;
+    }
+  }
+
+  // 새로 추가: 퀴즈와 키워드 연결 해제 메서드
+  Future<void> _unlinkQuizFromKeywords(String quizId) async {
+    try {
+      final keywords = await _keywordService.getKeywordsForQuiz(quizId);
+      for (var keyword in keywords) {
+        await _keywordService.unlinkKeywordFromQuiz(keyword.id, quizId);
+      }
+    } catch (e) {
+      _logger.e('퀴즈와 키워드 연결 해제 중 오류 발생: $e');
       rethrow;
     }
   }
@@ -888,6 +917,23 @@ class QuizService {
     });
   }
 
+  Future<void> resetSelectedOption(
+      String userId, String subjectId, String quizTypeId, String quizId) async {
+    _logger.i('사용자 $userId의 선택한 옵션 초기화 중');
+    try {
+      final quizData = _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId];
+      if (quizData != null) {
+        quizData.selectedOptionIndex = null;
+        await saveUserQuizData(userId);
+        await syncUserData(userId, getUserQuizData(userId));
+        _logger.d('선택한 옵션 초기화 완료');
+      }
+    } catch (e) {
+      _logger.e('선택한 옵션 초기화 중 오류 발생: $e');
+      rethrow;
+    }
+  }
+
   Map<String, dynamic> _convertFromQuizUserDataMap(
       Map<String, Map<String, Map<String, QuizUserData>>> data) {
     return data.map((subjectId, subjectData) {
@@ -903,24 +949,6 @@ class QuizService {
         }),
       );
     });
-  }
-
-  Future<void> resetUserQuizData(
-      String userId, String subjectId, String quizTypeId, String quizId) async {
-    _logger.i(
-        '사용자 $userId의 퀴즈 데이터 리셋 중: subject=$subjectId, quizType=$quizTypeId, quiz=$quizId');
-    try {
-      _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId] = QuizUserData(
-        nextReviewDate: DateTime.now(),
-        lastAnswered: DateTime.now(),
-      );
-
-      await saveUserQuizData(userId);
-      _logger.d('사용자 퀴즈 데이터 리셋 완료');
-    } catch (e) {
-      _logger.e('사용자 퀴즈 데이터 리셋 중 오류 발생: $e');
-      rethrow;
-    }
   }
 
   double getQuizAccuracy(
@@ -948,5 +976,50 @@ class QuizService {
       _logger.e('퀴즈 수를 가져오는 중 오류 발생: $e');
       return 0;
     }
+  }
+
+  Future<List<Quiz>> getOXQuizzes(String subjectId, String quizTypeId) async {
+    _logger.i('과목 $subjectId의 OX 퀴즈를 가져오는 중입니다: $quizTypeId');
+    try {
+      final quizzes = await getQuizzes(subjectId, quizTypeId);
+      return quizzes.where((quiz) => quiz.isOX).toList();
+    } catch (e) {
+      _logger.e('과목 $subjectId의 OX 퀴즈를 가져오는 중 오류가 발생했습니다: $e');
+      rethrow;
+    }
+  }
+
+  // 이미지 URL 처리를 위한 헬퍼 메서드
+  String _processImageUrl(String imageUrl) {
+    if (imageUrl.startsWith('http')) {
+      final uri = Uri.parse(imageUrl);
+      return uri.path.replaceFirst('/o/', '').split('?').first;
+    } else if (!imageUrl.startsWith('quiz_images/')) {
+      return 'quiz_images/$imageUrl';
+    }
+    return imageUrl;
+  }
+
+  // 캐시 업데이트를 위한 헬퍼 메서드
+  Future<void> _updateQuizCache(
+      String subjectId, String quizTypeId, Quiz quiz) async {
+    final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
+
+    // 메모리 캐시 업데이트
+    _cachedQuizzes[subjectId] ??= {};
+    _cachedQuizzes[subjectId]![quizTypeId] ??= {};
+    _cachedQuizzes[subjectId]![quizTypeId]![key] ??= [];
+
+    // 기존 퀴즈 업데이트 또는 새 퀴즈 추가
+    final quizList = _cachedQuizzes[subjectId]![quizTypeId]![key]!;
+    final index = quizList.indexWhere((q) => q.id == quiz.id);
+    if (index != -1) {
+      quizList[index] = quiz;
+    } else {
+      quizList.add(quiz);
+    }
+
+    // SharedPreferences 업데이트
+    await _updateSharedPreferences(subjectId, quizTypeId);
   }
 }

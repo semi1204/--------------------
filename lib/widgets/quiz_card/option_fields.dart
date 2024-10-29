@@ -7,6 +7,7 @@ class OptionFields extends StatelessWidget {
   final int correctOptionIndex;
   final Function(int?) onOptionChanged;
   final Logger logger;
+  final bool isOX;
 
   const OptionFields({
     super.key,
@@ -14,11 +15,41 @@ class OptionFields extends StatelessWidget {
     required this.correctOptionIndex,
     required this.onOptionChanged,
     required this.logger,
+    required this.isOX,
   });
 
   @override
   Widget build(BuildContext context) {
-    logger.i('옵션 필드 빌드');
+    logger.i('옵션 필드 빌드: ${isOX ? 'OX' : '일반'} 퀴즈');
+    return isOX ? _buildOXOptions() : _buildRegularOptions();
+  }
+
+  Widget _buildOXOptions() {
+    return Row(
+      children: List.generate(controllers.length, (index) {
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: RadioListTile<int>(
+              title: Text(controllers[index].text),
+              value: index,
+              groupValue: correctOptionIndex,
+              onChanged: (int? value) {
+                if (value != null && value != correctOptionIndex) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    onOptionChanged(value);
+                    logger.i('Correct option changed to: ${value + 1}');
+                  });
+                }
+              },
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildRegularOptions() {
     return Column(
       children: List.generate(controllers.length, (index) {
         return Padding(
@@ -34,15 +65,17 @@ class OptionFields extends StatelessWidget {
                 }
                 return null;
               },
-              isPreviewMode: false, // 미리보기 모드 비활성화
+              isPreviewMode: false,
               logger: logger,
             ),
             value: index,
             groupValue: correctOptionIndex,
             onChanged: (int? value) {
               if (value != null && value != correctOptionIndex) {
-                onOptionChanged(value);
-                logger.i('Correct option changed to: ${value + 1}');
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  onOptionChanged(value);
+                  logger.i('Correct option changed to: ${value + 1}');
+                });
               }
             },
           ),

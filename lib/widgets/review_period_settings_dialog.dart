@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/user_provider.dart';
@@ -14,30 +15,33 @@ class ReviewPeriodSettingsDialog extends StatefulWidget {
 
 class _ReviewPeriodSettingsDialogState
     extends State<ReviewPeriodSettingsDialog> {
-  late double _reviewPeriodMultiplier;
+  late double _targetRetention;
 
   @override
   void initState() {
     super.initState();
-    _reviewPeriodMultiplier = Provider.of<UserProvider>(context, listen: false)
-        .reviewPeriodMultiplier;
+    _targetRetention =
+        Provider.of<UserProvider>(context, listen: false).targetRetention;
   }
 
-  List<FlSpot> _generateReviewPoints(double multiplier) {
+  List<FlSpot> _generateReviewPoints(double retention) {
     List<int> reviewDays = [1, 3, 7, 15];
     return reviewDays.asMap().entries.map((entry) {
-      return FlSpot(entry.key.toDouble(), entry.value * multiplier);
+      // AnkiAlgorithm의 로직을 직접 사용하는 것이 더 일관성 있을 수 있음
+      double interval = AnkiAlgorithm.calculateIntervalForRetention(
+          entry.value.toDouble(), retention);
+      return FlSpot(entry.key.toDouble(), interval);
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context); // 추가
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     return AlertDialog(
-      backgroundColor: themeProvider.currentTheme.dialogBackgroundColor, // 추가
-      title: Text('복습 주기 설정',
-          style: TextStyle(color: themeProvider.textColor)), // 수정
+      backgroundColor: themeProvider.currentTheme.dialogBackgroundColor,
+      title: Text('목표 기억 유지율 설정',
+          style: TextStyle(color: themeProvider.textColor)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -55,7 +59,7 @@ class _ReviewPeriodSettingsDialogState
                       return FlLine(
                         color: themeProvider.isDarkMode
                             ? Colors.grey[700]
-                            : Colors.grey[300], // 수정
+                            : Colors.grey[300],
                         strokeWidth: 1,
                       );
                     },
@@ -76,7 +80,7 @@ class _ReviewPeriodSettingsDialogState
                               child: Text(
                                 '${index + 1}회차',
                                 style: TextStyle(
-                                  color: themeProvider.textColor, // 수정
+                                  color: themeProvider.textColor,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
                                 ),
@@ -96,7 +100,7 @@ class _ReviewPeriodSettingsDialogState
                           return Text(
                             '${value.toInt()}일',
                             style: TextStyle(
-                              color: themeProvider.textColor, // 수정
+                              color: themeProvider.textColor,
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -112,8 +116,8 @@ class _ReviewPeriodSettingsDialogState
                   ),
                   borderData: FlBorderData(
                     show: true,
-                    border: Border.all(
-                        color: themeProvider.textColor, width: 1), // 수정
+                    border:
+                        Border.all(color: themeProvider.textColor, width: 1),
                   ),
                   minX: 0,
                   maxX: 3,
@@ -121,7 +125,7 @@ class _ReviewPeriodSettingsDialogState
                   maxY: 30,
                   lineBarsData: [
                     LineChartBarData(
-                      spots: _generateReviewPoints(_reviewPeriodMultiplier),
+                      spots: _generateReviewPoints(_targetRetention),
                       isCurved: true,
                       curveSmoothness: 0.35,
                       gradient: const LinearGradient(
@@ -136,7 +140,7 @@ class _ReviewPeriodSettingsDialogState
                             radius: 6,
                             color: Colors.white,
                             strokeWidth: 4,
-                            strokeColor: Color(0xff02d39a),
+                            strokeColor: const Color(0xff02d39a),
                           );
                         },
                       ),
@@ -156,22 +160,22 @@ class _ReviewPeriodSettingsDialogState
             ),
             const SizedBox(height: 20),
             Slider(
-              value: _reviewPeriodMultiplier,
-              min: 0.5,
-              max: 2.0,
-              divisions: 15,
-              label: _reviewPeriodMultiplier.toStringAsFixed(2),
+              value: _targetRetention,
+              min: 0.6,
+              max: 0.95,
+              divisions: 25,
+              label: '${(_targetRetention * 100).toStringAsFixed(1)}%',
               onChanged: (value) {
                 setState(() {
-                  _reviewPeriodMultiplier = value;
+                  _targetRetention = value;
                 });
               },
             ),
             Text(
-              '복습 주기 배수: ${_reviewPeriodMultiplier.toStringAsFixed(2)}',
+              '목표 기억 유지율: ${(_targetRetention * 100).toStringAsFixed(1)}%',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: themeProvider.textColor, // 수정
+                color: themeProvider.textColor,
               ),
             ),
           ],
@@ -179,16 +183,14 @@ class _ReviewPeriodSettingsDialogState
       ),
       actions: [
         TextButton(
-          child: Text('취소',
-              style: TextStyle(color: themeProvider.textColor)), // 수정
+          child: Text('취소', style: TextStyle(color: themeProvider.textColor)),
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: Text('저장',
-              style: TextStyle(color: themeProvider.textColor)), // 수정
+          child: Text('저장', style: TextStyle(color: themeProvider.textColor)),
           onPressed: () {
             Provider.of<UserProvider>(context, listen: false)
-                .setReviewPeriodMultiplier(_reviewPeriodMultiplier);
+                .setTargetRetention(_targetRetention);
             Navigator.of(context).pop();
           },
         ),

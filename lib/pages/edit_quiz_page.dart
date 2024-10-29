@@ -6,6 +6,8 @@ import 'package:logger/logger.dart';
 import '../widgets/quiz_card/markdown_field.dart';
 import '../widgets/quiz_card/keyword_fields.dart';
 import '../widgets/quiz_card/option_fields.dart';
+import '../widgets/add_quiz/ox_toggle_button.dart';
+import '../models/keyword.dart';
 
 class EditQuizPage extends StatefulWidget {
   final Quiz quiz;
@@ -20,7 +22,7 @@ class EditQuizPage extends StatefulWidget {
   });
 
   @override
-  _EditQuizPageState createState() => _EditQuizPageState();
+  State<EditQuizPage> createState() => _EditQuizPageState();
 }
 
 class _EditQuizPageState extends State<EditQuizPage> {
@@ -32,9 +34,10 @@ class _EditQuizPageState extends State<EditQuizPage> {
   late final List<TextEditingController> _optionControllers;
   late int _correctOptionIndex;
   late final TextEditingController _explanationController;
-  late final List<TextEditingController> _keywordControllers;
+  late List<Keyword> _selectedKeywords;
   late final TextEditingController _yearController;
   late String? _examType;
+  late bool _isOX;
 
   bool _isPreviewMode = false;
 
@@ -52,12 +55,11 @@ class _EditQuizPageState extends State<EditQuizPage> {
     _correctOptionIndex = widget.quiz.correctOptionIndex;
     _explanationController =
         TextEditingController(text: widget.quiz.explanation);
-    _keywordControllers = widget.quiz.keywords
-        .map((keyword) => TextEditingController(text: keyword))
-        .toList();
+    _selectedKeywords = List.from(widget.quiz.keywords);
     _yearController =
         TextEditingController(text: widget.quiz.year?.toString() ?? '');
     _examType = widget.quiz.examType;
+    _isOX = widget.quiz.isOX;
   }
 
   @override
@@ -67,9 +69,6 @@ class _EditQuizPageState extends State<EditQuizPage> {
       controller.dispose();
     }
     _explanationController.dispose();
-    for (var controller in _keywordControllers) {
-      controller.dispose();
-    }
     _yearController.dispose();
     _logger.i('EditQuizPage disposed');
     super.dispose();
@@ -100,7 +99,12 @@ class _EditQuizPageState extends State<EditQuizPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               KeywordFields(
-                controllers: _keywordControllers,
+                initialKeywords: _selectedKeywords,
+                onKeywordsChanged: (keywords) {
+                  setState(() {
+                    _selectedKeywords = keywords;
+                  });
+                },
                 logger: _logger,
               ),
               const SizedBox(height: 16),
@@ -113,6 +117,28 @@ class _EditQuizPageState extends State<EditQuizPage> {
                 logger: _logger,
               ),
               const SizedBox(height: 16),
+              OXToggleButton(
+                initialValue: _isOX,
+                onChanged: (bool value) {
+                  setState(() {
+                    _isOX = value;
+                    if (_isOX) {
+                      _optionControllers.clear();
+                      _optionControllers.addAll([
+                        TextEditingController(text: 'O'),
+                        TextEditingController(text: 'X'),
+                      ]);
+                    } else {
+                      _optionControllers.clear();
+                      _optionControllers.addAll(
+                        List.generate(4, (_) => TextEditingController()),
+                      );
+                    }
+                    _correctOptionIndex = 0;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
               OptionFields(
                 controllers: _optionControllers,
                 correctOptionIndex: _correctOptionIndex,
@@ -122,6 +148,7 @@ class _EditQuizPageState extends State<EditQuizPage> {
                   });
                 },
                 logger: _logger,
+                isOX: _isOX,
               ),
               const SizedBox(height: 16),
               MarkdownField(
@@ -195,15 +222,13 @@ class _EditQuizPageState extends State<EditQuizPage> {
           correctOptionIndex: _correctOptionIndex,
           explanation: _explanationController.text,
           typeId: widget.quiz.typeId,
-          keywords: _keywordControllers
-              .map((c) => c.text.trim())
-              .where((keyword) => keyword.isNotEmpty)
-              .toList(),
+          keywords: _selectedKeywords,
           imageUrl: widget.quiz.imageUrl,
           year: _yearController.text.isNotEmpty
               ? int.parse(_yearController.text)
               : null,
           examType: _examType,
+          isOX: _isOX,
         );
         await _quizService.updateQuiz(
             widget.subjectId, widget.quizTypeId, updatedQuiz);

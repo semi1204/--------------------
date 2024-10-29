@@ -1,19 +1,25 @@
-// anki_algorithm.dart
-import 'dart:math';
-import 'package:logger/logger.dart';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-
-final _logger = Logger(
-  printer: PrettyPrinter(),
-  level:
-      kDebugMode ? Level.debug : Level.error, // Adjust log level based on build
-);
+import 'package:logger/logger.dart';
 
 class AnkiAlgorithm {
-  static const int initialInterval =
-      kDebugMode ? 1 : 1440; // 디버그 모드: 1분, 실제 모드: 1일(1440분)
-  static const double defaultEaseFactor = 2.5; // 기본 용이성 계수
-  static const double _minEaseFactor = 1.3; // 최소 용이성 계수
+  static const int initialInterval = kDebugMode ? 1 : 1440; // 디버그: 1분, 실제: 1일
+  static final Logger _logger = Logger();
+
+  // Modified: Make _targetRetention configurable
+  static double _targetRetention = 0.9; // Default target retention
+
+  // Add getter and setter for targetRetention
+  static double get targetRetention => _targetRetention;
+  static set targetRetention(double value) {
+    _targetRetention =
+        value.clamp(0.7, 0.95); // Limit range between 70% and 95%
+  }
+
+  // FSRS 파라미터
+  static const double _minStability = 1.0; // 최소 안정도
+  static const double _minDifficulty = 0.1; // 최소 난이도
+  static const double _maxDifficulty = 1.0; // 최대 난이도
 
   static Map<String, dynamic> calculateNextReview({
     required int interval,
@@ -24,183 +30,132 @@ class AnkiAlgorithm {
     int? mistakeCount,
     bool isUnderstandingImproved = false,
     required bool markForReview,
-    double? reviewPeriodMultiplier, // 사용자가 설정한 복습주기 계수 (기본값: 1.0)
   }) {
-    easeFactor ??= defaultEaseFactor;
-    reviewPeriodMultiplier ??= 1.0; // 기본값 설정
-    _logger.i('복습 계산 시작: interval=$interval, easeFactor=$easeFactor, ...');
+    double currentStability = interval.toDouble();
+    double currentDifficulty =
+        _convertEaseFactorToDifficulty(easeFactor ?? 2.5);
 
+    _logger.i(
+        'FSRS 계산 시작: stability=$currentStability, difficulty=$currentDifficulty');
+
+    // 응답 품질 계산 (1-5)
+    int responseQuality = qualityOfRecall ?? (isCorrect ? 4 : 1);
+
+    // 난이도 업데이트
+    double newDifficulty = _updateDifficulty(currentDifficulty, responseQuality,
+        isUnderstandingImproved, consecutiveCorrect);
+
+    // 안정도 업데이트
+    double newStability = _updateStability(currentStability, isCorrect,
+        newDifficulty, consecutiveCorrect, isUnderstandingImproved);
+
+    // 다음 복습 간격 계산
+    int newInterval = _calculateNextInterval(newStability);
+
+    _logger.d('''FSRS 계산 결과:
+      난이도: $currentDifficulty → $newDifficulty
+      안정도: $currentStability → $newStability
+      간격: $interval → $newInterval''');
+
+    return {
+      'interval': newInterval,
+      'easeFactor': _convertDifficultyToEaseFactor(newDifficulty),
+      'consecutiveCorrect': isCorrect ? consecutiveCorrect + 1 : 0,
+      'mistakeCount': _updateMistakeCount(
+          mistakeCount ?? 0, isCorrect, isUnderstandingImproved),
+    };
+  }
+
+  static double _updateDifficulty(
+    double currentDifficulty,
+    int responseQuality,
+    bool isUnderstandingImproved,
+    int consecutiveCorrect,
+  ) {
+    double delta = 0.1 * (responseQuality - 3);
+
+    // 연속 정���에 따른 난이도 감소
+    if (consecutiveCorrect > 0) {
+      delta -= 0.02 * consecutiveCorrect;
+    }
+
+    // 이해도 향상에 따른 추가 난이도 감소
     if (isUnderstandingImproved) {
-      return _handleImprovedUnderstanding(
-          interval, easeFactor, consecutiveCorrect, mistakeCount);
+      delta -= 0.05;
     }
 
-    return isCorrect
-        ? _handleCorrectAnswer(interval, easeFactor, consecutiveCorrect,
-            qualityOfRecall, mistakeCount, isUnderstandingImproved)
-        : _handleIncorrectAnswer(interval, easeFactor, consecutiveCorrect,
-            mistakeCount, isUnderstandingImproved);
+    return math.max(
+        _minDifficulty, math.min(_maxDifficulty, currentDifficulty - delta));
   }
 
-  static Map<String, dynamic> _handleImprovedUnderstanding(int interval,
-      double easeFactor, int consecutiveCorrect, int? mistakeCount) {
-    _logger.d('이해도 향상 처리 중');
-
-    // 이해도 향상 시 간격 증가를 더 크게 조정
-    int newInterval = (interval * 2.0).round(); // 1.5에서 2.0으로 증가
-    // 이해도 향상 시 용이성 계수 증가를 더 크게 조정
-    double newEaseFactor = min(easeFactor + 0.25, 2.5); // 0.15에서 0.25로 증가
-
-    return {
-      'interval': newInterval,
-      'easeFactor': newEaseFactor,
-      'consecutiveCorrect': consecutiveCorrect + 1,
-      'mistakeCount': max(0, (mistakeCount ?? 0) - 1),
-    };
-  }
-
-  static Map<String, dynamic> _handleIncorrectAnswer(
-      int interval,
-      double easeFactor,
-      int consecutiveCorrect,
-      int? mistakeCount,
-      bool isUnderstandingImproved) {
-    _logger.d('오답 처리 중');
-
-    int newInterval = _calculateNewInterval(
-        interval, isUnderstandingImproved, mistakeCount, consecutiveCorrect,
-        isCorrect: false);
-
-    double newEaseFactor = max(
-        _minEaseFactor,
-        easeFactor -
-            (isUnderstandingImproved ? 0.05 : 0.2) *
-                (mistakeCount ?? 1)); // 0.1에서 0.05로 감소
-
-    return {
-      'interval': newInterval,
-      'easeFactor': newEaseFactor,
-      'consecutiveCorrect': 0,
-      'mistakeCount': (mistakeCount ?? 0) + (isUnderstandingImproved ? 0 : 1),
-    };
-  }
-
-  static Map<String, dynamic> _handleCorrectAnswer(
-      int interval,
-      double easeFactor,
-      int consecutiveCorrect,
-      int? qualityOfRecall,
-      int? mistakeCount,
-      bool isUnderstandingImproved) {
-    _logger.d('정답 처리 중');
-
-    int newInterval = _calculateNewInterval(
-        interval, isUnderstandingImproved, mistakeCount, consecutiveCorrect,
-        isCorrect: true);
-    double newEaseFactor = _calculateNewEaseFactor(
-        easeFactor, qualityOfRecall, mistakeCount, isUnderstandingImproved);
-
-    return {
-      'interval': newInterval,
-      'easeFactor': newEaseFactor,
-      'consecutiveCorrect': consecutiveCorrect + 1,
-      'mistakeCount': max(0, (mistakeCount ?? 0) - 1),
-    };
-  }
-
-  static int _calculateNewInterval(int interval, bool isUnderstandingImproved,
-      int? mistakeCount, int consecutiveCorrect,
-      {bool isCorrect = false}) {
-    // 이해도 향상 시 간격 증가를 더 크게 조정
-    double multiplier;
-
-    if (isCorrect) {
-      if (isUnderstandingImproved) {
-        // Understanding improved intervals: 1d, 4d, 9d, 20d
-        if (consecutiveCorrect == 0) {
-          multiplier = 1.0; // Initial interval
-        } else if (consecutiveCorrect == 1) {
-          multiplier = 4.0; // From 1d to 4d
-        } else if (consecutiveCorrect == 2) {
-          multiplier = 2.25; // From 4d to 9d
-        } else if (consecutiveCorrect == 3) {
-          multiplier = 2.22; // From 9d to 20d
-        } else {
-          multiplier = 2.0; // Subsequent reviews
-        }
-      } else {
-        // Understanding not improved intervals: 1d, 2d, 3d
-        if (consecutiveCorrect == 0) {
-          multiplier = 1.0; // Initial interval
-        } else if (consecutiveCorrect == 1) {
-          multiplier = 2.0; // From 1d to 2d
-        } else if (consecutiveCorrect == 2) {
-          multiplier = 1.5; // From 2d to 3d
-        } else {
-          multiplier = 1.5; // Subsequent reviews
-        }
-      }
-    } else {
-      // Incorrect answers
-      multiplier = isUnderstandingImproved ? 0.8 : 0.5;
+  static double _updateStability(
+    double currentStability,
+    bool isCorrect,
+    double difficulty,
+    int consecutiveCorrect,
+    bool isUnderstandingImproved,
+  ) {
+    if (!isCorrect) {
+      return math.max(_minStability, currentStability * 0.5);
     }
 
-    int newInterval = (interval * multiplier).round();
+    double stabilityIncrease = 1.0 + (1.0 - difficulty);
 
-    // 실수 횟수에 따른 조정
-    if (mistakeCount != null && mistakeCount > 0) {
-      newInterval = (newInterval * (1 - 0.1 * mistakeCount)).round();
+    // 연속 정답 보너스
+    stabilityIncrease *= (1.0 + consecutiveCorrect * 0.1);
+
+    // 이해도 향상 보너스
+    if (isUnderstandingImproved) {
+      stabilityIncrease *= 1.2;
     }
 
-    // 최소 간격 보장
-    return max(kDebugMode ? 1 : 60, newInterval); // 디버그 모드: 1분, 실제 모드: 1시간
+    return currentStability * stabilityIncrease;
   }
 
-  static double _calculateNewEaseFactor(double easeFactor, int? qualityOfRecall,
-      int? mistakeCount, bool isUnderstandingImproved) {
-    _logger.d('새로운 용이성 계수 계산 시작');
+  static int _calculateNextInterval(double stability) {
+    // Calculate interval using the current target retention
+    int interval = (stability * (-math.log(_targetRetention))).round();
+    return math.max(initialInterval, interval);
+  }
 
-    if (qualityOfRecall == null) return easeFactor;
+  static int _updateMistakeCount(
+    int currentMistakes,
+    bool isCorrect,
+    bool isUnderstandingImproved,
+  ) {
+    if (!isCorrect) {
+      return currentMistakes + (isUnderstandingImproved ? 0 : 1);
+    }
+    return math.max(0, currentMistakes - 1);
+  }
 
-    // 이해도 향상 시 용이성 계수 변화를 더 크게 조정
-    double change = 0.15 * (qualityOfRecall - 3); // 0.1에서 0.15로 증가
+  // 기존 ease factor와의 호환성을 위한 변환 메서드
+  static double _convertEaseFactorToDifficulty(double easeFactor) {
+    return math.max(_minDifficulty, math.min(_maxDifficulty, 2.5 - easeFactor));
+  }
 
-    change *= isUnderstandingImproved ? 1.2 : 0.9; // 1.1에서 1.2로 증가
+  static double _convertDifficultyToEaseFactor(double difficulty) {
+    return math.max(1.3, math.min(2.5, 2.5 - difficulty));
+  }
 
-    return max(
-        _minEaseFactor,
-        easeFactor +
-            change -
-            (mistakeCount ?? 0) * 0.05 +
-            (isUnderstandingImproved ? 0.1 : 0)); // 0.05에서 0.1로 증가
+  // 기존 메서드 유지 (호환성)
+  static DateTime calculateNextReviewDate(int interval, double multiplier) {
+    return DateTime.now()
+        .add(Duration(minutes: (interval * multiplier).round()));
   }
 
   static int evaluateRecallQuality(Duration answerTime, bool isCorrect) {
-    _logger.d('회상 품질 평가: answerTime=$answerTime, isCorrect=$isCorrect');
+    if (!isCorrect) return 1;
 
-    if (!isCorrect) return 0;
-
-    if (kDebugMode) {
-      if (answerTime.inSeconds < 10) return 5;
-      if (answerTime.inSeconds < 20) return 4;
-      if (answerTime.inSeconds < 30) return 3;
-      return 2;
-    } else {
-      if (answerTime.inSeconds < 60) return 5;
-      if (answerTime.inSeconds < 180) return 4;
-      if (answerTime.inSeconds < 600) return 3;
-      return 2;
-    }
+    final seconds = answerTime.inSeconds;
+    if (seconds < 3) return 5;
+    if (seconds < 10) return 4;
+    if (seconds < 20) return 3;
+    return 2;
   }
 
-  // 다음 복습 날짜를 계산하는 메소드입니다. 주어진 간격에 따라 다음 복습 날짜를 반환합니다.
-  static DateTime calculateNextReviewDate(
-      int interval, double reviewPeriodMultiplier) {
-    // 로그를 통해 현재 간격을 기록합니다.
-    _logger.d(
-        '다음 복습 날짜 계산: interval=$interval, reviewPeriodMultiplier=$reviewPeriodMultiplier');
-    // 마지막 복습 날짜에 주어진 간격(분)을 더하여 다음 복습 날짜를 계산합니다.
-    return DateTime.now()
-        .add(Duration(minutes: (interval * reviewPeriodMultiplier).round()));
+  static double calculateIntervalForRetention(double days, double retention) {
+    // Calculate interval using the current target retention
+    return days * (-math.log(retention));
   }
 }

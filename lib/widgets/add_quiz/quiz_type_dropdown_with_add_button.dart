@@ -10,6 +10,7 @@ class QuizTypeDropdownWithAddButton extends StatelessWidget {
   final String? selectedTypeId;
   final Function(String?) onChanged;
   final VoidCallback onAddPressed;
+  final bool forceRefresh;
 
   const QuizTypeDropdownWithAddButton({
     super.key,
@@ -19,6 +20,7 @@ class QuizTypeDropdownWithAddButton extends StatelessWidget {
     required this.selectedTypeId,
     required this.onChanged,
     required this.onAddPressed,
+    this.forceRefresh = false,
   });
 
   @override
@@ -50,7 +52,11 @@ class QuizTypeDropdownWithAddButton extends StatelessWidget {
                     child: Text(type.name),
                   );
                 }).toList(),
-                onChanged: onChanged,
+                onChanged: (String? value) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    onChanged(value);
+                  });
+                },
                 validator: (value) =>
                     value == null ? 'Please select a quiz type' : null,
               );
@@ -59,7 +65,11 @@ class QuizTypeDropdownWithAddButton extends StatelessWidget {
         ),
         IconButton(
           icon: const Icon(Icons.add),
-          onPressed: onAddPressed,
+          onPressed: () {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              onAddPressed();
+            });
+          },
         ),
       ],
     );

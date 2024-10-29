@@ -7,6 +7,7 @@ import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
 import 'package:nursing_quiz_app_6/services/payment_service.dart'; // Add this import
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
 
 class UserProvider with ChangeNotifier {
   User? _user;
@@ -16,13 +17,27 @@ class UserProvider with ChangeNotifier {
   final QuizService _quizService = QuizService();
   final PaymentService _paymentService = PaymentService(); // Add this line
 
-  double _reviewPeriodMultiplier = 1.0;
-  double get reviewPeriodMultiplier => _reviewPeriodMultiplier;
+  double _targetRetention = 0.9;
+  double get targetRetention => _targetRetention;
 
-  void setReviewPeriodMultiplier(double value) {
-    _reviewPeriodMultiplier = value;
+  void setTargetRetention(double value) {
+    _logger.i('Updating target retention from $_targetRetention to $value');
+    _targetRetention = value;
+    AnkiAlgorithm.targetRetention = value;
     notifyListeners();
-    _saveReviewPeriodMultiplier();
+    _saveTargetRetention();
+  }
+
+  void _loadTargetRetention() async {
+    final prefs = await SharedPreferences.getInstance();
+    _targetRetention = prefs.getDouble('targetRetention') ?? 0.9;
+    AnkiAlgorithm.targetRetention = _targetRetention;
+    notifyListeners();
+  }
+
+  void _saveTargetRetention() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('targetRetention', _targetRetention);
   }
 
   Future<bool> isEmailVerified() async {
@@ -31,17 +46,6 @@ class UserProvider with ChangeNotifier {
 
   Future<void> sendEmailVerification() async {
     await _authService.sendEmailVerification();
-  }
-
-  void _loadReviewPeriodMultiplier() async {
-    final prefs = await SharedPreferences.getInstance();
-    _reviewPeriodMultiplier = prefs.getDouble('reviewPeriodMultiplier') ?? 1.0;
-    notifyListeners();
-  }
-
-  void _saveReviewPeriodMultiplier() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('reviewPeriodMultiplier', _reviewPeriodMultiplier);
   }
 
   User? get user => _user;
@@ -155,7 +159,6 @@ class UserProvider with ChangeNotifier {
       selectedOptionIndex: selectedOptionIndex,
       isUnderstandingImproved: isUnderstandingImproved,
       toggleReviewStatus: toggleReviewStatus,
-      reviewPeriodMultiplier: _reviewPeriodMultiplier,
     );
     // Removed redundant saveUserQuizData call as it's handled within updateUserQuizData
     // await _quizService.saveUserQuizData(_user!.uid);
@@ -192,14 +195,12 @@ class UserProvider with ChangeNotifier {
       _logger.w('사용자 ID가 없습니다. 복습 리스트에서 퀴즈를 제거할 수 없음');
       return;
     }
+
+    // 복습 리스트에서만 제거하고 복습 관련 데이터만 초기화
     await _quizService.removeFromReviewList(
         _user!.uid, subjectId, quizTypeId, quizId);
-    // 복습 데이터 초기화
-    await _quizService.resetUserQuizData(
-        _user!.uid, subjectId, quizTypeId, quizId);
-    notifyListeners();
 
-    // Added: Trigger synchronization after removing from review list
+    notifyListeners();
     await syncUserData();
   }
 
@@ -215,36 +216,46 @@ class UserProvider with ChangeNotifier {
 
   // 복습 리스트에 존재하는 퀴즈의 다음 복습 날짜를 확인하는 메소드
   DateTime? getNextReviewDate(
-      String subjectId, String quizTypeId, String quizId) {
+      String subjectId, String quizTypeId, String quizId,
+      {bool isUnderstandingImproved = true}) {
     if (_user == null) {
       _logger.w('사용자 ID가 없습니다. 다음 복습 날짜 확인할 수 없음');
       return null;
     }
     return _quizService.getNextReviewDate(
-        _user!.uid, subjectId, quizTypeId, quizId);
+        _user!.uid, subjectId, quizTypeId, quizId,
+        isUnderstandingImproved: isUnderstandingImproved);
   }
 
   // 복습 리스트에 존재하는 퀴즈의 다음 복습 날짜를 포맷팅하는 메소드
-  String? formatNextReviewDate(
+  Map<String, String> formatNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
-    //  `getNextReviewDate` 메소드를 호출하여 해당 날짜를 가져옴
-    final nextReviewDate = getNextReviewDate(subjectId, quizTypeId, quizId);
-    //다음 복습 날짜가 설정되지 않았는지 확인
-    if (nextReviewDate == null) {
-      _logger.w('다음 복습 날짜를 포맷팅할 수 없음: 날짜가 설정되지 않았습니다');
-      return null;
-    }
-
     final now = DateTime.now();
-    // 다음 복습 날짜와 현재 날짜의 차이를 계산
-    final difference = nextReviewDate.difference(now);
 
-    if (difference.isNegative) {
-      //차이가 음수인지 확인하여 복습 시간이 경과했는지 판단
-      return '복습시간이 경과했습니다';
+    // 알겠음 버튼을 눌렀을 때의 다음 복습 날짜
+    final nextReviewDateIfUnderstood = getNextReviewDate(
+        subjectId, quizTypeId, quizId,
+        isUnderstandingImproved: true);
+    // 모르겠음 버튼을 눌렀을 때의 다음 복습 날짜
+    final nextReviewDateIfNotUnderstood = getNextReviewDate(
+        subjectId, quizTypeId, quizId,
+        isUnderstandingImproved: false);
+
+    String formatDate(DateTime? date) {
+      if (date == null) {
+        return '날짜가 설정되지 않았습니다';
+      }
+      final difference = date.difference(now);
+      if (difference.isNegative) {
+        return '복습시간이 경과했습니다';
+      }
+      return _formatTimeDifference(difference);
     }
 
-    return _formatTimeDifference(difference);
+    return {
+      'understood': formatDate(nextReviewDateIfUnderstood),
+      'notUnderstood': formatDate(nextReviewDateIfNotUnderstood),
+    };
   }
 
   Map<String, dynamic> getUserQuizData() {
@@ -268,23 +279,6 @@ class UserProvider with ChangeNotifier {
       _logger.e('사용자 퀴즈 데이터 동기화 실패: $e');
       rethrow;
     }
-  }
-
-  // ---DONE : reset버튼을 누르면, 개별적인 퀴즈ID를 초기화 해야함. 지금은 전체 퀴즈를 초기화함. ---------//
-  Future<void> resetUserAnswers(
-      String subjectId, String quizTypeId, String quizId) async {
-    _logger.i('사용자 퀴즈 데이터 초기화: 과목=$subjectId, 퀴즈유형=$quizTypeId, 퀴즈=$quizId');
-    if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 퀴즈 데이터를 초기화할 수 없음');
-      return;
-    }
-    await _quizService.resetUserQuizData(
-        _user!.uid, subjectId, quizTypeId, quizId);
-    _logger.d('사용자 퀴즈 데이터 초기화 완료');
-    // notifyListeners();
-
-    // Added: Trigger synchronization after resetting quiz data
-    await syncUserData();
   }
 
   double getQuizAccuracy(String subjectId, String quizTypeId, String quizId) {
@@ -327,14 +321,13 @@ class UserProvider with ChangeNotifier {
 
   DateTime calculateNextReviewDate(int repetitions, Duration easeFactor) {
     final now = DateTime.now();
-    final intervalDays =
-        (easeFactor.inMinutes * _reviewPeriodMultiplier).round();
+    final intervalDays = (easeFactor.inMinutes * _targetRetention).round();
     return now.add(Duration(minutes: intervalDays));
   }
 
   UserProvider() {
     _loadUserData();
-    _loadReviewPeriodMultiplier();
+    _loadTargetRetention();
   }
 
   /// Counts the number of quizzes reviewed on a specific date for a given subject.

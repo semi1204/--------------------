@@ -31,13 +31,13 @@ class LinkedTitle extends StatelessWidget {
                   if (idx > 0)
                     Text(' > ',
                         style: textStyle ??
-                            getAppTextStyle(context, fontSize: 16)),
+                            getAppTextStyle(context, fontSize: 18)),
                   GestureDetector(
                     onTap: () => onTap(idx),
                     child: Text(
                       title,
                       style:
-                          (textStyle ?? getAppTextStyle(context, fontSize: 16))
+                          (textStyle ?? getAppTextStyle(context, fontSize: 18))
                               .copyWith(
                         fontWeight: idx == titles.length - 1
                             ? FontWeight.bold

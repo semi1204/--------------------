@@ -71,6 +71,31 @@ class MarkdownRenderer extends StatelessWidget {
                 );
               },
             ),
+            // 테이블 처리
+            TableConfig(
+              columnWidths: const {}, // 빈 맵을 사용
+              defaultColumnWidth: const IntrinsicColumnWidth(flex: 1),
+              // 테두리 스타일 추가
+              border: TableBorder.all(
+                color: Theme.of(context)
+                    .dividerColor
+                    .withOpacity(0.5), // 현재 테마의 dividerColor를 50% 투명도로 설정
+                width: 1,
+              ),
+              wrapper: (Widget table) {
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    return ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: constraints.maxWidth,
+                        maxWidth: constraints.maxWidth,
+                      ),
+                      child: table,
+                    );
+                  },
+                );
+              },
+            )
           ],
         );
 
@@ -88,11 +113,18 @@ class MarkdownRenderer extends StatelessWidget {
                 return HtmlNode(e.textContent, scaleFactor, context);
               },
             ),
+            SpanNodeGeneratorWithTag(
+              tag: 'divider',
+              generator: (e, config, visitor) {
+                return DividerNode();
+              },
+            ),
           ],
           inlineSyntaxList: [
             CustomInlineMathSyntax(),
             CustomKoreanFractionSyntax(),
             CustomHtmlSyntax(),
+            CustomDividerSyntax(),
           ],
         );
 
@@ -113,6 +145,11 @@ class MarkdownRenderer extends StatelessWidget {
   }
 
   String _preProcessHtml(String input) {
+    // 구분선 처리를 먼저 수행
+    input = input.replaceAllMapped(
+        RegExp(r'([^\n]*)\n---\s*$', multiLine: true),
+        (Match match) => '${match.group(1)}\n{{divider}}');
+
     // 테이블 처리
     input = _processTables(input);
 
@@ -159,7 +196,7 @@ class MarkdownRenderer extends StatelessWidget {
     int lastEnd = 0;
 
     for (final match in matches) {
-      // 테이 앞부분 처리
+      // 테이블 앞부분 처리
       if (match.start > lastEnd) {
         parts.add(input
             .substring(lastEnd, match.start)
@@ -204,43 +241,69 @@ class HtmlNode extends SpanNode {
       return const TextSpan(text: '\n');
     }
 
-    // {{html}} 태그 제거
+    // {{html}} 태��� 제거
     String processedContent =
         htmlContent.replaceAll('{{html}}', '').replaceAll('{{/html}}', '');
 
     return WidgetSpan(
-      child: HtmlWidget(
-        processedContent,
-        textStyle: TextStyle(fontSize: 16 * scaleFactor),
-        customWidgetBuilder: (dom.Element element) {
-          if (element.localName == 'img') {
-            final String? src = element.attributes['src'];
-            if (src != null) {
-              return NetworkImageWithLoader(
-                imageUrl: src,
-                fit: BoxFit.contain,
-                logger: Logger(),
-                width: MediaQuery.of(context).size.width,
-              );
-            }
-          }
-          return null;
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          return HtmlWidget(
+            processedContent,
+            textStyle: TextStyle(fontSize: 16 * scaleFactor),
+            customWidgetBuilder: (dom.Element element) {
+              if (element.localName == 'img') {
+                final String? src = element.attributes['src'];
+                if (src != null) {
+                  return NetworkImageWithLoader(
+                    imageUrl: src,
+                    fit: BoxFit.contain,
+                    logger: Logger(),
+                    width: constraints.maxWidth,
+                  );
+                }
+              }
+              return null;
+            },
+            customStylesBuilder: (element) {
+              if (element.localName == 'table') {
+                return {
+                  'border-collapse': 'collapse',
+                  'width': '100%',
+                  'max-width': '${constraints.maxWidth}px',
+                };
+              }
+              if (element.localName == 'td' || element.localName == 'th') {
+                return {
+                  'border': '1px solid black',
+                  'padding': '10px',
+                  'white-space': 'pre-wrap',
+                };
+              }
+              return null;
+            },
+            onTapUrl: (url) => false,
+            renderMode: RenderMode.column,
+          );
         },
-        customStylesBuilder: (element) {
-          if (element.localName == 'table') {
-            return {'border-collapse': 'collapse', 'width': '100%'};
-          }
-          if (element.localName == 'td' || element.localName == 'th') {
-            return {
-              'border': '1px solid black',
-              'padding': '8px',
-              'white-space': 'pre-wrap',
-            };
-          }
-          return null;
-        },
-        onTapUrl: (url) => false,
-        renderMode: RenderMode.column,
+      ),
+    );
+  }
+}
+
+class DividerNode extends SpanNode {
+  @override
+  InlineSpan build() {
+    return WidgetSpan(
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 10.0),
+              child: const Divider(color: Colors.grey, thickness: 1),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -303,6 +366,16 @@ class CustomHtmlSyntax extends md.InlineSyntax {
     final htmlContent = match[0]!;
     final element = md.Element.text('html', htmlContent);
     parser.addNode(element);
+    return true;
+  }
+}
+
+class CustomDividerSyntax extends md.InlineSyntax {
+  CustomDividerSyntax() : super(r'\{\{divider\}\}');
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    parser.addNode(md.Element('divider', []));
     return true;
   }
 }

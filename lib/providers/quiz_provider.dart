@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/services/payment_service.dart';
 import '../models/quiz.dart';
 import '../services/quiz_service.dart';
 import 'user_provider.dart';
@@ -10,6 +11,7 @@ class QuizProvider with ChangeNotifier {
   final QuizService _quizService;
   final UserProvider _userProvider;
   final Logger _logger;
+  final PaymentService _paymentService;
 
   List<Quiz> _allQuizzes = [];
   List<Quiz> _filteredQuizzes = [];
@@ -24,7 +26,8 @@ class QuizProvider with ChangeNotifier {
   String? _selectedSubjectId;
   String? _selectedQuizTypeId;
 
-  QuizProvider(this._quizService, this._userProvider, this._logger);
+  QuizProvider(this._quizService, this._userProvider, this._logger,
+      this._paymentService);
 
   List<Quiz> get quizzes => _filteredQuizzes;
   Map<String, int?> get selectedAnswers => _selectedAnswers;
@@ -122,9 +125,20 @@ class QuizProvider with ChangeNotifier {
     _lastScrollIndex = index;
   }
 
-  void selectAnswer(
-      String subjectId, String quizTypeId, String quizId, int answerIndex) {
+  Future<void> selectAnswer(String subjectId, String quizTypeId, String quizId,
+      int answerIndex) async {
+    final paymentService =
+        _paymentService; // Assuming _paymentService is injected in constructor
+    final canAttempt = await paymentService.canAttemptQuiz();
+
+    if (!canAttempt) {
+      _logger.w('User cannot attempt more quizzes without subscription');
+      return;
+    }
+
     _selectedAnswers[quizId] = answerIndex;
+    await paymentService.incrementQuizAttempt();
+
     _userProvider.updateUserQuizData(
       subjectId,
       quizTypeId,

@@ -12,10 +12,10 @@ import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
 class UserProvider with ChangeNotifier {
   User? _user;
   bool _isSubscribed = false; // Add this line
-  final Logger _logger = Logger();
+  final Logger _logger;
   final AuthService _authService = AuthService();
   final QuizService _quizService = QuizService();
-  final PaymentService _paymentService = PaymentService(); // Add this line
+  final PaymentService _paymentService;
 
   double _targetRetention = 0.9;
   double get targetRetention => _targetRetention;
@@ -79,7 +79,7 @@ class UserProvider with ChangeNotifier {
   // Add this method
   Future<void> checkAndUpdateSubscriptionStatus() async {
     if (_user != null) {
-      _isSubscribed = await _paymentService.checkSubscriptionStatus(_user!.uid);
+      _isSubscribed = await _paymentService.checkSubscriptionStatus();
       notifyListeners();
     }
   }
@@ -103,7 +103,7 @@ class UserProvider with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _logger.e('유저의 로그인 상태 확인 실패: $e');
+      _logger.e('유저의 로그인 상태 ��인 실패: $e');
       return false;
     }
   }
@@ -219,7 +219,7 @@ class UserProvider with ChangeNotifier {
       String subjectId, String quizTypeId, String quizId,
       {bool isUnderstandingImproved = true}) {
     if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 다음 복습 날짜 확인할 수 없음');
+      _logger.w('사용자 ID가 없습니��. 다음 복습 날짜 확인할 수 없음');
       return null;
     }
     return _quizService.getNextReviewDate(
@@ -325,10 +325,11 @@ class UserProvider with ChangeNotifier {
     return now.add(Duration(minutes: intervalDays));
   }
 
-  UserProvider() {
-    _loadUserData();
-    _loadTargetRetention();
-  }
+  UserProvider({
+    required PaymentService paymentService,
+    required Logger logger,
+  })  : _paymentService = paymentService,
+        _logger = logger;
 
   /// Counts the number of quizzes reviewed on a specific date for a given subject.
   int getReviewedQuizzesCount(String subjectId, DateTime date) {
@@ -368,5 +369,15 @@ class UserProvider with ChangeNotifier {
       _logger.e('Error during account deletion: $e');
       rethrow;
     }
+  }
+
+  Future<bool> canAttemptQuiz() async {
+    if (_user == null) return false;
+    return await _paymentService.canAttemptQuiz();
+  }
+
+  Future<void> incrementQuizAttempt() async {
+    if (_user == null) return;
+    await _paymentService.incrementQuizAttempt();
   }
 }

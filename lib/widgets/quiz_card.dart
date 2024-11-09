@@ -228,11 +228,19 @@ class _QuizPageCardState extends State<QuizPageCard> {
   }
 
   // 퀴즈카드의 옵션을 선택했을 때 실행되는 함수
-  void _selectOption(int index, UserProvider userProvider) {
-    _logger.i('퀴즈 페이지 카드: 옵션 $index 선택: quizId=${widget.quiz.id}');
+  void _selectOption(int index, UserProvider userProvider) async {
     if (userProvider.user == null) {
       _showLoginPrompt(context);
       return;
+    }
+
+    if (!userProvider.isSubscribed) {
+      final canAttempt = await userProvider.canAttemptQuiz();
+      if (!canAttempt) {
+        _showSubscriptionPrompt(context);
+        return;
+      }
+      await userProvider.incrementQuizAttempt();
     }
 
     if (_selectedOptionIndex == null) {
@@ -257,10 +265,6 @@ class _QuizPageCardState extends State<QuizPageCard> {
       );
 
       widget.onAnswerSelected?.call(index);
-
-      _logger.i('퀴즈 페이지 카드: 유저가 옵션 $index 선택. 정답: $isCorrect.');
-    } else {
-      _logger.i('퀴즈 페이지 카드: 옵션이 이미 선택되었습니다. 새로운 선택을 무시합니다.');
     }
   }
 
@@ -332,8 +336,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                       quiz: widget.quiz,
                       subjectId: widget.subjectId,
                       quizTypeId: widget.quizTypeId,
-                      onResetQuiz:
-                          () {}, // ReviewPageCard에서는 리셋 기능을 제��하지 않습니다.
+                      onResetQuiz: () {}, // ReviewPageCard에서는 리셋 기능을 제하지 않습니다.
                       onReportError: () {
                         showDialog(
                           context: context,

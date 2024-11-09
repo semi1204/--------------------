@@ -22,8 +22,10 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  final paymentService = PaymentService(logger: logger);
+  await paymentService.initialize();
+
   final quizService = QuizService();
-  final paymentService = PaymentService(); // Add this line
 
   runApp(
     MultiProvider(
@@ -31,8 +33,12 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         Provider<Logger>.value(value: logger),
         Provider<AuthService>(create: (_) => AuthService()),
-        Provider<PaymentService>.value(value: paymentService), // Add this line
-        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider<PaymentService>.value(
+            value: paymentService), // Changed this line
+        ChangeNotifierProvider(
+            create: (context) => UserProvider(
+                logger: context.read<Logger>(),
+                paymentService: context.read<PaymentService>())),
         Provider<QuizService>.value(value: quizService),
         ChangeNotifierProvider(create: (_) => SubjectProvider()),
         ChangeNotifierProvider(
@@ -40,12 +46,13 @@ void main() async {
             context.read<QuizService>(),
             context.read<UserProvider>(),
             context.read<Logger>(),
+            context.read<PaymentService>(),
           ),
         ),
         ChangeNotifierProvider(
           create: (context) => ReviewQuizzesProvider(
-            quizService,
-            Logger(),
+            context.read<QuizService>(),
+            context.read<Logger>(),
             context.read<UserProvider>().user?.uid,
           ),
         ),
@@ -69,7 +76,7 @@ class MyApp extends StatelessWidget {
       builder: (context, themeProvider, _) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'Nursing Quiz App',
+          title: '딸깍복습 간호사 국가고시',
           theme: themeProvider.currentTheme,
           home: const AuthWrapper(),
         );

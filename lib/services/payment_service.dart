@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -286,31 +288,95 @@ class PaymentService extends ChangeNotifier {
   }
 
   void showSubscriptionDialog(BuildContext context) {
-    showDialog(
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+
+    showModalBottomSheet(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('구독이 필요합니다'),
-        content: const Column(
+      backgroundColor: themeProvider.currentTheme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('무료로 제공되는 10문제를 모두 사용하셨습니다.'),
-            SizedBox(height: 8),
-            Text('구독하시면 무제한으로 문제를 풀 수 있습니다.'),
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: themeProvider.currentTheme.colorScheme.onSurface
+                    .withOpacity(0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Icon(
+              Icons.lock_outline,
+              size: 48,
+              color: themeProvider.currentTheme.colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '구독이 필요합니다',
+              style: themeProvider.currentTheme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '무료로 제공되는 10문제를 모두 사용하셨습니다.',
+              style: themeProvider.currentTheme.textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '구독하시면 무제한으로 문제를 풀 수 있습니다.',
+              style: themeProvider.currentTheme.textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      '나중에',
+                      style: TextStyle(color: themeProvider.textColor),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: themeProvider.buttonColor,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await navigateToSubscriptionPage(context);
+                    },
+                    child: Text(
+                      '구독하기',
+                      style: TextStyle(
+                        color: themeProvider.currentTheme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('나중에'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await navigateToSubscriptionPage(context);
-            },
-            child: const Text('구독하기'),
-          ),
-        ],
       ),
     );
   }

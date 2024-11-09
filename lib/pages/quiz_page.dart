@@ -333,8 +333,9 @@ class _QuizPageState extends State<QuizPage>
 
   Widget _buildOneByOneView(QuizProvider quizProvider,
       UserProvider userProvider, QuizViewModeProvider viewMode) {
-    if (quizProvider.quizzes.isEmpty)
+    if (quizProvider.quizzes.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox());
+    }
 
     final currentQuiz = quizProvider.quizzes[viewMode.currentIndex];
     final isLastQuiz = viewMode.currentIndex == quizProvider.quizzes.length - 1;

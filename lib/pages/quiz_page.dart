@@ -40,6 +40,7 @@ class _QuizPageState extends State<QuizPage>
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final quizProvider = context.read<QuizProvider>();
+      final viewModeProvider = context.read<QuizViewModeProvider>();
 
       // Set selected subject and quiz type IDs
       quizProvider.setSelectedSubjectId(widget.subject.id);
@@ -55,6 +56,9 @@ class _QuizPageState extends State<QuizPage>
         widget.quizType.id,
       );
       final initialIndex = quizProvider.lastScrollIndex;
+
+      // Set initial index for both view modes
+      viewModeProvider.setCurrentIndex(initialIndex);
 
       // Scroll to the initial index
       await _scrollController.scrollToIndex(
@@ -84,24 +88,27 @@ class _QuizPageState extends State<QuizPage>
               controller: _scrollController,
               slivers: [
                 SliverAppBar(
-                  title: LinkedTitle(
-                    titles: [widget.subject.name, widget.quizType.name],
-                    onTap: (index) {
-                      if (index == 0) {
-                        // Navigate to SubjectPage
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (context) => const SubjectPage(),
-                          ),
-                        );
-                      } else if (index == 1) {
-                        // Navigate back to QuizTypePage
-                        Navigator.of(context).pop();
-                      }
-                      // Reset sort option when navigating
-                      quizProvider.resetSortOption();
-                    },
-                    textStyle: getAppTextStyle(context, fontSize: 16),
+                  title: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: LinkedTitle(
+                      titles: [widget.subject.name, widget.quizType.name],
+                      onTap: (index) {
+                        if (index == 0) {
+                          // Navigate to SubjectPage
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (context) => const SubjectPage(),
+                            ),
+                          );
+                        } else if (index == 1) {
+                          // Navigate back to QuizTypePage
+                          Navigator.of(context).pop();
+                        }
+                        // Reset sort option when navigating
+                        quizProvider.resetSortOption();
+                      },
+                      textStyle: getAppTextStyle(context, fontSize: 16),
+                    ),
                   ),
                   floating: true,
                   snap: true,

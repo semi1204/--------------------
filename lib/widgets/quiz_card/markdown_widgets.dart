@@ -51,10 +51,30 @@ class MarkdownRenderer extends StatelessWidget {
                     fontSize: 10.72 * scaleFactor,
                     fontWeight: FontWeight.bold)),
             ListConfig(
+              marginLeft: 32.0,
+              marginBottom: 8.0,
               marker: (isOrdered, depth, index) {
-                return Text(
-                  isOrdered ? '${index + 1}.' : '•',
-                  style: TextStyle(fontSize: 16 * scaleFactor),
+                return Container(
+                  width: 24,
+                  height: 24,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: isOrdered
+                      ? null
+                      : BoxDecoration(
+                          shape: BoxShape.circle,
+                          color:
+                              Theme.of(context).primaryColor.withOpacity(0.1),
+                        ),
+                  child: Center(
+                    child: Text(
+                      isOrdered ? '${index + 1}.' : '•',
+                      style: TextStyle(
+                        fontSize: 16 * scaleFactor,
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 );
               },
             ),
@@ -95,7 +115,25 @@ class MarkdownRenderer extends StatelessWidget {
                   },
                 );
               },
-            )
+              headerStyle: TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 16 * scaleFactor,
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Colors.black
+                    : Colors.white,
+              ),
+              bodyStyle: TextStyle(
+                fontSize: 16 * scaleFactor,
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Colors.black
+                    : Colors.white,
+              ),
+              headPadding: const EdgeInsets.all(12),
+              bodyPadding: const EdgeInsets.all(12),
+              headerRowDecoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+              ),
+            ),
           ],
         );
 
@@ -119,12 +157,20 @@ class MarkdownRenderer extends StatelessWidget {
                 return DividerNode();
               },
             ),
+            SpanNodeGeneratorWithTag(
+              tag: 'highlight',
+              generator: (e, config, visitor) => HighlightNode(
+                e.textContent,
+                color: Theme.of(context).primaryColor.withOpacity(0.2),
+              ),
+            ),
           ],
           inlineSyntaxList: [
             CustomInlineMathSyntax(),
             CustomKoreanFractionSyntax(),
             CustomHtmlSyntax(),
             CustomDividerSyntax(),
+            CustomHighlightSyntax(),
           ],
         );
 
@@ -136,16 +182,23 @@ class MarkdownRenderer extends StatelessWidget {
           config: config,
         );
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: markdownWidgets,
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: markdownWidgets,
+          ),
         );
       },
     );
   }
 
   String _preProcessHtml(String input) {
-    // 구분선 처리를 먼저 수행
+    input = input.replaceAllMapped(
+      RegExp(r'==(.+?)=='),
+      (match) => '{{highlight}}${match[1]}{{/highlight}}',
+    );
+
     input = input.replaceAllMapped(
         RegExp(r'([^\n]*)\n---\s*$', multiLine: true),
         (Match match) => '${match.group(1)}\n{{divider}}');
@@ -376,6 +429,34 @@ class CustomDividerSyntax extends md.InlineSyntax {
   @override
   bool onMatch(md.InlineParser parser, Match match) {
     parser.addNode(md.Element('divider', []));
+    return true;
+  }
+}
+
+class HighlightNode extends SpanNode {
+  final String text;
+  final Color color;
+
+  HighlightNode(this.text, {required this.color});
+
+  @override
+  InlineSpan build() {
+    return TextSpan(
+      text: text,
+      style: TextStyle(
+        backgroundColor: color,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+}
+
+class CustomHighlightSyntax extends md.InlineSyntax {
+  CustomHighlightSyntax() : super(r'\{\{highlight\}\}(.*?)\{\{/highlight\}\}');
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    parser.addNode(md.Element.text('highlight', match[1]!));
     return true;
   }
 }

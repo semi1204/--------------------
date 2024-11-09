@@ -12,6 +12,11 @@ class QuizViewModeProvider with ChangeNotifier {
     _loadPreference();
   }
 
+  void setCurrentIndex(int index) {
+    _currentIndex = index;
+    notifyListeners();
+  }
+
   Future<void> _loadPreference() async {
     final prefs = await SharedPreferences.getInstance();
     _isOneByOne = prefs.getBool('isOneByOne') ?? false;

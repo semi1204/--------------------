@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
-import 'package:provider/provider.dart';
+import 'package:nursing_quiz_app_6/models/subscription_constants.dart';
+import 'package:nursing_quiz_app_6/widgets/bottom_sheet/subscription_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -19,13 +19,15 @@ class PaymentService extends ChangeNotifier {
 
   static const String _subscriptionEndDateKey = 'subscription_end_date';
   static const String _freeQuizCountKey = 'free_quiz_count';
-  static const String _yearlySubscriptionId =
-      'com.nursingquiz.subscription.yearly';
   static const int maxFreeQuizzes = 10;
 
-  late final SharedPreferences _prefs;
+  SharedPreferences? _prefs;
+
+  // 상품 정보를 저장할 변수 추가
+  List<ProductDetails> _productDetails = [];
 
   Future<void> _initPrefs() async {
+    if (_prefs != null) return;
     _prefs = await SharedPreferences.getInstance();
   }
 
@@ -37,8 +39,22 @@ class PaymentService extends ChangeNotifier {
       return;
     }
 
-    const Set<String> kIds = {_yearlySubscriptionId};
-    await _inAppPurchase.queryProductDetails(kIds);
+    const Set<String> kIds = {
+      'com.example.nursingQuizApp.yearly',
+      'com.example.nursingQuizApp.monthly',
+    };
+
+    // 상품 정보 조회 및 저장
+    final ProductDetailsResponse response =
+        await _inAppPurchase.queryProductDetails(kIds);
+    if (response.error != null) {
+      _logger.e('Error loading products: ${response.error}');
+      return;
+    }
+
+    _productDetails = response.productDetails;
+    _logger.i('Loaded ${_productDetails.length} products');
+
     _purchaseUpdatedSubscription =
         _inAppPurchase.purchaseStream.listen(_handlePurchaseUpdate);
   }
@@ -62,7 +78,7 @@ class PaymentService extends ChangeNotifier {
 
       // 로컬과 서버 상태가 다르면 로컬 상태 업데이트
       if (localStatus != isActiveOnServer) {
-        await _prefs.setInt(
+        await _prefs?.setInt(
           _subscriptionEndDateKey,
           serverEndDate.millisecondsSinceEpoch,
         );
@@ -72,14 +88,14 @@ class PaymentService extends ChangeNotifier {
       return isActiveOnServer;
     } catch (e) {
       _logger.e('Error checking subscription status: $e');
-      return await hasActiveSubscription(); // 서버 체크 실패시 로컬 상태 반환
+      return await hasActiveSubscription();
     }
   }
 
   Future<bool> hasActiveSubscription() async {
     try {
       await _initPrefs();
-      final subscriptionEndDate = _prefs.getInt(_subscriptionEndDateKey);
+      final subscriptionEndDate = _prefs?.getInt(_subscriptionEndDateKey);
 
       if (subscriptionEndDate == null) return false;
 
@@ -95,9 +111,7 @@ class PaymentService extends ChangeNotifier {
     try {
       if (await hasActiveSubscription()) return true;
 
-      final currentCount = _prefs.getInt(_freeQuizCountKey) ?? 0;
-
-      _logger.i('Current quiz attempt count: $currentCount');
+      final currentCount = _prefs?.getInt(_freeQuizCountKey) ?? 0;
       return currentCount < maxFreeQuizzes;
     } catch (e) {
       _logger.e('Error checking quiz attempt availability: $e');
@@ -109,10 +123,10 @@ class PaymentService extends ChangeNotifier {
     try {
       if (await hasActiveSubscription()) return;
 
-      final currentCount = _prefs.getInt(_freeQuizCountKey) ?? 0;
+      final currentCount = _prefs?.getInt(_freeQuizCountKey) ?? 0;
       final newCount = currentCount + 1;
 
-      await _prefs.setInt(_freeQuizCountKey, newCount);
+      await _prefs?.setInt(_freeQuizCountKey, newCount);
       _logger.i('Incremented quiz attempt count to: $newCount');
 
       notifyListeners();
@@ -124,7 +138,7 @@ class PaymentService extends ChangeNotifier {
   Future<int> getRemainingQuizzes() async {
     if (await hasActiveSubscription()) return -1;
 
-    final currentCount = _prefs.getInt(_freeQuizCountKey) ?? 0;
+    final currentCount = _prefs?.getInt(_freeQuizCountKey) ?? 0;
     return maxFreeQuizzes - currentCount;
   }
 
@@ -137,7 +151,6 @@ class PaymentService extends ChangeNotifier {
         _logger.e('Purchase error: ${purchaseDetails.error}');
       } else if (purchaseDetails.status == PurchaseStatus.purchased ||
           purchaseDetails.status == PurchaseStatus.restored) {
-        // Verify the purchase before delivering the product
         final bool valid = await _verifyPurchase(purchaseDetails);
         if (valid) {
           await _updateSubscriptionStatus(purchaseDetails);
@@ -146,7 +159,6 @@ class PaymentService extends ChangeNotifier {
           _logger.e('Purchase verification failed');
         }
 
-        // Complete the purchase regardless of verification result
         if (purchaseDetails.pendingCompletePurchase) {
           await _inAppPurchase.completePurchase(purchaseDetails);
         }
@@ -158,8 +170,6 @@ class PaymentService extends ChangeNotifier {
   }
 
   Future<bool> _verifyPurchase(PurchaseDetails purchaseDetails) async {
-    // TODO: Implement your server-side purchase verification
-    // You should verify the purchase with your backend server
     try {
       final verificationData = purchaseDetails.verificationData;
       final response = await _verifyWithServer(
@@ -180,8 +190,6 @@ class PaymentService extends ChangeNotifier {
     required String source,
   }) async {
     try {
-      // TODO: Implement your server verification logic
-      // This is where you would make an API call to your backend
       final user = _auth.currentUser;
       if (user == null) return false;
 
@@ -192,7 +200,7 @@ class PaymentService extends ChangeNotifier {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      return true; // Return true only after proper verification
+      return true;
     } catch (e) {
       _logger.e('Server verification error: $e');
       return false;
@@ -200,10 +208,14 @@ class PaymentService extends ChangeNotifier {
   }
 
   Future<void> _updateSubscriptionStatus(PurchaseDetails purchase) async {
-    final endDate = DateTime.now().add(const Duration(days: 365));
+    final endDate = DateTime.now().add(
+      purchase.productID == SubscriptionIds.monthlyId
+          ? const Duration(days: 30)
+          : const Duration(days: 365),
+    );
 
     // 로컬 저장
-    await _prefs.setInt(
+    await _prefs?.setInt(
       _subscriptionEndDateKey,
       endDate.millisecondsSinceEpoch,
     );
@@ -214,24 +226,102 @@ class PaymentService extends ChangeNotifier {
       await _firestore.collection('subscriptions').doc(user.uid).set({
         'endDate': Timestamp.fromDate(endDate),
         'purchaseToken': purchase.purchaseID,
+        'productId': purchase.productID,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     }
   }
 
-  Future<void> navigateToSubscriptionPage(BuildContext context) async {
-    _logger.i('Navigating to subscription page');
-    try {
-      final ProductDetails productDetails = await _getSubscriptionProduct();
+  Future<List<SubscriptionPlan>> getSubscriptionPlans() async {
+    if (_productDetails.isEmpty) {
+      _logger.w('No product details available, trying to reload...');
+      await initialize(); // 상품 정보 다시 로드 시도
+    }
 
-      // Show loading indicator
+    List<SubscriptionPlan> plans = [];
+
+    try {
+      final monthlyProduct = _productDetails.firstWhere(
+        (p) => p.id == SubscriptionIds.monthlyId,
+        orElse: () => throw Exception('Monthly subscription product not found'),
+      );
+
+      plans.add(SubscriptionPlan(
+        id: monthlyProduct.id,
+        title: '월간 구독',
+        description: '매월 자동 갱신',
+        price: monthlyProduct.price,
+        period: '월',
+        originalPrice: monthlyProduct.price,
+        savePercent: '0',
+      ));
+
+      final yearlyProduct = _productDetails.firstWhere(
+        (p) => p.id == SubscriptionIds.yearlyId,
+        orElse: () => throw Exception('Yearly subscription product not found'),
+      );
+
+      plans.add(SubscriptionPlan(
+        id: yearlyProduct.id,
+        title: '연간 구독',
+        description: '연간 결제 시 30% 할인',
+        price: yearlyProduct.price,
+        period: '년',
+        originalPrice: monthlyProduct.price,
+        savePercent: '30',
+        isPopular: true,
+      ));
+
+      _logger.i('Created ${plans.length} subscription plans');
+    } catch (e) {
+      _logger.e('Error creating subscription plans: $e');
+    }
+
+    return plans;
+  }
+
+  Future<void> showEnhancedSubscriptionDialog(BuildContext context) async {
+    if (!context.mounted) return;
+
+    _logger.i('Fetching subscription plans...');
+    final plans = await getSubscriptionPlans();
+    _logger.i('Fetched ${plans.length} plans');
+
+    if (plans.isEmpty) {
+      _logger.w('No subscription plans available');
       if (context.mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const Center(child: CircularProgressIndicator()),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('구독 상품을 불러올 수 없습니다.')),
         );
       }
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => SubscriptionBottomSheet(
+        plans: plans,
+        onSubscriptionSelected: _handleSubscription,
+      ),
+    );
+  }
+
+  Future<void> _handleSubscription(
+      BuildContext context, SubscriptionPlan plan) async {
+    try {
+      final ProductDetails productDetails =
+          await _getSubscriptionProduct(plan.id);
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext ctx) =>
+            const Center(child: CircularProgressIndicator()),
+      );
 
       final bool available = await _inAppPurchase.isAvailable();
       if (!available) {
@@ -245,24 +335,20 @@ class PaymentService extends ChangeNotifier {
         ),
       );
 
-      // Hide loading indicator
       if (context.mounted) {
         Navigator.of(context).pop();
       }
-
-      _logger.i('Successfully initiated purchase flow');
     } catch (e) {
       _logger.e('Error initiating purchase: $e');
       if (context.mounted) {
-        Navigator.of(context).pop(); // Hide loading indicator
         showDialog(
           context: context,
-          builder: (_) => AlertDialog(
+          builder: (BuildContext ctx) => AlertDialog(
             title: const Text('구독 오류'),
             content: Text('구독 처리 중 오류가 발생했습니다: ${e.toString()}'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.of(ctx).pop(),
                 child: const Text('확인'),
               ),
             ],
@@ -272,9 +358,9 @@ class PaymentService extends ChangeNotifier {
     }
   }
 
-  Future<ProductDetails> _getSubscriptionProduct() async {
+  Future<ProductDetails> _getSubscriptionProduct(String productId) async {
     final ProductDetailsResponse response =
-        await _inAppPurchase.queryProductDetails({_yearlySubscriptionId});
+        await _inAppPurchase.queryProductDetails({productId});
 
     if (response.notFoundIDs.isNotEmpty) {
       throw Exception('Subscription product not found');
@@ -285,100 +371,6 @@ class PaymentService extends ChangeNotifier {
     }
 
     return response.productDetails.first;
-  }
-
-  void showSubscriptionDialog(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: themeProvider.currentTheme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: themeProvider.currentTheme.colorScheme.onSurface
-                    .withOpacity(0.2),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Icon(
-              Icons.lock_outline,
-              size: 48,
-              color: themeProvider.currentTheme.colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '구독이 필요합니다',
-              style: themeProvider.currentTheme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '무료로 제공되는 10문제를 모두 사용하셨습니다.',
-              style: themeProvider.currentTheme.textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '구독하시면 무제한으로 문제를 풀 수 있습니다.',
-              style: themeProvider.currentTheme.textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(
-                      '나중에',
-                      style: TextStyle(color: themeProvider.textColor),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: themeProvider.buttonColor,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      await navigateToSubscriptionPage(context);
-                    },
-                    child: Text(
-                      '구독하기',
-                      style: TextStyle(
-                        color: themeProvider.currentTheme.colorScheme.onPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override

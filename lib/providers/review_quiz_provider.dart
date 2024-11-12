@@ -147,6 +147,8 @@ class ReviewQuizzesProvider with ChangeNotifier {
     return subject.name;
   }
 
+  // removeQuizFromReview: 현재 화면에 표시되는 퀴즈 목록(_quizzesForReview)에서만 퀴즈를 제거
+  // UI 업데이트용
   void removeQuizFromReview(String quizId) {
     _quizzesForReview.removeWhere((quiz) => quiz.id == quizId);
     notifyListeners();

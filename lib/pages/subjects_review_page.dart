@@ -96,10 +96,11 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
                     ?.toIso8601String() ??
                 DateTime.now().toIso8601String(),
             onFeedbackGiven: (quiz, isUnderstandingImproved) async {
+              provider.removeQuizFromReview(quiz.id);
               _reviewedQuizIds.add(quiz.id);
               await _saveReviewedQuizIds();
               setState(() {});
-            }, // DONE : 복습 카드 제거를 누르면, reviewpage에서 카드가 곧바로 제거
+            },
             onRemoveCard: (quizId) {
               userProvider.removeFromReviewList(
                 provider.selectedSubjectId!,

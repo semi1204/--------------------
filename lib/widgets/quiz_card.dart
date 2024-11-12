@@ -189,17 +189,6 @@ class _QuizPageCardState extends State<QuizPageCard> {
                       question: widget.quiz.question,
                       logger: _logger,
                     ),
-                    const SizedBox(height: 16),
-                    QuizOptions(
-                      quiz: widget.quiz,
-                      selectedOptionIndex: _selectedOptionIndex,
-                      hasAnswered: _hasAnswered,
-                      isQuizPage: widget.isQuizPage,
-                      onSelectOption: (index) {
-                        _selectOption(index, userProvider);
-                      },
-                      logger: _logger,
-                    ),
                     if (_hasAnswered) ...[
                       const SizedBox(height: 16),
                       QuizExplanation(
@@ -212,6 +201,17 @@ class _QuizPageCardState extends State<QuizPageCard> {
                         rebuildTrigger: widget.rebuildExplanation,
                       ),
                     ],
+                    const SizedBox(height: 16),
+                    QuizOptions(
+                      quiz: widget.quiz,
+                      selectedOptionIndex: _selectedOptionIndex,
+                      hasAnswered: _hasAnswered,
+                      isQuizPage: widget.isQuizPage,
+                      onSelectOption: (index) {
+                        _selectOption(index, userProvider);
+                      },
+                      logger: _logger,
+                    ),
                     if (widget.isAdmin)
                       QuizAdminActions(
                         onEdit: widget.onEdit,
@@ -231,6 +231,15 @@ class _QuizPageCardState extends State<QuizPageCard> {
   void _selectOption(int index, UserProvider userProvider) async {
     if (userProvider.user == null) {
       _showLoginPrompt(context);
+      return;
+    }
+
+    if (userProvider.user?.email == ADMIN_EMAIL) {
+      // 관리자는 바로 퀴즈 풀 수 있도록 처리
+      setState(() {
+        _selectedOptionIndex = index;
+        _hasAnswered = true;
+      });
       return;
     }
 
@@ -286,7 +295,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
 
   void _showSubscriptionPrompt(BuildContext context) {
     final paymentService = Provider.of<PaymentService>(context, listen: false);
-    paymentService.showSubscriptionDialog(context);
+    paymentService.showEnhancedSubscriptionDialog(context);
   }
 }
 
@@ -447,7 +456,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                   child: Column(
                     children: [
                       Text(
-                        '어려움 🤔',
+                        '어려움🤔',
                         style: TextStyle(
                           color: textColor,
                           fontWeight: FontWeight.bold,
@@ -474,7 +483,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                   child: Column(
                     children: [
                       Text(
-                        '알겠음 😊',
+                        '알겠음😊',
                         style: TextStyle(
                           color: textColor,
                           fontWeight: FontWeight.bold,

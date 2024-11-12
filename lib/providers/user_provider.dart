@@ -185,7 +185,7 @@ class UserProvider with ChangeNotifier {
     await syncUserData();
   }
 
-  // 복습 리스트에서 퀴즈를 제거하는 메소드
+  // 복습 리스트 Data에서 퀴즈를 제거하는 메소드
   Future<void> removeFromReviewList(
     String subjectId,
     String quizTypeId,

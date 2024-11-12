@@ -72,25 +72,6 @@ class _QuizExplanationState extends State<QuizExplanation> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.keywords.isNotEmpty) ...[
-              const Text(
-                '키워드',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 4.0,
-                runSpacing: 2.0,
-                children: widget.keywords
-                    .map((keyword) => Chip(
-                          label: Text(keyword.content),
-                          onDeleted: () =>
-                              _showKeywordDescription(context, keyword),
-                        ))
-                    .toList(),
-              ),
-              const SizedBox(height: 16),
-            ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -112,10 +93,28 @@ class _QuizExplanationState extends State<QuizExplanation> {
               data: widget.explanation,
               logger: widget.logger,
             ),
-            const SizedBox(height: 16),
-            if (widget.feedbackButtons != null) ...[
-              widget.feedbackButtons!,
+            if (widget.keywords.isNotEmpty) ...[
               const SizedBox(height: 16),
+              const Text(
+                '키워드',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 4.0,
+                runSpacing: 2.0,
+                children: widget.keywords
+                    .map((keyword) => Chip(
+                          label: Text(keyword.content),
+                          onDeleted: () =>
+                              _showKeywordDescription(context, keyword),
+                        ))
+                    .toList(),
+              ),
+            ],
+            if (widget.feedbackButtons != null) ...[
+              const SizedBox(height: 16),
+              widget.feedbackButtons!,
             ],
           ],
         );

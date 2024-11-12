@@ -105,23 +105,36 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
                 ),
                 const SizedBox(height: 40),
                 FilledButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final userProvider =
                         Provider.of<UserProvider>(context, listen: false);
                     if (userProvider.user == null) {
                       _showLoginPrompt(context);
-                    } else {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ChangeNotifierProvider<
-                              ReviewQuizzesProvider>.value(
-                            value: provider,
-                            child: SubjectReviewPage(
-                                subjectId: provider.selectedSubjectId!),
-                          ),
-                        ),
-                      );
+                      return;
                     }
+
+                    final paymentService =
+                        Provider.of<PaymentService>(context, listen: false);
+                    final isSubscribed =
+                        await paymentService.checkSubscriptionStatus();
+
+                    if (!isSubscribed) {
+                      if (!mounted) return;
+                      _showSubscriptionPrompt(context);
+                      return;
+                    }
+
+                    if (!mounted) return;
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ChangeNotifierProvider<ReviewQuizzesProvider>.value(
+                          value: provider,
+                          child: SubjectReviewPage(
+                              subjectId: provider.selectedSubjectId!),
+                        ),
+                      ),
+                    );
                   },
                   style: FilledButton.styleFrom(
                     elevation: 0,
@@ -187,6 +200,6 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
 
   void _showSubscriptionPrompt(BuildContext context) {
     final paymentService = Provider.of<PaymentService>(context, listen: false);
-    paymentService.showSubscriptionDialog(context);
+    paymentService.showEnhancedSubscriptionDialog(context);
   }
 }

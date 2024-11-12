@@ -24,12 +24,15 @@ class QuizOptions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Add key to force rebuild when quiz is reset
-    return Container(
-      key: ValueKey('${quiz.id}_${selectedOptionIndex ?? "none"}'),
-      child: quiz.isOX
-          ? _buildOXOptions()
-          : Column(children: _buildRegularOptions()),
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 300),
+      opacity: hasAnswered ? 0.7 : 1.0,
+      child: Container(
+        key: ValueKey('${quiz.id}_${selectedOptionIndex ?? "none"}'),
+        child: quiz.isOX
+            ? _buildOXOptions()
+            : Column(children: _buildRegularOptions()),
+      ),
     );
   }
 

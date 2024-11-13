@@ -51,7 +51,7 @@ class SubscriptionBottomSheet extends StatelessWidget {
   Widget _buildHeader(ThemeProvider themeProvider) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
+      child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(16),
@@ -66,24 +66,31 @@ class SubscriptionBottomSheet extends StatelessWidget {
               color: themeProvider.currentTheme.colorScheme.primary,
             ),
           ),
-          const SizedBox(height: 24),
-          Text(
-            '프리미엄 구독',
-            style:
-                themeProvider.currentTheme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '프리미엄 구독',
+                  style: themeProvider.currentTheme.textTheme.headlineMedium
+                      ?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '무제한으로 모든 기능을 이용하세요',
+                  style:
+                      themeProvider.currentTheme.textTheme.titleLarge?.copyWith(
+                    color: themeProvider.currentTheme.colorScheme.onSurface
+                        .withOpacity(0.8),
+                    height: 1.4,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '무제한으로 모든 기능을 이용하세요',
-            style: themeProvider.currentTheme.textTheme.titleLarge?.copyWith(
-              color: themeProvider.currentTheme.colorScheme.onSurface
-                  .withOpacity(0.8),
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -132,7 +139,7 @@ class SubscriptionBottomSheet extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Text(
-        '구독은 선택한 기간이 종료되면 자동으로 갱신되며, 해지하지 않으면 동일한 가격으로 자동 결제됩니다. 언제든지 설정에서 구독을 관리할 수 있습니다.',
+        '구독은 선택한 기간이 종료되면 자동으로 갱신되며,\n해지하지 않으면 동일한 가격으로 자동 결제됩니다.\n언제든지 AppStore 설정에서 구독을 관리할 수 있습니다.',
         style: themeProvider.currentTheme.textTheme.bodySmall?.copyWith(
           color:
               themeProvider.currentTheme.colorScheme.onSurface.withOpacity(0.6),
@@ -220,6 +227,40 @@ class _SubscriptionCard extends StatelessWidget {
                                   .withOpacity(0.6),
                             ),
                           ),
+                          const SizedBox(height: 8),
+                          if (plan.id == SubscriptionIds.yearlyId)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: themeProvider
+                                    .currentTheme.colorScheme.primary
+                                    .withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.timer_outlined,
+                                    size: 16,
+                                    color: themeProvider
+                                        .currentTheme.colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '3일 무료 체험 후 결제',
+                                    style: themeProvider
+                                        .currentTheme.textTheme.bodySmall
+                                        ?.copyWith(
+                                      color: themeProvider
+                                          .currentTheme.colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ),

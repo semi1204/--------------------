@@ -263,7 +263,7 @@ class PaymentService extends ChangeNotifier {
       plans.add(SubscriptionPlan(
         id: monthlyProduct.id,
         title: '월간 구독',
-        description: '매월 자동 갱신',
+        description: '매월 결제 갱신',
         price: monthlyProduct.price,
         period: '월',
         originalPrice: monthlyProduct.price,
@@ -278,7 +278,7 @@ class PaymentService extends ChangeNotifier {
       plans.add(SubscriptionPlan(
         id: yearlyProduct.id,
         title: '연간 구독',
-        description: '연간 결제 시 70%% 할인',
+        description: '연간 결제 시 70% 할인',
         price: yearlyProduct.price,
         period: '년',
         originalPrice: monthlyProduct.price,

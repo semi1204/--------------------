@@ -122,7 +122,7 @@ class SubscriptionBottomSheet extends StatelessWidget {
           const _FeatureItem(text: '무제한 퀴즈 풀이'),
           const _FeatureItem(text: '모든 카테고리 접근'),
           const _FeatureItem(text: '상세한 해설'),
-          const _FeatureItem(text: '성적 분석 리포트'),
+          const _FeatureItem(text: 'AI 맞춤형 복습'),
         ],
       ),
     );

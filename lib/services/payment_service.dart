@@ -7,6 +7,7 @@ import 'package:logger/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+import 'package:in_app_review/in_app_review.dart';
 
 class PaymentService extends ChangeNotifier {
   PaymentService({required Logger logger}) : _logger = logger;
@@ -128,6 +129,19 @@ class PaymentService extends ChangeNotifier {
 
       await _prefs?.setInt(_freeQuizCountKey, newCount);
       _logger.i('Incremented quiz attempt count to: $newCount');
+
+      // 10번째 퀴즈 시도시 리뷰 요청
+      if (newCount == maxFreeQuizzes) {
+        try {
+          final InAppReview inAppReview = InAppReview.instance;
+          if (await inAppReview.isAvailable()) {
+            _logger.i('Requesting app review after max free quizzes');
+            await inAppReview.requestReview();
+          }
+        } catch (e) {
+          _logger.e('Error requesting app review: $e');
+        }
+      }
 
       notifyListeners();
     } catch (e) {
@@ -264,11 +278,11 @@ class PaymentService extends ChangeNotifier {
       plans.add(SubscriptionPlan(
         id: yearlyProduct.id,
         title: '연간 구독',
-        description: '연간 결제 시 30% 할인',
+        description: '연간 결제 시 70%% 할인',
         price: yearlyProduct.price,
         period: '년',
         originalPrice: monthlyProduct.price,
-        savePercent: '30',
+        savePercent: '70%',
         isPopular: true,
       ));
 

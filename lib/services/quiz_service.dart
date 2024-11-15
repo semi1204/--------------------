@@ -10,6 +10,7 @@ import 'dart:convert';
 import '../utils/anki_algorithm.dart';
 import 'dart:async';
 import 'keyword_service.dart';
+import 'dart:math' as math;
 
 // TODO : 무조건 firebase에서 데이터 파싱하지 말고, 로컬스토리지에서 가져오도록 수정해야함
 // TODO : 로컬스토리지에서 가져오는 방법 찾아보기
@@ -194,7 +195,8 @@ class QuizService {
         markForReview: true,
       );
 
-      quizData.interval = ankiResult['interval'] as int;
+      quizData.interval =
+          math.min(AnkiAlgorithm.maxInterval, ankiResult['interval'] as int);
       quizData.easeFactor = ankiResult['easeFactor'] as double;
       quizData.consecutiveCorrect = ankiResult['consecutiveCorrect'] as int;
       quizData.mistakeCount = ankiResult['mistakeCount'] as int;

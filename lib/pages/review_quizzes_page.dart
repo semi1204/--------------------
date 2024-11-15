@@ -105,37 +105,7 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
                 ),
                 const SizedBox(height: 40),
                 FilledButton(
-                  onPressed: () async {
-                    final userProvider =
-                        Provider.of<UserProvider>(context, listen: false);
-                    if (userProvider.user == null) {
-                      _showLoginPrompt(context);
-                      return;
-                    }
-
-                    final paymentService =
-                        Provider.of<PaymentService>(context, listen: false);
-                    final isSubscribed =
-                        await paymentService.checkSubscriptionStatus();
-
-                    if (!isSubscribed) {
-                      if (!mounted) return;
-                      _showSubscriptionPrompt(context);
-                      return;
-                    }
-
-                    if (!mounted) return;
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ChangeNotifierProvider<ReviewQuizzesProvider>.value(
-                          value: provider,
-                          child: SubjectReviewPage(
-                              subjectId: provider.selectedSubjectId!),
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: () => _handleReviewStart(context, provider),
                   style: FilledButton.styleFrom(
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -198,8 +168,52 @@ class _ReviewQuizzesPageContentState extends State<_ReviewQuizzesPageContent> {
     );
   }
 
-  void _showSubscriptionPrompt(BuildContext context) {
+  // 구독 상태 확인 후 구독 다이얼로그 표시
+  void _showSubscriptionPrompt(BuildContext context) async {
     final paymentService = Provider.of<PaymentService>(context, listen: false);
-    paymentService.showEnhancedSubscriptionDialog(context);
+    // 구독 상태 확인
+    final isSubscribed = await paymentService.checkSubscriptionStatus();
+
+    // 구독 상태가 아니면 구독 다이얼로그 표시
+    if (!isSubscribed && mounted) {
+      paymentService.showEnhancedSubscriptionDialog(context);
+    }
+  }
+
+  void _handleReviewStart(
+      BuildContext context, ReviewQuizzesProvider provider) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final logger = Provider.of<Logger>(context, listen: false);
+    // 1. 로그인 여부 확인
+    if (userProvider.user == null) {
+      _showLoginPrompt(context);
+      return;
+    }
+
+    logger.d('Checking access for user: ${userProvider.user?.email}');
+
+    // 2. 구독 상태 확인
+    final paymentService = Provider.of<PaymentService>(context, listen: false);
+    final hasAccess = await paymentService.checkSubscriptionStatus();
+
+    logger.d('Access check result: $hasAccess');
+
+    // 3. 구독 상태가 아니면 구독 다이얼로그 표시
+    if (!hasAccess) {
+      if (!mounted) return;
+      _showSubscriptionPrompt(context);
+      return;
+    }
+
+    // 4. 구독 상태가 맞으면 복습 페이지로 이동
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChangeNotifierProvider<ReviewQuizzesProvider>.value(
+          value: provider,
+          child: SubjectReviewPage(subjectId: provider.selectedSubjectId!),
+        ),
+      ),
+    );
   }
 }

@@ -21,6 +21,9 @@ class AnkiAlgorithm {
   static const double _minDifficulty = 0.1; // 최소 난이도
   static const double _maxDifficulty = 1.0; // 최대 난이도
 
+  // 최대 복습 간격을 45일(64800분)로 제한하는 상수 추가
+  static const int maxInterval = kDebugMode ? 45 : 64800; // 디버그: 45분, 실제: 45일
+
   static Map<String, dynamic> calculateNextReview({
     required int interval,
     double? easeFactor,
@@ -74,7 +77,7 @@ class AnkiAlgorithm {
   ) {
     double delta = 0.1 * (responseQuality - 3);
 
-    // 연속 정���에 따른 난이도 감소
+    // 연속 정답에 따른 난이도 감소
     if (consecutiveCorrect > 0) {
       delta -= 0.02 * consecutiveCorrect;
     }
@@ -115,7 +118,8 @@ class AnkiAlgorithm {
   static int _calculateNextInterval(double stability) {
     // Calculate interval using the current target retention
     int interval = (stability * (-math.log(_targetRetention))).round();
-    return math.max(initialInterval, interval);
+    // 최소값과 최대값 사이로 제한
+    return math.max(initialInterval, math.min(maxInterval, interval));
   }
 
   static int _updateMistakeCount(

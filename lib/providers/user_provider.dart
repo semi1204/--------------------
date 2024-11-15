@@ -8,6 +8,7 @@ import 'package:nursing_quiz_app_6/services/quiz_service.dart';
 import 'package:nursing_quiz_app_6/services/payment_service.dart'; // Add this import
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
+import 'dart:math' as math;
 
 class UserProvider with ChangeNotifier {
   User? _user;
@@ -319,9 +320,11 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+// calculateNextReviewDate 메소드 수정
   DateTime calculateNextReviewDate(int repetitions, Duration easeFactor) {
     final now = DateTime.now();
-    final intervalDays = (easeFactor.inMinutes * _targetRetention).round();
+    final intervalDays =
+        math.min(45, (easeFactor.inMinutes * _targetRetention).round());
     return now.add(Duration(minutes: intervalDays));
   }
 

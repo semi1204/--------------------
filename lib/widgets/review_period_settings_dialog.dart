@@ -3,7 +3,7 @@ import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/user_provider.dart';
-import '../providers/theme_provider.dart'; // 추가
+import '../providers/theme_provider.dart';
 
 class ReviewPeriodSettingsDialog extends StatefulWidget {
   const ReviewPeriodSettingsDialog({super.key});
@@ -16,6 +16,7 @@ class ReviewPeriodSettingsDialog extends StatefulWidget {
 class _ReviewPeriodSettingsDialogState
     extends State<ReviewPeriodSettingsDialog> {
   late double _targetRetention;
+  final List<int> reviewDays = [1, 3, 7, 15];
 
   @override
   void initState() {
@@ -25,9 +26,7 @@ class _ReviewPeriodSettingsDialogState
   }
 
   List<FlSpot> _generateReviewPoints(double retention) {
-    List<int> reviewDays = [1, 3, 7, 15];
     return reviewDays.asMap().entries.map((entry) {
-      // AnkiAlgorithm의 로직을 직접 사용하는 것이 더 일관성 있을 수 있음
       double interval = AnkiAlgorithm.calculateIntervalForRetention(
           entry.value.toDouble(), retention);
       return FlSpot(entry.key.toDouble(), interval);
@@ -37,6 +36,8 @@ class _ReviewPeriodSettingsDialogState
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final points = _generateReviewPoints(_targetRetention);
+    final maxY = points.map((p) => p.y).reduce((a, b) => a > b ? a : b);
 
     return AlertDialog(
       backgroundColor: themeProvider.currentTheme.dialogBackgroundColor,
@@ -46,6 +47,15 @@ class _ReviewPeriodSettingsDialogState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Text(
+              '복습 간격 증가 추이',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: themeProvider.textColor,
+              ),
+            ),
+            const SizedBox(height: 10),
             SizedBox(
               height: 300,
               width: 350,
@@ -54,7 +64,7 @@ class _ReviewPeriodSettingsDialogState
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval: 5,
+                    horizontalInterval: maxY / 6,
                     getDrawingHorizontalLine: (value) {
                       return FlLine(
                         color: themeProvider.isDarkMode
@@ -67,18 +77,24 @@ class _ReviewPeriodSettingsDialogState
                   titlesData: FlTitlesData(
                     show: true,
                     bottomTitles: AxisTitles(
+                      axisNameWidget: Text(
+                        '복습 날짜',
+                        style: TextStyle(
+                          color: themeProvider.textColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 30,
                         interval: 1,
                         getTitlesWidget: (value, meta) {
-                          List<int> reviewDays = [1, 3, 7, 15];
                           int index = value.toInt();
                           if (index >= 0 && index < reviewDays.length) {
                             return Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
-                                '${index + 1}회차',
+                                '${reviewDays[index]}일',
                                 style: TextStyle(
                                   color: themeProvider.textColor,
                                   fontWeight: FontWeight.bold,
@@ -92,10 +108,17 @@ class _ReviewPeriodSettingsDialogState
                       ),
                     ),
                     leftTitles: AxisTitles(
+                      axisNameWidget: Text(
+                        '복습 간격(일)',
+                        style: TextStyle(
+                          color: themeProvider.textColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 40,
-                        interval: 5,
+                        interval: maxY / 6,
                         getTitlesWidget: (value, meta) {
                           return Text(
                             '${value.toInt()}일',
@@ -122,12 +145,12 @@ class _ReviewPeriodSettingsDialogState
                   minX: 0,
                   maxX: 3,
                   minY: 0,
-                  maxY: 30,
+                  maxY: maxY * 1.1,
                   lineBarsData: [
                     LineChartBarData(
-                      spots: _generateReviewPoints(_targetRetention),
+                      spots: points,
                       isCurved: true,
-                      curveSmoothness: 0.35,
+                      curveSmoothness: 0.5,
                       gradient: const LinearGradient(
                         colors: [Color(0xff23b6e6), Color(0xff02d39a)],
                       ),
@@ -153,8 +176,29 @@ class _ReviewPeriodSettingsDialogState
                           ],
                         ),
                       ),
+                      showingIndicators:
+                          List.generate(points.length, (index) => index),
                     ),
                   ],
+                  lineTouchData: LineTouchData(
+                    enabled: true,
+                    touchTooltipData: LineTouchTooltipData(
+                      tooltipRoundedRadius: 8,
+                      tooltipPadding: const EdgeInsets.all(8),
+                      tooltipMargin: 8,
+                      getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          return LineTooltipItem(
+                            '${spot.y.toStringAsFixed(1)}일',
+                            const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          );
+                        }).toList();
+                      },
+                    ),
+                  ),
                 ),
               ),
             ),

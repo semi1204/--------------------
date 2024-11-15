@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:nursing_quiz_app_6/models/subscription_constants.dart';
+import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'package:nursing_quiz_app_6/widgets/bottom_sheet/subscription_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
@@ -62,19 +63,29 @@ class PaymentService extends ChangeNotifier {
 
   Future<bool> checkSubscriptionStatus() async {
     try {
+      // 유저 정보 가져오기
       final user = _auth.currentUser;
       if (user == null) return false;
+      // admin 상태 로그 출력
+      _logger.d('Checking admin status for user: ${user.email}');
 
-      // 로컬 체크
+      // 이메일로 admin 체크
+      if (user.email == ADMIN_EMAIL) {
+        _logger.i('User is admin - granting access');
+        return true;
+      }
+
+      // 로컬 상태 확인
       final localStatus = await hasActiveSubscription();
-
-      // 서버 체크
+      // firestore에서 유저 정보 가져오기
       final doc =
           await _firestore.collection('subscriptions').doc(user.uid).get();
-
+      // firestore에서 유저 정보가 없으면 로컬 상태 반환
       if (!doc.exists) return localStatus;
 
+      // firestore에서 유저 정보 가져오기
       final serverEndDate = (doc.data()?['endDate'] as Timestamp).toDate();
+      // firestore에서 유저 정보가 있으면 서버 상태 확인
       final isActiveOnServer = DateTime.now().isBefore(serverEndDate);
 
       // 로컬과 서버 상태가 다르면 로컬 상태 업데이트

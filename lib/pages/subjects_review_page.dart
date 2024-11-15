@@ -78,40 +78,47 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
       delegate: SliverChildBuilderDelegate(
         (context, index) {
           final quiz = provider.quizzesForReview[index];
-          return ReviewPageCard(
-            key: ValueKey(quiz.id),
-            quiz: quiz,
-            isAdmin: userProvider.isAdmin,
-            questionNumber: index + 1,
-            onAnswerSelected: (answerIndex) => _handleAnswerSelected(
-                quiz, answerIndex, provider, userProvider),
-            subjectId: provider.selectedSubjectId!,
-            quizTypeId: quiz.typeId,
-            nextReviewDate: userProvider
-                    .getNextReviewDate(
-                      provider.selectedSubjectId!,
-                      quiz.typeId,
-                      quiz.id,
-                    )
-                    ?.toIso8601String() ??
-                DateTime.now().toIso8601String(),
-            onFeedbackGiven: (quiz, isUnderstandingImproved) async {
-              provider.removeQuizFromReview(quiz.id);
-              _reviewedQuizIds.add(quiz.id);
-              await _saveReviewedQuizIds();
-              setState(() {});
-            },
-            onRemoveCard: (quizId) {
-              userProvider.removeFromReviewList(
-                provider.selectedSubjectId!,
-                quiz.typeId,
-                quizId,
-              );
-              provider.removeQuizFromReview(quizId);
-              _reviewedQuizIds.add(quizId);
-              _saveReviewedQuizIds();
-              setState(() {});
-            },
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 800,
+              ),
+              child: ReviewPageCard(
+                key: ValueKey(quiz.id),
+                quiz: quiz,
+                isAdmin: userProvider.isAdmin,
+                questionNumber: index + 1,
+                onAnswerSelected: (answerIndex) => _handleAnswerSelected(
+                    quiz, answerIndex, provider, userProvider),
+                subjectId: provider.selectedSubjectId!,
+                quizTypeId: quiz.typeId,
+                nextReviewDate: userProvider
+                        .getNextReviewDate(
+                          provider.selectedSubjectId!,
+                          quiz.typeId,
+                          quiz.id,
+                        )
+                        ?.toIso8601String() ??
+                    DateTime.now().toIso8601String(),
+                onFeedbackGiven: (quiz, isUnderstandingImproved) async {
+                  provider.removeQuizFromReview(quiz.id);
+                  _reviewedQuizIds.add(quiz.id);
+                  await _saveReviewedQuizIds();
+                  setState(() {});
+                },
+                onRemoveCard: (quizId) {
+                  userProvider.removeFromReviewList(
+                    provider.selectedSubjectId!,
+                    quiz.typeId,
+                    quizId,
+                  );
+                  provider.removeQuizFromReview(quizId);
+                  _reviewedQuizIds.add(quizId);
+                  _saveReviewedQuizIds();
+                  setState(() {});
+                },
+              ),
+            ),
           );
         },
         childCount: provider.quizzesForReview.length,

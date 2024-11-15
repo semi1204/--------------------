@@ -353,72 +353,79 @@ class _QuizPageState extends State<QuizPage>
           key: ObjectKey('${currentQuiz.id}_${viewMode.currentIndex}'),
           controller: _scrollController,
           index: viewMode.currentIndex,
-          child: Column(
-            children: [
-              QuizPageCard(
-                key: ObjectKey(currentQuiz.id),
-                quiz: currentQuiz,
-                questionNumber: viewMode.currentIndex + 1,
-                isAdmin: userProvider.isAdmin,
-                onEdit: () => _editQuiz(currentQuiz),
-                onDelete: () => _deleteQuiz(currentQuiz),
-                onAnswerSelected: (answerIndex) =>
-                    _selectAnswer(quizProvider, currentQuiz.id, answerIndex),
-                onResetQuiz: () => _resetQuiz(quizProvider, currentQuiz.id),
-                subjectId: widget.subject.id,
-                quizTypeId: widget.quizType.id,
-                selectedOptionIndex:
-                    quizProvider.selectedAnswers[currentQuiz.id],
-                isQuizPage: true,
-                nextReviewDate: userProvider
-                        .getNextReviewDate(
-                          widget.subject.id,
-                          widget.quizType.id,
-                          currentQuiz.id,
-                        )
-                        ?.toIso8601String() ??
-                    DateTime.now().toIso8601String(),
-                rebuildExplanation: quizProvider.rebuildExplanation,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 800,
               ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: viewMode.currentIndex > 0
-                          ? () async {
-                              viewMode.previousQuiz();
-                              if (mounted) {
-                                await _scrollController.scrollToIndex(
-                                  viewMode.currentIndex,
-                                  preferPosition: AutoScrollPosition.begin,
-                                );
-                              }
-                            }
-                          : null,
+              child: Column(
+                children: [
+                  QuizPageCard(
+                    key: ObjectKey(currentQuiz.id),
+                    quiz: currentQuiz,
+                    questionNumber: viewMode.currentIndex + 1,
+                    isAdmin: userProvider.isAdmin,
+                    onEdit: () => _editQuiz(currentQuiz),
+                    onDelete: () => _deleteQuiz(currentQuiz),
+                    onAnswerSelected: (answerIndex) => _selectAnswer(
+                        quizProvider, currentQuiz.id, answerIndex),
+                    onResetQuiz: () => _resetQuiz(quizProvider, currentQuiz.id),
+                    subjectId: widget.subject.id,
+                    quizTypeId: widget.quizType.id,
+                    selectedOptionIndex:
+                        quizProvider.selectedAnswers[currentQuiz.id],
+                    isQuizPage: true,
+                    nextReviewDate: userProvider
+                            .getNextReviewDate(
+                              widget.subject.id,
+                              widget.quizType.id,
+                              currentQuiz.id,
+                            )
+                            ?.toIso8601String() ??
+                        DateTime.now().toIso8601String(),
+                    rebuildExplanation: quizProvider.rebuildExplanation,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: viewMode.currentIndex > 0
+                              ? () async {
+                                  viewMode.previousQuiz();
+                                  if (mounted) {
+                                    await _scrollController.scrollToIndex(
+                                      viewMode.currentIndex,
+                                      preferPosition: AutoScrollPosition.begin,
+                                    );
+                                  }
+                                }
+                              : null,
+                        ),
+                        Text(
+                            '${viewMode.currentIndex + 1}/${quizProvider.quizzes.length}'),
+                        IconButton(
+                          icon: const Icon(Icons.arrow_forward),
+                          onPressed: !isLastQuiz
+                              ? () async {
+                                  viewMode.nextQuiz();
+                                  if (mounted) {
+                                    await _scrollController.scrollToIndex(
+                                      viewMode.currentIndex,
+                                      preferPosition: AutoScrollPosition.begin,
+                                    );
+                                  }
+                                }
+                              : null,
+                        ),
+                      ],
                     ),
-                    Text(
-                        '${viewMode.currentIndex + 1}/${quizProvider.quizzes.length}'),
-                    IconButton(
-                      icon: const Icon(Icons.arrow_forward),
-                      onPressed: !isLastQuiz
-                          ? () async {
-                              viewMode.nextQuiz();
-                              if (mounted) {
-                                await _scrollController.scrollToIndex(
-                                  viewMode.currentIndex,
-                                  preferPosition: AutoScrollPosition.begin,
-                                );
-                              }
-                            }
-                          : null,
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ]),

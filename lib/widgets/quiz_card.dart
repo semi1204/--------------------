@@ -151,73 +151,80 @@ class _QuizPageCardState extends State<QuizPageCard> {
             _logger.d(
                 '퀴즈 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList, nextReviewDate=$nextReviewDate, markedForReview=${quizData?['markedForReview']}');
 
-            return Card(
-              margin: const EdgeInsets.all(8.0),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    QuizHeader(
-                      quiz: widget.quiz,
-                      subjectId: widget.subjectId,
-                      quizTypeId: widget.quizTypeId,
-                      onResetQuiz: () {
-                        setState(() {
-                          _selectedOptionIndex = null;
-                          _hasAnswered = false;
-                          _startTime = DateTime.now();
-                        });
-                        widget.onResetQuiz?.call();
-                      },
-                      onReportError: () {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return ErrorReportDialog(
-                              quiz: widget.quiz,
-                              subjectId: widget.subjectId,
-                              quizTypeId: widget.quizTypeId,
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 800,
+                ),
+                child: Card(
+                  margin: const EdgeInsets.all(8.0),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        QuizHeader(
+                          quiz: widget.quiz,
+                          subjectId: widget.subjectId,
+                          quizTypeId: widget.quizTypeId,
+                          onResetQuiz: () {
+                            setState(() {
+                              _selectedOptionIndex = null;
+                              _hasAnswered = false;
+                              _startTime = DateTime.now();
+                            });
+                            widget.onResetQuiz?.call();
+                          },
+                          onReportError: () {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return ErrorReportDialog(
+                                  quiz: widget.quiz,
+                                  subjectId: widget.subjectId,
+                                  quizTypeId: widget.quizTypeId,
+                                );
+                              },
                             );
                           },
-                        );
-                      },
-                      logger: _logger,
+                          logger: _logger,
+                        ),
+                        const SizedBox(height: 16),
+                        QuizQuestion(
+                          question: widget.quiz.question,
+                          logger: _logger,
+                        ),
+                        if (_hasAnswered) ...[
+                          const SizedBox(height: 16),
+                          QuizExplanation(
+                            explanation: widget.quiz.explanation,
+                            logger: _logger,
+                            keywords: widget.quiz.keywords,
+                            quizId: widget.quiz.id,
+                            subjectId: widget.subjectId,
+                            quizTypeId: widget.quizTypeId,
+                            rebuildTrigger: widget.rebuildExplanation,
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        QuizOptions(
+                          quiz: widget.quiz,
+                          selectedOptionIndex: _selectedOptionIndex,
+                          hasAnswered: _hasAnswered,
+                          isQuizPage: widget.isQuizPage,
+                          onSelectOption: (index) {
+                            _selectOption(index, userProvider);
+                          },
+                          logger: _logger,
+                        ),
+                        if (widget.isAdmin)
+                          QuizAdminActions(
+                            onEdit: widget.onEdit,
+                            onDelete: widget.onDelete,
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    QuizQuestion(
-                      question: widget.quiz.question,
-                      logger: _logger,
-                    ),
-                    if (_hasAnswered) ...[
-                      const SizedBox(height: 16),
-                      QuizExplanation(
-                        explanation: widget.quiz.explanation,
-                        logger: _logger,
-                        keywords: widget.quiz.keywords,
-                        quizId: widget.quiz.id,
-                        subjectId: widget.subjectId,
-                        quizTypeId: widget.quizTypeId,
-                        rebuildTrigger: widget.rebuildExplanation,
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    QuizOptions(
-                      quiz: widget.quiz,
-                      selectedOptionIndex: _selectedOptionIndex,
-                      hasAnswered: _hasAnswered,
-                      isQuizPage: widget.isQuizPage,
-                      onSelectOption: (index) {
-                        _selectOption(index, userProvider);
-                      },
-                      logger: _logger,
-                    ),
-                    if (widget.isAdmin)
-                      QuizAdminActions(
-                        onEdit: widget.onEdit,
-                        onDelete: widget.onDelete,
-                      ),
-                  ],
+                  ),
                 ),
               ),
             );
@@ -334,68 +341,76 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
             _logger.d(
                 '복습 페이지 카드 빌드: quizId=${widget.quiz.id}, isInReviewList=$isInReviewList, nextReviewDate=$nextReviewDate, markedForReview=${quizData?['markedForReview']}');
 
-            return Card(
-              margin: const EdgeInsets.all(8.0),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    QuizHeader(
-                      quiz: widget.quiz,
-                      subjectId: widget.subjectId,
-                      quizTypeId: widget.quizTypeId,
-                      onResetQuiz: () {}, // ReviewPageCard에서는 리셋 기능을 제하지 않습니다.
-                      onReportError: () {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return ErrorReportDialog(
-                              quiz: widget.quiz,
-                              subjectId: widget.subjectId,
-                              quizTypeId: widget.quizTypeId,
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 800,
+                ),
+                child: Card(
+                  margin: const EdgeInsets.all(8.0),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        QuizHeader(
+                          quiz: widget.quiz,
+                          subjectId: widget.subjectId,
+                          quizTypeId: widget.quizTypeId,
+                          onResetQuiz:
+                              () {}, // ReviewPageCard에서는 리셋 기능을 제하지 않습니다.
+                          onReportError: () {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return ErrorReportDialog(
+                                  quiz: widget.quiz,
+                                  subjectId: widget.subjectId,
+                                  quizTypeId: widget.quizTypeId,
+                                );
+                              },
                             );
                           },
-                        );
-                      },
-                      logger: _logger,
+                          logger: _logger,
+                        ),
+                        const SizedBox(height: 16),
+                        QuizQuestion(
+                          question: widget.quiz.question,
+                          logger: _logger,
+                        ),
+                        const SizedBox(height: 16),
+                        QuizOptions(
+                          quiz: widget.quiz,
+                          selectedOptionIndex: _selectedOptionIndex,
+                          hasAnswered: _hasAnswered,
+                          isQuizPage: false,
+                          onSelectOption: (index) =>
+                              _selectOption(index, userProvider),
+                          logger: _logger,
+                        ),
+                        if (_hasAnswered) ...[
+                          const SizedBox(height: 16),
+                          QuizExplanation(
+                            explanation: widget.quiz.explanation,
+                            logger: _logger,
+                            keywords: widget.quiz.keywords,
+                            quizId: widget.quiz.id,
+                            subjectId: widget.subjectId,
+                            quizTypeId: widget.quizTypeId,
+                            rebuildTrigger: false,
+                            feedbackButtons: _buildFeedbackButtons(),
+                            isReviewPage: true,
+                            onRemoveCard: widget.onRemoveCard,
+                          ),
+                        ],
+                        if (widget.isAdmin)
+                          QuizAdminActions(
+                            onEdit: widget.onEdit,
+                            onDelete: widget.onDelete,
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    QuizQuestion(
-                      question: widget.quiz.question,
-                      logger: _logger,
-                    ),
-                    const SizedBox(height: 16),
-                    QuizOptions(
-                      quiz: widget.quiz,
-                      selectedOptionIndex: _selectedOptionIndex,
-                      hasAnswered: _hasAnswered,
-                      isQuizPage: false,
-                      onSelectOption: (index) =>
-                          _selectOption(index, userProvider),
-                      logger: _logger,
-                    ),
-                    if (_hasAnswered) ...[
-                      const SizedBox(height: 16),
-                      QuizExplanation(
-                        explanation: widget.quiz.explanation,
-                        logger: _logger,
-                        keywords: widget.quiz.keywords,
-                        quizId: widget.quiz.id,
-                        subjectId: widget.subjectId,
-                        quizTypeId: widget.quizTypeId,
-                        rebuildTrigger: false,
-                        feedbackButtons: _buildFeedbackButtons(),
-                        isReviewPage: true,
-                        onRemoveCard: widget.onRemoveCard,
-                      ),
-                    ],
-                    if (widget.isAdmin)
-                      QuizAdminActions(
-                        onEdit: widget.onEdit,
-                        onDelete: widget.onDelete,
-                      ),
-                  ],
+                  ),
                 ),
               ),
             );
@@ -546,6 +561,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
       widget.onFeedbackGiven(widget.quiz, isUnderstandingImproved);
     } else {
       _logger.w('No user answer found for quiz: ${widget.quiz.id}');
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('먼저 퀴즈에 답변해주세요.')),
       );

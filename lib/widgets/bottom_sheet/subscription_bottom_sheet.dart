@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/models/subscription_constants.dart';
 import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SubscriptionBottomSheet extends StatelessWidget {
   final List<SubscriptionPlan> plans;
@@ -13,6 +14,12 @@ class SubscriptionBottomSheet extends StatelessWidget {
     required this.onSubscriptionSelected,
   });
 
+  Future<void> _launchURL(String url) async {
+    if (await canLaunch(url)) {
+      await launch(url);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
@@ -23,14 +30,30 @@ class SubscriptionBottomSheet extends StatelessWidget {
         color: themeProvider.currentTheme.colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: Column(
-        children: [
-          _buildDragHandle(themeProvider),
-          _buildHeader(themeProvider),
-          _buildSubscriptionList(),
-          _buildFeatures(themeProvider),
-          _buildDisclaimer(themeProvider),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildDragHandle(themeProvider),
+            _buildHeader(themeProvider),
+            const SizedBox(height: 24), // 헤더와 구독 리스트 사이 간격 추가
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              itemCount: plans.length,
+              itemBuilder: (context, index) {
+                final plan = plans[index];
+                return _SubscriptionCard(
+                  plan: plan,
+                  onTap: () => onSubscriptionSelected(context, plan),
+                );
+              },
+            ),
+            _buildFeatures(themeProvider),
+            _buildDisclaimer(themeProvider),
+            _buildPrivacyLinks(context, themeProvider),
+          ],
+        ),
       ),
     );
   }
@@ -97,22 +120,6 @@ class SubscriptionBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildSubscriptionList() {
-    return Expanded(
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        itemCount: plans.length,
-        itemBuilder: (context, index) {
-          final plan = plans[index];
-          return _SubscriptionCard(
-            plan: plan,
-            onTap: () => onSubscriptionSelected(context, plan),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildFeatures(ThemeProvider themeProvider) {
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -145,6 +152,46 @@ class SubscriptionBottomSheet extends StatelessWidget {
               themeProvider.currentTheme.colorScheme.onSurface.withOpacity(0.6),
         ),
         textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  Widget _buildPrivacyLinks(BuildContext context, ThemeProvider themeProvider) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          TextButton(
+            onPressed: () => _launchURL('https://semi1204.github.io/'),
+            child: Text(
+              '개인정보 처리방침',
+              style: themeProvider.currentTheme.textTheme.bodySmall?.copyWith(
+                color: themeProvider.currentTheme.colorScheme.onSurface
+                    .withOpacity(0.6),
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+          Text(
+            ' | ',
+            style: themeProvider.currentTheme.textTheme.bodySmall?.copyWith(
+              color: themeProvider.currentTheme.colorScheme.onSurface
+                  .withOpacity(0.6),
+            ),
+          ),
+          TextButton(
+            onPressed: () => _launchURL('https://semi1204.github.io/'),
+            child: Text(
+              '이용약관',
+              style: themeProvider.currentTheme.textTheme.bodySmall?.copyWith(
+                color: themeProvider.currentTheme.colorScheme.onSurface
+                    .withOpacity(0.6),
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

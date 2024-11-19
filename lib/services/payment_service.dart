@@ -416,7 +416,7 @@ class PaymentService extends ChangeNotifier {
 
       _logger.i('Purchase restoration completed');
     } catch (e) {
-      _logger.e('Error restoring purchases: $e');
+      _logger.e('Errosr restoring purchases: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('구매 내역 복원에 실패했습니다.')),

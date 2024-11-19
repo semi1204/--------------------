@@ -72,7 +72,7 @@ class QuizService {
       if (docSnapshot.exists) {
         final data = docSnapshot.data() as Map<String, dynamic>;
         _userQuizData[userId] = _convertToQuizUserDataMap(data);
-        _logger.i('Firebase에서 ��용자 $userId의 퀴즈 데이터를 로드했습니다');
+        _logger.i('Firebase에서 용자 $userId의 퀴즈 데이터를 로드했습니다');
       } else {
         _logger.w('Firebase에 사용자 $userId의 데이터가 없습니다');
       }
@@ -742,7 +742,7 @@ class QuizService {
       // 캐시 데이터를 SharedPreferences에 저장
       await _updateSharedPreferences(subjectId, quizTypeId);
     } catch (e) {
-      _logger.e('과목 $subjectId에 ��즈를 삭제하는 중 오류가 발생했습니다: $e');
+      _logger.e('과목 $subjectId에 즈를 삭제하는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
@@ -904,14 +904,44 @@ class QuizService {
   Map<String, Map<String, Map<String, QuizUserData>>> _convertToQuizUserDataMap(
       Map<String, dynamic> data) {
     return data.map((subjectId, subjectData) {
+      if (subjectData is! Map<String, dynamic>) {
+        _logger.w('Invalid subject data format for $subjectId: $subjectData');
+        return MapEntry(subjectId, {});
+      }
+
       return MapEntry(
         subjectId,
-        (subjectData as Map<String, dynamic>).map((quizTypeId, quizTypeData) {
+        subjectData.map((quizTypeId, quizTypeData) {
+          if (quizTypeData is! Map<String, dynamic>) {
+            _logger.w(
+                'Invalid quiz type data format for $quizTypeId: $quizTypeData');
+            return MapEntry(quizTypeId, {});
+          }
+
           return MapEntry(
             quizTypeId,
-            (quizTypeData as Map<String, dynamic>).map((quizId, quizData) {
-              return MapEntry(quizId,
-                  QuizUserData.fromJson(quizData as Map<String, dynamic>));
+            quizTypeData.map((quizId, quizData) {
+              if (quizData is! Map<String, dynamic>) {
+                _logger.w('Invalid quiz data format for $quizId: $quizData');
+                return MapEntry(
+                    quizId, QuizUserData(lastAnswered: DateTime.now()));
+              }
+
+              // Timestamp를 DateTime으로 변환
+              if (quizData['lastAnswered'] is Timestamp) {
+                quizData['lastAnswered'] =
+                    (quizData['lastAnswered'] as Timestamp)
+                        .toDate()
+                        .toIso8601String();
+              }
+              if (quizData['nextReviewDate'] is Timestamp) {
+                quizData['nextReviewDate'] =
+                    (quizData['nextReviewDate'] as Timestamp)
+                        .toDate()
+                        .toIso8601String();
+              }
+
+              return MapEntry(quizId, QuizUserData.fromJson(quizData));
             }),
           );
         }),

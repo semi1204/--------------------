@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nursing_quiz_app_6/models/subscription_constants.dart';
 import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
+import 'package:nursing_quiz_app_6/services/payment_service.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -52,6 +53,7 @@ class SubscriptionBottomSheet extends StatelessWidget {
             _buildFeatures(themeProvider),
             _buildDisclaimer(themeProvider),
             _buildPrivacyLinks(context, themeProvider),
+            _buildRestoreButton(context, themeProvider),
           ],
         ),
       ),
@@ -192,6 +194,22 @@ class SubscriptionBottomSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRestoreButton(
+      BuildContext context, ThemeProvider themeProvider) {
+    return TextButton(
+      onPressed: () {
+        Provider.of<PaymentService>(context, listen: false)
+            .restorePurchases(context);
+      },
+      child: Text(
+        '구매 내역 복원',
+        style: themeProvider.currentTheme.textTheme.bodyMedium?.copyWith(
+          color: themeProvider.currentTheme.colorScheme.primary,
+        ),
       ),
     );
   }

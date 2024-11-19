@@ -398,6 +398,33 @@ class PaymentService extends ChangeNotifier {
     return response.productDetails.first;
   }
 
+  Future<void> restorePurchases(BuildContext context) async {
+    try {
+      _logger.i('Starting purchase restoration');
+
+      if (!await _inAppPurchase.isAvailable()) {
+        throw Exception('Store not available');
+      }
+
+      await _inAppPurchase.restorePurchases();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('구매 내역을 복원했습니다.')),
+        );
+      }
+
+      _logger.i('Purchase restoration completed');
+    } catch (e) {
+      _logger.e('Error restoring purchases: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('구매 내역 복원에 실패했습니다.')),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _purchaseUpdatedSubscription.cancel();

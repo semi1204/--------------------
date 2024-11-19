@@ -58,8 +58,8 @@ class _QuizPageState extends State<QuizPage>
       final initialIndex = quizProvider.lastScrollIndex;
 
       // Set initial index for both view modes
-      viewModeProvider.setCurrentIndex(initialIndex);
-
+      viewModeProvider.setCurrentQuizPosition(
+          initialIndex, quizProvider.quizzes[initialIndex].id);
       // Scroll to the initial index
       await _scrollController.scrollToIndex(
         initialIndex,
@@ -168,7 +168,7 @@ class _QuizPageState extends State<QuizPage>
                                     controller: _scrollController,
                                     index: index,
                                     child: QuizPageCard(
-                                      key: ObjectKey(quiz.id),
+                                      key: GlobalKey(),
                                       quiz: quiz,
                                       questionNumber: index + 1,
                                       isAdmin: userProvider.isAdmin,
@@ -430,5 +430,85 @@ class _QuizPageState extends State<QuizPage>
         ),
       ]),
     );
+  }
+
+  int _findVisibleQuizIndex() {
+    if (!_scrollController.hasClients) return 0;
+
+    final ScrollPosition position = _scrollController.position;
+    final double viewportStart = position.pixels;
+    final double viewportEnd = viewportStart + position.viewportDimension;
+
+    // BuildContext를 통해 RenderObject에 접근
+    final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return 0;
+
+    // 현재 보이는 영역의 중앙점
+    final double centerPosition = (viewportStart + viewportEnd) / 2;
+
+    // Provider를 통해 퀴즈 목록 가져오기
+    final quizProvider = context.read<QuizProvider>();
+    final quizzes = quizProvider.quizzes;
+
+    // 각 퀴즈 카드의 위치를 확인하여 가장 가까운 퀴즈 찾기
+    for (int i = 0; i < quizzes.length; i++) {
+      final RenderBox? cardBox = _getQuizCardRenderBox(i);
+      if (cardBox == null) continue;
+
+      final Offset offset = cardBox.localToGlobal(Offset.zero);
+      final double cardStart = offset.dy;
+      final double cardEnd = cardStart + cardBox.size.height;
+
+      // 카드가 화면 중앙에 가장 가까운 것을 선택
+      if (cardStart <= centerPosition && centerPosition <= cardEnd) {
+        return i;
+      }
+    }
+
+    return 0;
+  }
+
+  // 특정 인덱스의 퀴즈 카드의 RenderBox를 가져오는 헬퍼 메서드
+  RenderBox? _getQuizCardRenderBox(int index) {
+    final GlobalKey cardKey = GlobalKey();
+    final BuildContext? cardContext = cardKey.currentContext;
+    return cardContext?.findRenderObject() as RenderBox?;
+  }
+
+  // 뷰 모드 토글 핸들러 수정
+  void _handleViewModeToggle(BuildContext context) {
+    final viewModeProvider = context.read<QuizViewModeProvider>();
+    final quizProvider = context.read<QuizProvider>();
+
+    if (!viewModeProvider.isOneByOne) {
+      // 스크롤 모드에서 단일 모드로 전환
+      final visibleIndex = _findVisibleQuizIndex();
+      if (quizProvider.quizzes.isNotEmpty &&
+          visibleIndex < quizProvider.quizzes.length) {
+        final visibleQuiz = quizProvider.quizzes[visibleIndex];
+        print(
+            'Switching to single view mode. Quiz ID: ${visibleQuiz.id}, Index: $visibleIndex'); // 디버깅용
+        viewModeProvider.setCurrentQuizPosition(visibleIndex, visibleQuiz.id);
+      }
+    } else {
+      // 단일 모드에서 스크롤 모드로 전환
+      final currentQuizId = viewModeProvider.currentQuizId;
+      final currentIndex =
+          quizProvider.quizzes.indexWhere((quiz) => quiz.id == currentQuizId);
+
+      if (currentIndex != -1) {
+        print(
+            'Switching to scroll mode. Quiz ID: $currentQuizId, Index: $currentIndex'); // 디버깅용
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _scrollController.scrollToIndex(
+              currentIndex,
+              preferPosition: AutoScrollPosition.begin,
+            );
+          }
+        });
+      }
+    }
+    viewModeProvider.toggleViewMode();
   }
 }

@@ -127,19 +127,22 @@ class QuizProvider with ChangeNotifier {
 
   Future<void> selectAnswer(String subjectId, String quizTypeId, String quizId,
       int answerIndex) async {
-    final paymentService =
-        _paymentService; // Assuming _paymentService is injected in constructor
-    final canAttempt = await paymentService.canAttemptQuiz();
+    // 먼저 답변을 저장
+    _selectedAnswers[quizId] = answerIndex;
 
-    if (!canAttempt) {
-      _logger.w('User cannot attempt more quizzes without subscription');
-      return;
+    // payment 관련 처리
+    if (!_userProvider.isSubscribed) {
+      final canAttempt = await _paymentService.canAttemptQuiz();
+      if (!canAttempt) {
+        _logger.w('User cannot attempt more quizzes without subscription');
+        // 답변은 저장되지만 추가 시도는 제한됨
+        return;
+      }
+      await _paymentService.incrementQuizAttempt();
     }
 
-    _selectedAnswers[quizId] = answerIndex;
-    await paymentService.incrementQuizAttempt();
-
-    _userProvider.updateUserQuizData(
+    // 사용자 데이터 업데이트
+    await _userProvider.updateUserQuizData(
       subjectId,
       quizTypeId,
       quizId,
@@ -147,6 +150,7 @@ class QuizProvider with ChangeNotifier {
           _allQuizzes.firstWhere((q) => q.id == quizId).correctOptionIndex,
       selectedOptionIndex: answerIndex,
     );
+
     updateQuizAccuracy(subjectId, quizTypeId, quizId);
     notifyListeners();
   }

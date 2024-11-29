@@ -241,15 +241,18 @@ class _QuizPageCardState extends State<QuizPageCard> {
       return;
     }
 
-    if (userProvider.user?.email == ADMIN_EMAIL) {
-      // 관리자는 바로 퀴즈 풀 수 있도록 처리
-      setState(() {
-        _selectedOptionIndex = index;
-        _hasAnswered = true;
-      });
+    // 이미 답변을 선택했다면 추가 처리하지 않음
+    if (_selectedOptionIndex != null) {
       return;
     }
 
+    // 관리자 처리
+    if (userProvider.user?.email == ADMIN_EMAIL) {
+      _updateQuizState(index, userProvider);
+      return;
+    }
+
+    // 구독 확인 및 시도 가능 여부 확인
     if (!userProvider.isSubscribed) {
       final canAttempt = await userProvider.canAttemptQuiz();
       if (!canAttempt) {
@@ -259,29 +262,33 @@ class _QuizPageCardState extends State<QuizPageCard> {
       await userProvider.incrementQuizAttempt();
     }
 
-    if (_selectedOptionIndex == null) {
-      setState(() {
-        _selectedOptionIndex = index;
-        _hasAnswered = true;
-      });
+    _updateQuizState(index, userProvider);
+  }
 
-      final endTime = DateTime.now();
-      final answerTime = endTime.difference(_startTime!);
-      final isCorrect = widget.quiz.isOX
-          ? index == (widget.quiz.correctOptionIndex == 0 ? 0 : 1)
-          : index == widget.quiz.correctOptionIndex;
+  // 퀴즈 상태 업데이트를 위한 별도 메서드
+  void _updateQuizState(int index, UserProvider userProvider) {
+    setState(() {
+      _selectedOptionIndex = index;
+      _hasAnswered = true;
+    });
 
-      userProvider.updateUserQuizData(
-        widget.subjectId,
-        widget.quizTypeId,
-        widget.quiz.id,
-        isCorrect,
-        answerTime: answerTime,
-        selectedOptionIndex: index,
-      );
+    final endTime = DateTime.now();
+    final answerTime = endTime.difference(_startTime!);
+    final isCorrect = widget.quiz.isOX
+        ? index == (widget.quiz.correctOptionIndex == 0 ? 0 : 1)
+        : index == widget.quiz.correctOptionIndex;
 
-      widget.onAnswerSelected?.call(index);
-    }
+    // 사용자 퀴즈 데이터 업데이트
+    userProvider.updateUserQuizData(
+      widget.subjectId,
+      widget.quizTypeId,
+      widget.quiz.id,
+      isCorrect,
+      answerTime: answerTime,
+      selectedOptionIndex: index,
+    );
+
+    widget.onAnswerSelected?.call(index);
   }
 
   void _showLoginPrompt(BuildContext context) {

@@ -104,56 +104,136 @@ class QuizHeader extends StatelessWidget {
         );
         logger.d('퀴즈 정답률: $accuracy');
 
-        return Row(
-          // 우측: 정답률과 초기화 버튼
-          // DONE : 정답률 표시와 Row를 이루는 왼쪽에 빨색, 노란색, 초록색, 으로 작은 원으로 불빛이 들어오게 함.정답률이 85% 이상이면 초록색, 60% 이상이면 노란색, 60% 미만이면 빨간색으로 표시
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              _getExamInfo(),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-            if (questionNumber != null) ...[
-              Text(
-                '$questionNumber',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Colors.grey[600],
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // 문제 번호와 기출 정보를 포함하는 왼쪽 섹션
+              Expanded(
+                child: Row(
+                  children: [
+                    if (questionNumber != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          '$questionNumber번',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    if (questionNumber != null)
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        height: 20,
+                        width: 1,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outline
+                            .withOpacity(0.2),
+                      ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.3),
+                        ),
+                      ),
+                      child: Text(
+                        _getExamInfo(),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+
+              // 정확도와 메뉴 버튼
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 정확도 표시
+                  GestureDetector(
+                    onTap: () {
+                      final quizProvider =
+                          Provider.of<QuizProvider>(context, listen: false);
+                      showModalBottomSheet(
+                        context: context,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.vertical(top: Radius.circular(20)),
+                        ),
+                        builder: (context) => AccuracyFilterBottomSheet(),
+                      );
+                    },
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _getAccuracyColor(accuracy),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        AccuracyDisplay(accuracy: accuracy),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // 메뉴 버튼
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => _showQuizMenu(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          Ionicons.ellipsis_horizontal,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
-            Row(
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _getAccuracyColor(accuracy),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                AccuracyDisplay(accuracy: accuracy),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Ionicons.ellipsis_vertical, size: 20),
-                  onPressed: () => _showQuizMenu(context),
-                  tooltip: 'Quiz Menu',
-                ),
-              ],
-            ),
-          ],
+          ),
         );
       },
     );
   }
-
-  // --------- DONE : 퀴즈 초기화 버튼 클릭 시 데이터 이동확인 ---------//
 
   String _getExamInfo() {
     String examInfo = '';
@@ -174,5 +254,91 @@ class QuizHeader extends StatelessWidget {
     } else {
       return Colors.red;
     }
+  }
+}
+
+class AccuracyFilterBottomSheet extends StatelessWidget {
+  const AccuracyFilterBottomSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final quizProvider = Provider.of<QuizProvider>(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 16, bottom: 16),
+            child: Text(
+              '정답률로 필터링',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.filter_list),
+            title: const Text('전체 보기'),
+            selected: quizProvider.currentSortOption == SortOption.all,
+            onTap: () {
+              quizProvider.setSortOption(SortOption.all);
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: Container(
+              width: 24,
+              height: 24,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red,
+              ),
+            ),
+            title: const Text('20% 미만'),
+            selected: quizProvider.currentSortOption == SortOption.low,
+            onTap: () {
+              quizProvider.setSortOption(SortOption.low);
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: Container(
+              width: 24,
+              height: 24,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.yellow,
+              ),
+            ),
+            title: const Text('20% ~ 60%'),
+            selected: quizProvider.currentSortOption == SortOption.medium,
+            onTap: () {
+              quizProvider.setSortOption(SortOption.medium);
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: Container(
+              width: 24,
+              height: 24,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.green,
+              ),
+            ),
+            title: const Text('60% 이상'),
+            selected: quizProvider.currentSortOption == SortOption.high,
+            onTap: () {
+              quizProvider.setSortOption(SortOption.high);
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
   }
 }

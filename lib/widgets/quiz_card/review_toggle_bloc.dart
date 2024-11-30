@@ -6,8 +6,7 @@ import 'package:nursing_quiz_app_6/utils/constants.dart';
 class ReviewToggleBloc extends AnyAnimatedButtonBloc<bool, bool, String> {
   @override
   Future<Either<String, bool>> asyncAction(bool input) async {
-    // Simulate an API call
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 300));
     return Right(!input);
   }
 }
@@ -29,10 +28,16 @@ class ReviewToggleButton extends CustomAnyAnimatedButton {
 
   @override
   AnyAnimatedButtonParams get defaultParams => AnyAnimatedButtonParams(
-        height: 32,
+        height: 32, // 높이를 36에서 32로 줄임
         decoration: BoxDecoration(
-          color: isInReviewList ? INCORRECT_OPTION_COLOR : CORRECT_OPTION_COLOR,
-          borderRadius: BorderRadius.circular(16),
+          color: Colors.transparent, // 배경색을 투명하게 변경
+          border: Border.all(
+            color: isInReviewList
+                ? INCORRECT_OPTION_COLOR.withOpacity(0.5)
+                : CORRECT_OPTION_COLOR.withOpacity(0.5),
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(16), // 크기가 줄어든 만큼 radius도 조정
         ),
         child: Material(
           color: Colors.transparent,
@@ -40,20 +45,27 @@ class ReviewToggleButton extends CustomAnyAnimatedButton {
             onTap: onTap,
             borderRadius: BorderRadius.circular(16),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12), // 패딩도 약간 줄임
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     isInReviewList ? Icons.remove_circle : Icons.add_circle,
-                    color: isInReviewList ? Colors.red : Colors.green,
-                    size: 18,
+                    color: isInReviewList
+                        ? INCORRECT_OPTION_COLOR
+                        : CORRECT_OPTION_COLOR,
+                    size: 18, // 아이콘 크기도 약간 줄임
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6), // 간격도 약간 줄임
                   Flexible(
                     child: Text(
                       isInReviewList ? '복습 제거' : '복습 추가',
-                      style: TextStyle(color: textColor, fontSize: 12),
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 13, // 폰트 크기도 약간 줄임
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.3,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -67,9 +79,8 @@ class ReviewToggleButton extends CustomAnyAnimatedButton {
   @override
   AnyAnimatedButtonParams get progressParams =>
       AnyAnimatedButtonParams.progress(
-        size: 40,
-        backgroundColor:
-            isInReviewList ? INCORRECT_OPTION_COLOR : CORRECT_OPTION_COLOR,
+        size: 32, // 크기 조정
+        backgroundColor: Colors.transparent, // 배경색 투명하게
       );
 
   @override
@@ -77,7 +88,7 @@ class ReviewToggleButton extends CustomAnyAnimatedButton {
 
   @override
   AnyAnimatedButtonParams get errorParams => AnyAnimatedButtonParams.error(
-        size: 40,
-        backgroundColor: Colors.red,
+        size: 32, // 크기 조정
+        backgroundColor: Colors.transparent, // 배경색 투명하게
       );
 }

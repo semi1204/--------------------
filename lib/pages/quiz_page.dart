@@ -115,10 +115,6 @@ class _QuizPageState extends State<QuizPage>
                   pinned: false,
                   actions: [
                     IconButton(
-                      icon: const Icon(Icons.sort),
-                      onPressed: () => _showFilterDialog(context, quizProvider),
-                    ),
-                    IconButton(
                       icon: Icon(
                         context.select((QuizViewModeProvider p) => p.isOneByOne)
                             ? Icons.view_agenda
@@ -206,58 +202,6 @@ class _QuizPageState extends State<QuizPage>
           },
         ),
       ),
-    );
-  }
-
-  void _showFilterDialog(BuildContext context, QuizProvider quizProvider) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('카드 필터'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioListTile<SortOption>(
-                title: const Text('모든 카드'),
-                value: SortOption.all,
-                groupValue: quizProvider.currentSortOption,
-                onChanged: (SortOption? value) {
-                  quizProvider.setSortOption(value!);
-                  Navigator.pop(context);
-                },
-              ),
-              RadioListTile<SortOption>(
-                title: const Text('빨간색 카드 (60% 미만)'),
-                value: SortOption.low,
-                groupValue: quizProvider.currentSortOption,
-                onChanged: (SortOption? value) {
-                  quizProvider.setSortOption(value!);
-                  Navigator.pop(context);
-                },
-              ),
-              RadioListTile<SortOption>(
-                title: const Text('노란색 카드 (60% - 85%)'),
-                value: SortOption.medium,
-                groupValue: quizProvider.currentSortOption,
-                onChanged: (SortOption? value) {
-                  quizProvider.setSortOption(value!);
-                  Navigator.pop(context);
-                },
-              ),
-              RadioListTile<SortOption>(
-                title: const Text('초록색 카드 (85% 이상)'),
-                value: SortOption.high,
-                groupValue: quizProvider.currentSortOption,
-                onChanged: (SortOption? value) {
-                  quizProvider.setSortOption(value!);
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 

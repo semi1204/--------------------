@@ -183,7 +183,7 @@ class MarkdownRenderer extends StatelessWidget {
         );
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: markdownWidgets,

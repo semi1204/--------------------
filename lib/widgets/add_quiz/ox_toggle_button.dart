@@ -13,25 +13,62 @@ class OXToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Switch(
-      value: initialValue,
-      onChanged: onChanged,
-      activeColor: Colors.orange[700],
-      inactiveTrackColor: Colors.blue[700],
-      thumbColor: WidgetStateProperty.resolveWith<Color>(
-        (Set<WidgetState> states) {
-          return Colors.white;
-        },
-      ),
-      thumbIcon: WidgetStateProperty.resolveWith<Icon?>(
-        (Set<WidgetState> states) {
-          if (states.contains(WidgetState.selected)) {
-            // return const Icon(Icons.calculate_outlined, color: Colors.orange);
-            // // TODO: Replace with Ionicons package icon when available
-            return const Icon(Ionicons.reader_outline, color: Colors.orange);
-          }
-          return const Icon(Ionicons.calculator_outline, color: Colors.blue);
-        },
+    return GestureDetector(
+      onTap: () => onChanged?.call(!initialValue),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 65,
+        height: 32,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          color:
+              initialValue ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0),
+          boxShadow: [
+            BoxShadow(
+              color: initialValue
+                  ? const Color(0xFF6366F1).withOpacity(0.3)
+                  : Colors.black12,
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              left: initialValue ? 33 : 0,
+              top: 0,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    initialValue
+                        ? Ionicons.reader_outline
+                        : Ionicons.calculator_outline,
+                    size: 18,
+                    color: initialValue
+                        ? const Color(0xFF6366F1)
+                        : const Color(0xFF94A3B8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

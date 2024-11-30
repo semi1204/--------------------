@@ -56,12 +56,12 @@ class QuizProvider with ChangeNotifier {
         case SortOption.all:
           return true;
         case SortOption.low:
-          return _getQuizAccuracy(quiz) < 0.6;
+          return _getQuizAccuracy(quiz) < 0.2;
         case SortOption.medium:
           final accuracy = _getQuizAccuracy(quiz);
-          return accuracy >= 0.6 && accuracy < 0.85;
+          return accuracy >= 0.2 && accuracy < 0.6;
         case SortOption.high:
-          return _getQuizAccuracy(quiz) >= 0.85;
+          return _getQuizAccuracy(quiz) >= 0.6;
       }
     }).toList();
     _isFilterEmpty = _filteredQuizzes.isEmpty;

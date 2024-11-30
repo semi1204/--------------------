@@ -9,29 +9,51 @@ class AccuracyDisplay extends StatelessWidget {
     super.key,
     required this.accuracy,
   });
-
   @override
   Widget build(BuildContext context) {
     final accuracyPercentage = (accuracy * 100).toStringAsFixed(1);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    Color accuracyColor;
+    if (accuracy >= 0.85) {
+      accuracyColor = Colors.green;
+    } else if (accuracy >= 0.60) {
+      accuracyColor = Colors.yellow;
+    } else {
+      accuracyColor = Colors.red;
+    }
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.blue.shade100,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: accuracyColor.withOpacity(0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).shadowColor.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.bar_chart,
-              size: 16, color: Color.fromARGB(255, 127, 190, 241)),
-          const SizedBox(width: 4),
+          Icon(
+            Icons.bar_chart,
+            size: 16,
+            color: accuracyColor,
+          ),
+          const SizedBox(width: 6),
           Text(
             '$accuracyPercentage%',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Color.fromARGB(255, 22, 125, 209),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],

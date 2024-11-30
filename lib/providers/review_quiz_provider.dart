@@ -62,10 +62,9 @@ class ReviewQuizzesProvider with ChangeNotifier {
       _logger.i('복습 카드 ${_quizzesForReview.length}개 로드 완료');
       _logger.d('로드된 퀴즈: ${_quizzesForReview.map((q) => q.id).toList()}');
 
-      // Update _subjectTotalReviewQuizIds
-      _subjectTotalReviewQuizIds.putIfAbsent(_selectedSubjectId!, () => {});
-      _subjectTotalReviewQuizIds[_selectedSubjectId!]!
-          .addAll(_quizzesForReview.map((q) => q.id));
+      // 오늘의 복습 퀴즈만 포함하도록 초기화 후 새로 설정
+      _subjectTotalReviewQuizIds[_selectedSubjectId!] =
+          Set<String>.from(_quizzesForReview.map((q) => q.id));
       _saveTotalReviewQuizIds();
     } catch (e) {
       _logger.e('퀴즈 복습 데이터를 불러올 수 없음: $e');

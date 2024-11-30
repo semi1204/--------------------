@@ -11,6 +11,17 @@ class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final Logger _logger = Logger();
 
+  // Get current user's display name directly from Firebase
+  String? getCurrentUserDisplayName() {
+    return _auth.currentUser?.displayName;
+  }
+
+  // Reload and get latest user data
+  Future<String?> getLatestUserDisplayName() async {
+    await _auth.currentUser?.reload();
+    return _auth.currentUser?.displayName;
+  }
+
   Future<User?> signInWithEmailAndPassword(
       String email, String password) async {
     try {
@@ -39,7 +50,7 @@ class AuthService {
         password: password,
       );
 
-      // 사용자 표시 이름 설정
+      // Set user display name
       await userCredential.user?.updateProfile(displayName: displayName);
 
       await userCredential.user?.sendEmailVerification();
@@ -71,7 +82,7 @@ class AuthService {
         final UserCredential userCredential =
             await _auth.signInWithCredential(credential);
 
-        // Google 계정의 이름을 Firebase 사용자 프로필에 설정
+        // Set Google account name to Firebase user profile
         if (googleSignInAccount.displayName != null) {
           await userCredential.user
               ?.updateProfile(displayName: googleSignInAccount.displayName);
@@ -112,7 +123,7 @@ class AuthService {
 
       final userCredential = await _auth.signInWithCredential(oauthCredential);
 
-      // Apple 계정의 이름을 Firebase 사용자 프로필에 설정
+      // Set Apple account name to Firebase user profile
       if (appleCredential.givenName != null) {
         final displayName =
             '${appleCredential.givenName} ${appleCredential.familyName}';

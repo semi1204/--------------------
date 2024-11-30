@@ -70,7 +70,11 @@ class QuizOptions extends StatelessWidget {
     return InkWell(
       onTap: (!isQuizPage || !hasAnswered) ? () => onSelectOption(index) : null,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+        padding: const EdgeInsets.symmetric(
+            vertical: 2.0,
+            horizontal: 16.0), // Reduced vertical padding from 8.0 to 4.0
+        margin: const EdgeInsets.symmetric(
+            vertical: 1.0), // Added small margin between options
         decoration: BoxDecoration(
           color: _getOptionColor(showSelection, isSelected, isCorrect),
           borderRadius: BorderRadius.circular(8.0),

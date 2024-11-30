@@ -14,9 +14,19 @@ class QuizQuestion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MarkdownRenderer(
-      data: question,
-      logger: logger,
+    return Material(
+      elevation: 1,
+      borderRadius: BorderRadius.circular(1),
+      color: Theme.of(context).brightness == Brightness.light
+          ? Theme.of(context).cardColor.withOpacity(0.1)
+          : Theme.of(context).cardColor.withOpacity(0.1),
+      child: Padding(
+        padding: const EdgeInsets.all(0.0),
+        child: MarkdownRenderer(
+          data: question,
+          logger: logger,
+        ),
+      ),
     );
   }
 }

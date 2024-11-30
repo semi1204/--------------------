@@ -1,6 +1,5 @@
 // quiz.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:logger/logger.dart';
 import 'package:nursing_quiz_app_6/models/keyword.dart';
 
 class Quiz {
@@ -10,12 +9,11 @@ class Quiz {
   final int correctOptionIndex;
   final String explanation;
   final String typeId;
-  final List<Keyword> keywords; // String에서 Keyword로 변경
+  final List<Keyword> keywords;
   final String? imageUrl;
   final int? year;
   final String? examType;
   final bool isOX;
-  final Logger _logger = Logger();
 
   Quiz({
     required this.id,
@@ -24,14 +22,12 @@ class Quiz {
     required this.correctOptionIndex,
     required this.explanation,
     required this.typeId,
-    required this.keywords, // 기본값 제거
+    required this.keywords,
     this.imageUrl,
     this.year,
     this.examType,
     required this.isOX,
-  }) {
-    _logger.d('퀴즈 데이터가 마크다운 지원으로 생성');
-  }
+  });
 
   // 중앙 변환 메서드
   Map<String, dynamic> _toMap() => {
@@ -41,21 +37,20 @@ class Quiz {
         'correctOptionIndex': correctOptionIndex,
         'explanation': explanation,
         'typeId': typeId,
-        'keywords':
-            keywords.map((k) => k.toMap()).toList(), // Keyword 객체를 Map으로 변환
+        'keywords': keywords.map((k) => k.toMap()).toList(),
         'imageUrl': imageUrl,
         'year': year,
         'examType': examType,
         'isOX': isOX,
       };
+
   // 중앙 파싱 메서드
-  static Quiz _fromMap(Map<String, dynamic> map, {Logger? logger}) {
+  static Quiz _fromMap(Map<String, dynamic> map) {
     String? imageUrl = map['imageUrl'];
     if (imageUrl != null && !imageUrl.startsWith('http')) {
       imageUrl =
           'https://firebasestorage.googleapis.com/v0/b/nursingquizapp6.appspot.com/o/$imageUrl?alt=media';
     }
-    logger?.d('이미지 URL 처리 완료: $imageUrl');
 
     return Quiz(
       id: map['id'] ?? '',
@@ -75,11 +70,10 @@ class Quiz {
     );
   }
 
-  factory Quiz.fromFirestore(DocumentSnapshot doc, Logger logger) {
+  factory Quiz.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    data['id'] = doc.id; // Firestore의 문서 ID를 map에 추가
-    logger.d('firestore 데이터로 퀴즈 생성: $data');
-    return _fromMap(data, logger: logger);
+    data['id'] = doc.id;
+    return _fromMap(data);
   }
 
   factory Quiz.fromJson(Map<String, dynamic> json) => _fromMap(json);
@@ -89,7 +83,6 @@ class Quiz {
   Map<String, dynamic> toJson() => _toMap();
 
   Map<String, dynamic> toFirestore() {
-    _logger.d('퀴즈 데이터를 Firestore에 변환');
     return _toMap();
   }
 

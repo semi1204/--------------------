@@ -397,7 +397,7 @@ class QuizService {
           .get();
 
       if (docSnapshot.exists) {
-        return Quiz.fromFirestore(docSnapshot, _logger);
+        return Quiz.fromFirestore(docSnapshot);
       } else {
         _logger.w('퀴즈를 찾을 수 없음: quizId=$quizId');
         return null;
@@ -525,9 +525,7 @@ class QuizService {
               .collection('quizzes')
               .get();
           // Firestore 문서를 Quiz 객체로 변환하여 리스트로 반환
-          return snapshot.docs
-              .map((doc) => Quiz.fromFirestore(doc, _logger))
-              .toList();
+          return snapshot.docs.map((doc) => Quiz.fromFirestore(doc)).toList();
         },
         // 캐시된 데이터 파싱 방
         parseData: (data) => (json.decode(data) as List)
@@ -892,9 +890,7 @@ class QuizService {
           .where(FieldPath.documentId, whereIn: quizIds)
           .get();
 
-      return quizzes.docs
-          .map((doc) => Quiz.fromFirestore(doc, _logger))
-          .toList();
+      return quizzes.docs.map((doc) => Quiz.fromFirestore(doc)).toList();
     } catch (e) {
       _logger.e('과목 $subjectId에 대한 퀴즈를 가져오는 중 오류가 발생했습니다: $e');
       rethrow;
@@ -995,17 +991,65 @@ class QuizService {
   // type별 퀴즈 수 가져오기
   Future<int> getTotalQuizCount(String subjectId, String quizTypeId) async {
     try {
-      // 먼저 캐시된 데이터를 확인합니다.
+      _logger.i('퀴즈 수를 가져오는 중: $subjectId, $quizTypeId');
+
+      // 1. 메모리 캐시 확인
       final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
       if (_cachedQuizzes[subjectId]?[quizTypeId]?[key] != null) {
+        _logger.d('메모리 캐시에서 퀴즈 수를 가져왔습니다');
         return _cachedQuizzes[subjectId]![quizTypeId]![key]!.length;
       }
 
-      // 캐시된 데이터가 없으면 Firestore에서 가져옵니다.
+      // 2. 로컬 저장소 확인
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(key);
+      final cacheTimestamp = prefs.getInt('${key}_timestamp');
+
+      if (cachedData != null && cacheTimestamp != null) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - cacheTimestamp < _cacheExpiration.inMilliseconds) {
+          _logger.d('로컬 저장소에서 퀴즈 수를 가져왔습니다');
+          final quizzes = (json.decode(cachedData) as List)
+              .map((item) => Quiz.fromJson(item as Map<String, dynamic>))
+              .toList();
+          return quizzes.length;
+        }
+      }
+
+      // 3. Firestore에서 가져오기
+      _logger.d('Firestore에서 퀴즈 수를 가져오는 중입니다');
       final quizzes = await getQuizzes(subjectId, quizTypeId);
       return quizzes.length;
     } catch (e) {
       _logger.e('퀴즈 수를 가져오는 중 오류 발생: $e');
+      return 0;
+    }
+  }
+
+  Future<int> getWeightedAverageAccuracy(
+      String userId, String subjectId, String quizTypeId) async {
+    _logger.i('가중 평균 정답률을 계산하는 중입니다: $userId, $subjectId, $quizTypeId');
+    try {
+      final quizzes = await getQuizzes(subjectId, quizTypeId);
+      int totalCorrect = 0;
+      int totalAttempts = 0;
+
+      for (var quiz in quizzes) {
+        final quizData =
+            _userQuizData[userId]?[subjectId]?[quizTypeId]?[quiz.id];
+        if (quizData != null && quizData.total > 0) {
+          totalCorrect += quizData.correct;
+          totalAttempts += quizData.total;
+        }
+      }
+
+      if (totalAttempts == 0) {
+        return 0;
+      }
+
+      return ((totalCorrect / totalAttempts) * 100).round();
+    } catch (e) {
+      _logger.e('가중 평균 정답률을 계산하는 중 오류 발생: $e');
       return 0;
     }
   }

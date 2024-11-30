@@ -50,12 +50,13 @@ class AuthService {
         password: password,
       );
 
-      // Set user display name
+      // 닉네임 설정 및 즉시 reload
       await userCredential.user?.updateProfile(displayName: displayName);
+      await userCredential.user?.reload();
 
       await userCredential.user?.sendEmailVerification();
       _logger.i(
-          'User ${userCredential.user?.email} signed up with email. Display name set to $displayName. Verification email sent.');
+          'User ${userCredential.user?.email} signed up. Display name set to: ${userCredential.user?.displayName}');
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
       _logger.e('Firebase Auth Error during sign up: ${e.code} - ${e.message}');
@@ -82,13 +83,17 @@ class AuthService {
         final UserCredential userCredential =
             await _auth.signInWithCredential(credential);
 
-        // Set Google account name to Firebase user profile
-        if (googleSignInAccount.displayName != null) {
+        // 닉네임이 없는 경우 이메일의 @ 앞부분을 닉네임으로 설정
+        if (userCredential.user?.displayName == null ||
+            userCredential.user!.displayName!.isEmpty) {
+          final defaultNickname = userCredential.user?.email?.split('@')[0];
           await userCredential.user
-              ?.updateProfile(displayName: googleSignInAccount.displayName);
+              ?.updateProfile(displayName: defaultNickname);
+          await userCredential.user?.reload();
         }
 
-        _logger.i('User ${userCredential.user?.email} signed in with Google');
+        _logger.i(
+            'User ${userCredential.user?.email} signed in with Google. Display name: ${userCredential.user?.displayName}');
         return userCredential.user;
       }
     } on FirebaseAuthException catch (e) {
@@ -209,5 +214,29 @@ class AuthService {
     final bytes = utf8.encode(input);
     final digest = sha256.convert(bytes);
     return digest.toString();
+  }
+
+  // 닉네임 업데이트 메서드 추가
+  Future<void> updateUserDisplayName(String newDisplayName) async {
+    try {
+      User? user = _auth.currentUser;
+      if (user != null) {
+        await user.updateProfile(displayName: newDisplayName);
+        await user.reload();
+        _logger.i('Display name updated to: $newDisplayName');
+      } else {
+        throw Exception('No user is currently signed in');
+      }
+    } catch (e) {
+      _logger.e('Error updating display name: $e');
+      rethrow;
+    }
+  }
+
+  // 닉네임 유효성 검사 메서드 추가
+  bool isValidDisplayName(String displayName) {
+    // 2-20자 제한, 특수문자 제한 등
+    final RegExp validDisplayName = RegExp(r'^[a-zA-Z0-9가-힣]{2,20}$');
+    return validDisplayName.hasMatch(displayName);
   }
 }

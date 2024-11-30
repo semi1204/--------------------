@@ -60,12 +60,14 @@ class ReviewQuizzesProvider with ChangeNotifier {
       _quizzesForReview = await _quizService.getQuizzesForReview(
           userId!, _selectedSubjectId!, null);
       _logger.i('복습 카드 ${_quizzesForReview.length}개 로드 완료');
-      _logger.d('로드된 퀴즈: ${_quizzesForReview.map((q) => q.id).toList()}');
 
-      // 오늘의 복습 퀴즈만 포함하도록 초기화 후 새로 설정
-      _subjectTotalReviewQuizIds[_selectedSubjectId!] =
-          Set<String>.from(_quizzesForReview.map((q) => q.id));
-      _saveTotalReviewQuizIds();
+      // 오늘의 복습 퀴즈 초기화 및 설정
+      if (!_isSameDay(_lastResetDate, DateTime.now())) {
+        _subjectTotalReviewQuizIds[_selectedSubjectId!] =
+            Set<String>.from(_quizzesForReview.map((q) => q.id));
+        _lastResetDate = DateTime.now();
+        await _saveTotalReviewQuizIds();
+      }
     } catch (e) {
       _logger.e('퀴즈 복습 데이터를 불러올 수 없음: $e');
     } finally {
@@ -128,8 +130,12 @@ class ReviewQuizzesProvider with ChangeNotifier {
   }
 
   void _resetReviewedQuizIds() {
+    // 복습한 퀴즈 목록 초기화
+    _subjectReviewedQuizIds.clear();
+    // 오늘의 총 복습 퀴즈 목록도 초기화
     _subjectTotalReviewQuizIds.clear();
     _lastResetDate = DateTime.now();
+    _saveReviewedQuizIds();
     _saveTotalReviewQuizIds();
   }
 
@@ -164,12 +170,17 @@ class ReviewQuizzesProvider with ChangeNotifier {
     }
 
     try {
+      // 오늘의 총 복습 문제 수
       int total = _subjectTotalReviewQuizIds[subjectId]?.length ?? 0;
-      int remaining = _quizzesForReview.length;
-      int completed = total - remaining;
 
-      // Ensure completed is not negative
+      // 남은 문제 수는 현재 _quizzesForReview의 길이
+      int remaining = _quizzesForReview.length;
+
+      // 완료된 문제 수는 (총 문제 수 - 남은 문제 수)
+      int completed = total - remaining;
       completed = max(0, completed);
+
+      _logger.d('복습 진행도 - 총: $total, 완료: $completed, 남음: $remaining');
 
       return {'total': total, 'completed': completed, 'remaining': remaining};
     } catch (e) {
@@ -186,6 +197,26 @@ class ReviewQuizzesProvider with ChangeNotifier {
     } catch (e) {
       _logger.e('복습할 퀴즈를 가져오는 중 오류 발생: $e');
       return [];
+    }
+  }
+
+  Future<void> syncWithUserData() async {
+    if (userId == null || _selectedSubjectId == null) return;
+
+    try {
+      // 현재 복습 퀴즈 목록 새로고침
+      _quizzesForReview = await _quizService.getQuizzesForReview(
+          userId!, _selectedSubjectId!, null);
+
+      // 진행도 업데이트를 위한 상태 갱신
+      if (_subjectTotalReviewQuizIds[_selectedSubjectId!] == null) {
+        _subjectTotalReviewQuizIds[_selectedSubjectId!] =
+            Set<String>.from(_quizzesForReview.map((q) => q.id));
+      }
+
+      notifyListeners();
+    } catch (e) {
+      _logger.e('사용자 데이터 동기화 중 오류 발생: $e');
     }
   }
 }

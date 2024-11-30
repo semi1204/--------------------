@@ -1,13 +1,12 @@
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
 class AnkiAlgorithm {
-  static const int initialInterval = kDebugMode ? 1 : 1440; // 디버그: 1분, 실제: 1일
+  static const int initialInterval = 10; // 10분
   static final Logger _logger = Logger();
 
   // Modified: Make _targetRetention configurable
-  static double _targetRetention = 0.9; // Default target retention
+  static double _targetRetention = 0.8; // Default target retention
 
   // Add getter and setter for targetRetention
   static double get targetRetention => _targetRetention;
@@ -21,8 +20,8 @@ class AnkiAlgorithm {
   static const double _minDifficulty = 0.1; // 최소 난이도
   static const double _maxDifficulty = 1.0; // 최대 난이도
 
-  // 최대 복습 간격을 45일(64800분)로 제한하는 상수 추가
-  static const int maxInterval = kDebugMode ? 45 : 64800; // 디버그: 45분, 실제: 45일
+  // 최대 복습 간격을 15일(21600분)로 제한하는 상수 추가 (기존 45일의 1/3)
+  static const int maxInterval = 21600; // 15일
 
   static Map<String, dynamic> calculateNextReview({
     required int interval,
@@ -52,8 +51,8 @@ class AnkiAlgorithm {
     double newStability = _updateStability(currentStability, isCorrect,
         newDifficulty, consecutiveCorrect, isUnderstandingImproved);
 
-    // 다음 복습 간격 계산
-    int newInterval = _calculateNextInterval(newStability);
+    // 다음 복습 간격 계산 (1/3로 감소)
+    int newInterval = (_calculateNextInterval(newStability) / 3).round();
 
     _logger.d('''FSRS 계산 결과:
       난이도: $currentDifficulty → $newDifficulty

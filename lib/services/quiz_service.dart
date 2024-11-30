@@ -11,6 +11,8 @@ import '../utils/anki_algorithm.dart';
 import 'dart:async';
 import 'keyword_service.dart';
 import 'dart:math' as math;
+import 'auth_service.dart';
+import 'payment_service.dart'; // Added import
 
 // 데이터를 보내고 받을 때의 원칙은 무조건, 최신의 데이터를 덮어쓰는 방식으로 최대한 적은 데이터를 송수신하게 해야함
 class QuizService {
@@ -21,6 +23,9 @@ class QuizService {
   final Logger _logger = Logger();
   final Uuid _uuid = const Uuid();
   final KeywordService _keywordService = KeywordService();
+  final AuthService _authService = AuthService();
+  final PaymentService _paymentService =
+      PaymentService(logger: Logger()); // Added PaymentService instance
 
   static const String _subjectsKey = 'subjects'; // 과목 데이터 캐시 키
   static const String _quizTypesKey = 'quizTypes'; // 퀴즈 유형 데이터 캐시 키
@@ -36,8 +41,14 @@ class QuizService {
   QuizService._internal();
   // 로컬 스토리지에서 사용자 퀴즈 데이터를 로드하는 메소드
 
+  String _getUserDisplayName(String userId) {
+    final displayName = _authService.getCurrentUserDisplayName();
+    return displayName ?? userId;
+  }
+
   Future<void> loadUserQuizData(String userId) async {
-    _logger.i('사용자 $userId의 퀴즈 데이터를 로드하는 중');
+    final userName = _getUserDisplayName(userId);
+    _logger.i('사용자 $userName($userId)의 퀴즈 데이터를 로드하는 중');
     try {
       final prefs = await SharedPreferences.getInstance(); // 앱의 로컬 데이터 저장소에 접근
       final String? jsonString = prefs
@@ -48,14 +59,15 @@ class QuizService {
             json.decode(jsonString); // 문자열을 Map으로 변환
         _userQuizData[userId] = _convertToQuizUserDataMap(
             jsonData); // Map을 QuizUserData 객체로 변환하여 저장
-        _logger.i('로컬 스토리지에서 사용자 $userId의 퀴즈 데이터를 로드했습니다');
+        _logger.i('로컬 스토리지에서 사용자 $userName($userId)의 퀴즈 데이터를 로드했습니다');
       } else {
         // 로컬 저장소에 퀴즈 데이터가 없으면
-        _logger.i('로컬 스토리지에 사용자 $userId의 데이터가 없습니다. Firebase에서 로드를 시도합니다.');
+        _logger.i(
+            '로컬 스토리지에 사용자 $userName($userId)의 데이터가 없습니다. Firebase에서 로드를 시도합니다.');
         await _loadUserQuizDataFromFirebase(userId); // Firebase에서 퀴즈 데이터를 로드
       }
     } catch (e) {
-      _logger.e('사용자 $userId의 퀴즈 데이터를 로드하는 중 오류 발생: $e');
+      _logger.e('사용자 $userName($userId)의 퀴즈 데이터를 로드하는 중 오류 발생: $e');
       rethrow;
     }
   }
@@ -63,6 +75,18 @@ class QuizService {
   // Firebase에서 사용자 퀴즈 데이터를 로드하는 메소드
   Future<void> _loadUserQuizDataFromFirebase(String userId) async {
     try {
+      // 결제 상태 확인
+      final hasValidSubscription =
+          await _paymentService.checkSubscriptionStatus();
+      if (!hasValidSubscription) {
+        final canAttempt = await _paymentService.canAttemptQuiz();
+        if (!canAttempt) {
+          _logger.w(
+              'User $userId has no valid subscription or free attempts remaining');
+          throw Exception('Subscription required or free attempts exhausted');
+        }
+      }
+
       final docSnapshot =
           await _firestore.collection('users').doc(userId).get();
       if (docSnapshot.exists) {
@@ -160,8 +184,9 @@ class QuizService {
     bool isUnderstandingImproved = false,
     bool? toggleReviewStatus,
   }) async {
+    final userName = _getUserDisplayName(userId);
     _logger.i(
-        '사용자 퀴즈 데이터 업데이트 중: user=$userId, subject=$subjectId, quizType=$quizTypeId, quiz=$quizId, correct=$isCorrect');
+        '사용자 $userName($userId)의 퀴즈 데이터 업데이트 중: subject=$subjectId, quizType=$quizTypeId, quiz=$quizId, correct=$isCorrect');
 
     _userQuizData[userId] ??= {};
     _userQuizData[userId]![subjectId] ??= {};
@@ -234,7 +259,7 @@ class QuizService {
     }
 
     await saveUserQuizData(userId); // Ensure data is saved locally
-    _logger.d('사용자 퀴즈 데이터 업데이트 완료');
+    _logger.d('사용자 $userName($userId)의 퀴즈 데이터 업데이트 완료');
 
     // Added: Trigger synchronization after updating quiz data
     await syncUserData(userId, getUserQuizData(userId));
@@ -725,7 +750,7 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
           .doc(quiz.id)
           .update(quizData);
 
-      // KeywordService를 통한 키워드 업데이트
+      // KeywordService를 통한 키워�� 업데이트
       final processedKeywords =
           await _keywordService.processQuizKeywords(quiz.keywords, quiz.id);
 
@@ -838,7 +863,8 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
   // New method to generate performance analytics
   Future<Map<String, dynamic>> generatePerformanceAnalytics(
       String userId, String subjectId) async {
-    _logger.i('사용자 $userId에 대한 성능 분석을 생성하는 중입니다: 과목 $subjectId');
+    final userName = _getUserDisplayName(userId);
+    _logger.i('사용자 $userName($userId)에 대한 성능 분석을 생성하는 중입니다: 과목 $subjectId');
     try {
       await loadUserQuizData(userId);
       final userData = _userQuizData[userId];
@@ -898,7 +924,7 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
         'recentPerformance': recentPerformance,
       };
     } catch (e) {
-      _logger.e('사용자 $userId에 대한 성능 분석을 생성하는 중 오류가 발생했습니다: $e');
+      _logger.e('사용자 $userName($userId)에 대한 성능 분석을 생성하는 중 오류가 발생했습니다: $e');
       return {'error': '성능 분석을 생성하는 중 오류가 발생했습니다'};
     }
   }
@@ -973,17 +999,18 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
 
   Future<void> resetSelectedOption(
       String userId, String subjectId, String quizTypeId, String quizId) async {
-    _logger.i('사용자 $userId의 선택한 옵션 초기화 중');
+    final userName = _getUserDisplayName(userId);
+    _logger.i('사용자 $userName($userId)의 선택한 옵션 초기화 중');
     try {
       final quizData = _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId];
       if (quizData != null) {
         quizData.selectedOptionIndex = null;
         await saveUserQuizData(userId);
         await syncUserData(userId, getUserQuizData(userId));
-        _logger.d('선택한 옵션 초기화 완료');
+        _logger.d('사용자 $userName($userId)의 선택한 옵션 초기화 완료');
       }
     } catch (e) {
-      _logger.e('선택한 옵션 초기화 중 오류 발생: $e');
+      _logger.e('사용자 $userName($userId)의 선택한 옵션 초기화 중 오류 발생: $e');
       rethrow;
     }
   }

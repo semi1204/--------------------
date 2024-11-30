@@ -74,6 +74,7 @@ dependencies:
   in_app_purchase: ^3.2.0
   flutter_typeahead: ^5.2.0
   in_app_review: ^2.0.9
+  encrypt: ^5.0.3
 
 dev_dependencies:
   flutter_test:

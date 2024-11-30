@@ -25,7 +25,7 @@ class QuizQuestion extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color:
-                    isDarkMode ? Colors.black26 : Colors.grey.withOpacity(0.3),
+                    isDarkMode ? Colors.black26 : Colors.grey.withOpacity(0.2),
                 spreadRadius: 1,
                 blurRadius: 3,
                 offset: const Offset(0, 1),

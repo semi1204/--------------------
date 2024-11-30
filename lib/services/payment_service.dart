@@ -63,60 +63,57 @@ class PaymentService extends ChangeNotifier {
 
   Future<bool> checkSubscriptionStatus() async {
     try {
-      // 유저 정보 가져오기
       final user = _auth.currentUser;
       if (user == null) return false;
-      // admin 상태 로그 출력
-      _logger.d('Checking admin status for user: ${user.email}');
 
-      // 이메일로 admin 체크
+      _logger.d('Checking subscription status for user: ${user.email}');
+
+      // admin 체크
       if (user.email == ADMIN_EMAIL) {
         _logger.i('User is admin - granting access');
         return true;
       }
 
-      // 로컬 상태 확인
-      final localStatus = await hasActiveSubscription();
-      // firestore에서 유저 정보 가져오기
-      final doc =
-          await _firestore.collection('subscriptions').doc(user.uid).get();
-      // firestore에서 유저 정보가 없으면 로컬 상태 반환
-      if (!doc.exists) return localStatus;
+      // 서버에서 구독 상태 확인
+      try {
+        final doc =
+            await _firestore.collection('subscriptions').doc(user.uid).get();
+        if (doc.exists) {
+          final serverEndDate = (doc.data()?['endDate'] as Timestamp).toDate();
+          final isActiveOnServer = DateTime.now().isBefore(serverEndDate);
 
-      // firestore에서 유저 정보 가져오기
-      final serverEndDate = (doc.data()?['endDate'] as Timestamp).toDate();
-      // firestore에서 유저 정보가 있으면 서버 상태 확인
-      final isActiveOnServer = DateTime.now().isBefore(serverEndDate);
+          // 서버 상태를 로컬에 캐시
+          await _prefs?.setInt(
+            _subscriptionEndDateKey,
+            serverEndDate.millisecondsSinceEpoch,
+          );
 
-      // 로컬과 서버 상태가 다르면 로컬 상태 업데이트
-      if (localStatus != isActiveOnServer) {
-        await _prefs?.setInt(
-          _subscriptionEndDateKey,
-          serverEndDate.millisecondsSinceEpoch,
-        );
-        notifyListeners();
+          notifyListeners();
+          return isActiveOnServer;
+        }
+      } catch (e) {
+        _logger.w('Server check failed, falling back to local cache: $e');
       }
 
-      return isActiveOnServer;
+      // 서버 체크 실패시 로컬 캐시 사용
+      return await hasActiveSubscription();
     } catch (e) {
       _logger.e('Error checking subscription status: $e');
-      return await hasActiveSubscription();
+      return false;
     }
   }
 
   Future<bool> hasActiveSubscription() async {
-    try {
-      await _initPrefs();
-      final subscriptionEndDate = _prefs?.getInt(_subscriptionEndDateKey);
+    await _initPrefs();
+    final endDateMillis = _prefs?.getInt(_subscriptionEndDateKey);
+    if (endDateMillis == null) return false;
 
-      if (subscriptionEndDate == null) return false;
+    final endDate = DateTime.fromMillisecondsSinceEpoch(endDateMillis);
+    final isActive = DateTime.now().isBefore(endDate);
 
-      final endDate = DateTime.fromMillisecondsSinceEpoch(subscriptionEndDate);
-      return DateTime.now().isBefore(endDate);
-    } catch (e) {
-      _logger.e('Error checking local subscription status: $e');
-      return false;
-    }
+    _logger.d(
+        'Local subscription status: ${isActive ? 'active' : 'inactive'} until $endDate');
+    return isActive;
   }
 
   Future<bool> canAttemptQuiz() async {

@@ -191,7 +191,8 @@ class _QuizPageState extends State<QuizPage>
                                               )
                                               ?.toIso8601String() ??
                                           DateTime.now().toIso8601String(),
-                                      rebuildExplanation: quizProvider.rebuildExplanation,
+                                      rebuildExplanation:
+                                          quizProvider.rebuildExplanation,
                                     ),
                                   );
                                 },
@@ -437,7 +438,8 @@ class _QuizPageState extends State<QuizPage>
     if (!viewModeProvider.isOneByOne) {
       // 스크롤 모드에서 단일 모드로 전환
       final visibleIndex = _findVisibleQuizIndex();
-      if (quizProvider.quizzes.isNotEmpty && visibleIndex < quizProvider.quizzes.length) {
+      if (quizProvider.quizzes.isNotEmpty &&
+          visibleIndex < quizProvider.quizzes.length) {
         final visibleQuiz = quizProvider.quizzes[visibleIndex];
         viewModeProvider.setCurrentQuizPosition(visibleIndex, visibleQuiz.id);
         await viewModeProvider.toggleViewMode();
@@ -446,7 +448,7 @@ class _QuizPageState extends State<QuizPage>
       // 단일 모드에서 스크롤 모드로 전환
       final currentIndex = viewModeProvider.currentIndex;
       await viewModeProvider.toggleViewMode();
-      
+
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           await _scrollController.scrollToIndex(
@@ -472,8 +474,8 @@ class _QuizPageState extends State<QuizPage>
 
     for (int i = 0; i < context.read<QuizProvider>().quizzes.length; i++) {
       try {
-        final RenderBox? renderBox = _scrollController
-            .tagMap[i]?.context?.findRenderObject() as RenderBox?;
+        final RenderBox? renderBox = _scrollController.tagMap[i]?.context
+            ?.findRenderObject() as RenderBox?;
         if (renderBox == null) continue;
 
         final Offset offset = renderBox.localToGlobal(Offset.zero);

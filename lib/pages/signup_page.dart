@@ -61,6 +61,7 @@ class _SignUpPageState extends State<SignUpPage> {
         final user = await authService.signUpWithEmailAndPassword(
           _emailController.text,
           _passwordController.text,
+          _confirmPasswordController.text,
         );
         if (user != null) {
           if (!mounted) return;

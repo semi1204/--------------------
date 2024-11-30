@@ -74,54 +74,92 @@ class _SubjectReviewPageState extends State<SubjectReviewPage> {
     if (provider.quizzesForReview.isEmpty) {
       return SliverFillRemaining(child: _buildEmptyState(context, provider));
     }
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final quiz = provider.quizzesForReview[index];
-          return Center(
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(
                 maxWidth: 800,
               ),
-              child: ReviewPageCard(
-                key: ValueKey(quiz.id),
-                quiz: quiz,
-                isAdmin: userProvider.isAdmin,
-                questionNumber: index + 1,
-                onAnswerSelected: (answerIndex) => _handleAnswerSelected(
-                    quiz, answerIndex, provider, userProvider),
-                subjectId: provider.selectedSubjectId!,
-                quizTypeId: quiz.typeId,
-                nextReviewDate: userProvider
-                        .getNextReviewDate(
-                          provider.selectedSubjectId!,
-                          quiz.typeId,
-                          quiz.id,
-                        )
-                        ?.toIso8601String() ??
-                    DateTime.now().toIso8601String(),
-                onFeedbackGiven: (quiz, isUnderstandingImproved) async {
-                  provider.removeQuizFromReview(quiz.id);
-                  _reviewedQuizIds.add(quiz.id);
-                  await _saveReviewedQuizIds();
-                  setState(() {});
-                },
-                onRemoveCard: (quizId) {
-                  userProvider.removeFromReviewList(
-                    provider.selectedSubjectId!,
-                    quiz.typeId,
-                    quizId,
-                  );
-                  provider.removeQuizFromReview(quizId);
-                  _reviewedQuizIds.add(quizId);
-                  _saveReviewedQuizIds();
-                  setState(() {});
-                },
-              ),
+              child: provider.quizzesForReview.isNotEmpty
+                  ? Column(
+                      children: [
+                        ReviewPageCard(
+                          key: ValueKey(provider.quizzesForReview[0].id),
+                          quiz: provider.quizzesForReview[0],
+                          isAdmin: userProvider.isAdmin,
+                          questionNumber: 1,
+                          onAnswerSelected: (answerIndex) =>
+                              _handleAnswerSelected(
+                                  provider.quizzesForReview[0],
+                                  answerIndex,
+                                  provider,
+                                  userProvider),
+                          subjectId: provider.selectedSubjectId!,
+                          quizTypeId: provider.quizzesForReview[0].typeId,
+                          nextReviewDate: userProvider
+                                  .getNextReviewDate(
+                                    provider.selectedSubjectId!,
+                                    provider.quizzesForReview[0].typeId,
+                                    provider.quizzesForReview[0].id,
+                                  )
+                                  ?.toIso8601String() ??
+                              DateTime.now().toIso8601String(),
+                          onFeedbackGiven:
+                              (quiz, isUnderstandingImproved) async {
+                            provider.removeQuizFromReview(quiz.id);
+                            _reviewedQuizIds.add(quiz.id);
+                            await _saveReviewedQuizIds();
+                            setState(() {});
+                          },
+                          onRemoveCard: (quizId) {
+                            userProvider.removeFromReviewList(
+                              provider.selectedSubjectId!,
+                              provider.quizzesForReview[0].typeId,
+                              quizId,
+                            );
+                            provider.removeQuizFromReview(quizId);
+                            _reviewedQuizIds.add(quizId);
+                            _saveReviewedQuizIds();
+                            setState(() {});
+                          },
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: FutureBuilder<Map<String, int>>(
+                            future: provider
+                                .getReviewProgress(provider.selectedSubjectId!),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData) {
+                                return LayoutBuilder(
+                                    builder: (context, constraints) {
+                                  // 디바이스 너비에 따라 글자 크기 조정
+                                  double fontSize =
+                                      MediaQuery.of(context).size.width < 600
+                                          ? 14.0 // 모바일 디바이스
+                                          : 16.0; // 태블릿 이상
+
+                                  return Text(
+                                    '오늘의 복습: ${snapshot.data!['completed']}/${snapshot.data!['total']}',
+                                    style: TextStyle(
+                                      fontSize: fontSize,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  );
+                                });
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ),
+                      ],
+                    )
+                  : Container(),
             ),
-          );
-        },
-        childCount: provider.quizzesForReview.length,
+          ),
+        ],
       ),
     );
   }

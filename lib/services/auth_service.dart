@@ -31,16 +31,20 @@ class AuthService {
   }
 
   Future<User?> signUpWithEmailAndPassword(
-      String email, String password) async {
+      String email, String password, String displayName) async {
     try {
       final UserCredential userCredential =
           await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      // 사용자 표시 이름 설정
+      await userCredential.user?.updateProfile(displayName: displayName);
+
       await userCredential.user?.sendEmailVerification();
       _logger.i(
-          'User ${userCredential.user?.email} signed up with email. Verification email sent.');
+          'User ${userCredential.user?.email} signed up with email. Display name set to $displayName. Verification email sent.');
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
       _logger.e('Firebase Auth Error during sign up: ${e.code} - ${e.message}');
@@ -66,6 +70,13 @@ class AuthService {
 
         final UserCredential userCredential =
             await _auth.signInWithCredential(credential);
+
+        // Google 계정의 이름을 Firebase 사용자 프로필에 설정
+        if (googleSignInAccount.displayName != null) {
+          await userCredential.user
+              ?.updateProfile(displayName: googleSignInAccount.displayName);
+        }
+
         _logger.i('User ${userCredential.user?.email} signed in with Google');
         return userCredential.user;
       }
@@ -100,6 +111,15 @@ class AuthService {
       );
 
       final userCredential = await _auth.signInWithCredential(oauthCredential);
+
+      // Apple 계정의 이름을 Firebase 사용자 프로필에 설정
+      if (appleCredential.givenName != null) {
+        final displayName =
+            '${appleCredential.givenName} ${appleCredential.familyName}';
+        await userCredential.user
+            ?.updateProfile(displayName: displayName.trim());
+      }
+
       _logger.i('User ${userCredential.user?.email} signed in with Apple');
       return userCredential.user;
     } catch (e) {

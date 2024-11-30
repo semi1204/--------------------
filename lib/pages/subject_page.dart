@@ -298,6 +298,7 @@ class SubjectPage extends StatefulWidget {
 class _SubjectPageState extends State<SubjectPage> {
   final ScrollController _scrollController = ScrollController();
   bool _isScrolling = false;
+  Map<String, Map<String, dynamic>> _subjectProgressCache = {};
 
   @override
   void initState() {
@@ -305,7 +306,22 @@ class _SubjectPageState extends State<SubjectPage> {
     _scrollController.addListener(_scrollListener);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<SubjectProvider>(context, listen: false).loadSubjects();
+      _preloadSubjectProgress();
     });
+  }
+
+  Future<void> _preloadSubjectProgress() async {
+    final subjectProvider =
+        Provider.of<SubjectProvider>(context, listen: false);
+    final quizService = Provider.of<QuizService>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    for (var subject in subjectProvider.subjects) {
+      final progress = await _calculateQuizSubjectProgress(
+          quizService, userProvider, subject.id, 'default');
+      _subjectProgressCache[subject.id] = progress;
+    }
+    if (mounted) setState(() {});
   }
 
   void _scrollListener() {
@@ -374,6 +390,21 @@ class _SubjectPageState extends State<SubjectPage> {
       itemCount: subjectProvider.subjects.length,
       itemBuilder: (context, index) {
         final subject = subjectProvider.subjects[index];
+
+        // 캐시된 데이터 사용
+        if (_subjectProgressCache.containsKey(subject.id)) {
+          final progressData = _subjectProgressCache[subject.id]!;
+          return SubjectCard(
+            subject: subject,
+            progress: progressData['progress'] as double,
+            answeredCount: progressData['answeredCount'] as int,
+            totalCount: progressData['totalCount'] as int,
+            accuracy: progressData['accuracy'] as int,
+            userId: userId,
+            themeProvider: themeProvider,
+          );
+        }
+
         return FutureBuilder<Map<String, dynamic>>(
           future: _calculateQuizSubjectProgress(
               quizService, userProvider, subject.id, 'default'),
@@ -381,6 +412,7 @@ class _SubjectPageState extends State<SubjectPage> {
             if (progressSnapshot.connectionState == ConnectionState.waiting) {
               return const ListTile(title: Text('Loading...'));
             }
+
             final progressData = progressSnapshot.data ??
                 {
                   'progress': 0.0,
@@ -388,17 +420,16 @@ class _SubjectPageState extends State<SubjectPage> {
                   'totalCount': 0,
                   'accuracy': 0
                 };
-            final progress = progressData['progress'] as double;
-            final answeredCount = progressData['answeredCount'] as int;
-            final totalCount = progressData['totalCount'] as int;
-            final accuracy = progressData['accuracy'] as int;
+
+            // 데이터 캐싱
+            _subjectProgressCache[subject.id] = progressData;
 
             return SubjectCard(
               subject: subject,
-              progress: progress,
-              answeredCount: answeredCount,
-              totalCount: totalCount,
-              accuracy: accuracy,
+              progress: progressData['progress'] as double,
+              answeredCount: progressData['answeredCount'] as int,
+              totalCount: progressData['totalCount'] as int,
+              accuracy: progressData['accuracy'] as int,
               userId: userId,
               themeProvider: themeProvider,
             );
@@ -445,6 +476,11 @@ class _SubjectPageState extends State<SubjectPage> {
     final subjectData = quizData[subjectId] as Map<String, dynamic>?;
     final userId = userProvider.user?.uid;
 
+    // 캐시된 데이터가 있으면 사용
+    if (_subjectProgressCache.containsKey(subjectId)) {
+      return _subjectProgressCache[subjectId]!;
+    }
+
     int totalAnsweredQuizzes = 0;
     int totalQuizCount = 0;
     int totalAccuracy = 0;
@@ -478,12 +514,17 @@ class _SubjectPageState extends State<SubjectPage> {
     int averageAccuracy =
         totalTypes > 0 ? (totalAccuracy / totalTypes).round() : 0;
 
-    return {
+    final result = {
       'progress': progress,
       'answeredCount': totalAnsweredQuizzes,
       'totalCount': totalQuizCount,
       'accuracy': averageAccuracy
     };
+
+    // 결과 캐싱
+    _subjectProgressCache[subjectId] = result;
+
+    return result;
   }
 }
 

@@ -486,8 +486,10 @@ class _QuizPageState extends State<QuizPage>
       if (quizProvider.quizzes.isNotEmpty &&
           visibleIndex < quizProvider.quizzes.length) {
         final visibleQuiz = quizProvider.quizzes[visibleIndex];
-        print(
-            'Switching to single view mode. Quiz ID: ${visibleQuiz.id}, Index: $visibleIndex'); // 디버깅용
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              '단일 보기 모드로 전환. 퀴즈 ID: ${visibleQuiz.id}, 인덱스: $visibleIndex'),
+        ));
         viewModeProvider.setCurrentQuizPosition(visibleIndex, visibleQuiz.id);
       }
     } else {
@@ -497,8 +499,10 @@ class _QuizPageState extends State<QuizPage>
           quizProvider.quizzes.indexWhere((quiz) => quiz.id == currentQuizId);
 
       if (currentIndex != -1) {
-        print(
-            'Switching to scroll mode. Quiz ID: $currentQuizId, Index: $currentIndex'); // 디버깅용
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text('스크롤 모드로 전환. 퀴즈 ID: $currentQuizId, 인덱스: $currentIndex'),
+        ));
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             _scrollController.scrollToIndex(

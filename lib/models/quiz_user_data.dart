@@ -18,7 +18,7 @@ class QuizUserData {
     this.correct = 0,
     this.total = 0,
     this.accuracy = 0.0,
-    this.interval = AnkiAlgorithm.initialInterval,
+    this.interval = 0,
     this.easeFactor = 2.5,
     this.consecutiveCorrect = 0,
     required this.lastAnswered,
@@ -48,7 +48,7 @@ class QuizUserData {
         correct: json['correct'] ?? 0,
         total: json['total'] ?? 0,
         accuracy: json['accuracy'] ?? 0.0,
-        interval: json['interval'] ?? AnkiAlgorithm.initialInterval,
+        interval: json['interval'] ?? 0,
         easeFactor: json['easeFactor'] ?? 2.5,
         consecutiveCorrect: json['consecutiveCorrect'] ?? 0,
         nextReviewDate: json['nextReviewDate'] != null

@@ -43,7 +43,7 @@ class QuizOptions extends StatelessWidget {
         final option = entry.value;
         return Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 5.0),
             child: _buildOptionButton(index, option),
           ),
         );

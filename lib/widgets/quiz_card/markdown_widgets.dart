@@ -183,7 +183,7 @@ class MarkdownRenderer extends StatelessWidget {
         );
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: markdownWidgets,
@@ -294,7 +294,7 @@ class HtmlNode extends SpanNode {
       return const TextSpan(text: '\n');
     }
 
-    // {{html}} 태��� 제거
+    // {{html}} 태 제거
     String processedContent =
         htmlContent.replaceAll('{{html}}', '').replaceAll('{{/html}}', '');
 

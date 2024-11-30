@@ -15,6 +15,7 @@ class QuizHeader extends StatelessWidget {
   final VoidCallback onResetQuiz;
   final VoidCallback onReportError;
   final Logger logger;
+  final int? questionNumber;
 
   const QuizHeader({
     super.key,
@@ -24,6 +25,7 @@ class QuizHeader extends StatelessWidget {
     required this.onResetQuiz,
     required this.onReportError,
     required this.logger,
+    this.questionNumber,
   });
 
   // 각 퀴즈ID에 대한 메뉴화면
@@ -115,6 +117,16 @@ class QuizHeader extends StatelessWidget {
                 color: Colors.grey[600],
               ),
             ),
+            if (questionNumber != null) ...[
+              Text(
+                '$questionNumber',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
             Row(
               children: [
                 Container(

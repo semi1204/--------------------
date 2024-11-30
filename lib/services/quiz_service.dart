@@ -14,8 +14,8 @@ import 'dart:math' as math;
 
 // TODO : 무조건 firebase에서 데이터 파싱하지 말고, 로컬스토리지에서 가져오도록 수정해야함
 // TODO : 로컬스토리지에서 가져오는 방법 찾아보기
-// TODO : firebase와 연동은 동기화버튼으로 user_quiz_data_${userId} 데이터를 보내고, 받아야 함.
-// TODO : 모든 문제를 한번에 파싱하지 말고, 부분적으로 파싱하는 걸 생각해야 함.
+// TODO : firebase와 연동은 동기화버튼으로 user_quiz_data_${userId} 데이터를 보내고, 받아야.ham.
+// TODO : 모든 문제를 한번에 파싱하지 말고, 부분적으로 파싱하는 걸 생각해야.ham.
 // 데이터를 보내고 받을 때의 원칙은 무조건, 최신의 데이터를 덮어쓰는 방식으로 최대한 적은 데이터를 송수신하게 해야함
 class QuizService {
   static final QuizService _instance = QuizService._internal();
@@ -412,7 +412,37 @@ class QuizService {
   Map<String, dynamic> getUserQuizData(String userId) {
     _logger.i('사용자 퀴즈 데이터 가져오기: $userId');
     final data = _convertFromQuizUserDataMap(_userQuizData[userId] ?? {});
-    _logger.d('User quiz data: $data');
+
+    // FSRS 형식으로 로그 출력 - 변화가 있는 퀴즈만
+    if (_userQuizData[userId] != null) {
+      for (var subjectId in _userQuizData[userId]!.keys) {
+        for (var quizTypeId in _userQuizData[userId]![subjectId]!.keys) {
+          for (var quizId
+              in _userQuizData[userId]![subjectId]![quizTypeId]!.keys) {
+            final quizData =
+                _userQuizData[userId]![subjectId]![quizTypeId]![quizId]!;
+
+            // 복습 리스트에 있고, 최근에 변경된 퀴즈만 로그 출력
+            if (quizData.markedForReview &&
+                DateTime.now().difference(quizData.lastAnswered).inMinutes <
+                    1) {
+              final currentAccuracy = quizData.accuracy * 100;
+              final retention = AnkiAlgorithm.targetRetention * 100;
+              final intervalInDays = quizData.interval ~/ 1440; // 분을 일로 변환
+
+              _logger.d('''
+FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]:
+정답률: ${currentAccuracy.toStringAsFixed(1)}%
+기억유지율: ${retention.toStringAsFixed(1)}%
+복습 기간: ${intervalInDays}일
+복습 날짜: ${quizData.lastAnswered.toString()} → ${quizData.nextReviewDate?.toString() ?? '미정'}
+''');
+            }
+          }
+        }
+      }
+    }
+
     return data;
   }
 

@@ -157,9 +157,9 @@ class _QuizPageCardState extends State<QuizPageCard> {
                   maxWidth: 800,
                 ),
                 child: Card(
-                  margin: const EdgeInsets.all(8.0),
+                  margin: const EdgeInsets.all(4.0), // Card의 margin 줄임
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(8.0), // Card 내부 padding 줄임
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -167,6 +167,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
                           quiz: widget.quiz,
                           subjectId: widget.subjectId,
                           quizTypeId: widget.quizTypeId,
+                          questionNumber: widget.questionNumber,
                           onResetQuiz: () {
                             setState(() {
                               _selectedOptionIndex = null;
@@ -189,7 +190,7 @@ class _QuizPageCardState extends State<QuizPageCard> {
                           },
                           logger: _logger,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
                         QuizQuestion(
                           question: widget.quiz.question,
                           logger: _logger,
@@ -267,6 +268,11 @@ class _QuizPageCardState extends State<QuizPageCard> {
 
   // 퀴즈 상태 업데이트를 위한 별도 메서드
   void _updateQuizState(int index, UserProvider userProvider) {
+    _logger.i('퀴즈 상태 업데이트 시작: selectedIndex=$index');
+
+    final quizData = userProvider.getUserQuizData();
+    _logger.i('현재 사용자의 퀴즈 데이터: $quizData');
+
     setState(() {
       _selectedOptionIndex = index;
       _hasAnswered = true;
@@ -287,6 +293,8 @@ class _QuizPageCardState extends State<QuizPageCard> {
       answerTime: answerTime,
       selectedOptionIndex: index,
     );
+
+    _logger.i('퀴즈 상태 업데이트 완료: isCorrect=$isCorrect, answerTime=$answerTime');
 
     widget.onAnswerSelected?.call(index);
   }
@@ -354,9 +362,9 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                   maxWidth: 800,
                 ),
                 child: Card(
-                  margin: const EdgeInsets.all(8.0),
+                  margin: const EdgeInsets.all(4.0), // Card의 margin 줄임
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(8.0), // Card 내부 padding 줄임
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -364,6 +372,7 @@ class _ReviewPageCardState extends State<ReviewPageCard> {
                           quiz: widget.quiz,
                           subjectId: widget.subjectId,
                           quizTypeId: widget.quizTypeId,
+                          questionNumber: widget.questionNumber,
                           onResetQuiz:
                               () {}, // ReviewPageCard에서는 리셋 기능을 제하지 않습니다.
                           onReportError: () {

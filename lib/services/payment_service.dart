@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:nursing_quiz_app_6/models/subscription_constants.dart';
-import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'package:nursing_quiz_app_6/widgets/bottom_sheet/subscription_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
@@ -61,42 +60,43 @@ class PaymentService extends ChangeNotifier {
         _inAppPurchase.purchaseStream.listen(_handlePurchaseUpdate);
   }
 
+  static const String _subscriptionCacheKey = 'subscription_status';
+
   Future<bool> checkSubscriptionStatus() async {
     try {
       final user = _auth.currentUser;
       if (user == null) return false;
+      // 1. Check SharedPreferences cache first
+      await _initPrefs();
+      final cachedStatus =
+          _prefs?.getBool('${_subscriptionCacheKey}_${user.uid}');
+      final cachedTimestamp =
+          _prefs?.getInt('${_subscriptionCacheKey}_${user.uid}_timestamp');
 
-      _logger.d('Checking subscription status for user: ${user.email}');
-
-      // admin 체크
-      if (user.email == ADMIN_EMAIL) {
-        _logger.i('User is admin - granting access');
-        return true;
-      }
-
-      // 서버에서 구독 상태 확인
-      try {
-        final doc =
-            await _firestore.collection('subscriptions').doc(user.uid).get();
-        if (doc.exists) {
-          final serverEndDate = (doc.data()?['endDate'] as Timestamp).toDate();
-          final isActiveOnServer = DateTime.now().isBefore(serverEndDate);
-
-          // 서버 상태를 로컬에 캐시
-          await _prefs?.setInt(
-            _subscriptionEndDateKey,
-            serverEndDate.millisecondsSinceEpoch,
-          );
-
-          notifyListeners();
-          return isActiveOnServer;
+      if (cachedStatus != null && cachedTimestamp != null) {
+        final cacheAge = DateTime.now()
+            .difference(DateTime.fromMillisecondsSinceEpoch(cachedTimestamp));
+        if (cacheAge < const Duration(minutes: 30)) {
+          return cachedStatus;
         }
-      } catch (e) {
-        _logger.w('Server check failed, falling back to local cache: $e');
       }
 
-      // 서버 체크 실패시 로컬 캐시 사용
-      return await hasActiveSubscription();
+      // 2. Check Firestore only if cache miss or expired
+      final doc =
+          await _firestore.collection('subscriptions').doc(user.uid).get();
+      if (doc.exists) {
+        final serverEndDate = (doc.data()?['endDate'] as Timestamp).toDate();
+        final isActive = DateTime.now().isBefore(serverEndDate);
+
+        // Cache the result in SharedPreferences
+        await _prefs?.setBool('${_subscriptionCacheKey}_${user.uid}', isActive);
+        await _prefs?.setInt('${_subscriptionCacheKey}_${user.uid}_timestamp',
+            DateTime.now().millisecondsSinceEpoch);
+
+        return isActive;
+      }
+
+      return false;
     } catch (e) {
       _logger.e('Error checking subscription status: $e');
       return false;

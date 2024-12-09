@@ -12,9 +12,8 @@ import 'dart:async';
 import 'keyword_service.dart';
 import 'dart:math' as math;
 import 'auth_service.dart';
-import 'payment_service.dart'; // Added import
+import 'payment_service.dart';
 
-// 데이터를 보내고 받을 때의 원칙은 무조건, 최신의 데이터를 덮어쓰는 방식으로 최대한 적은 데이터를 송수신하게 해야함
 class QuizService {
   static final QuizService _instance = QuizService._internal();
   factory QuizService() => _instance;
@@ -24,13 +23,12 @@ class QuizService {
   final Uuid _uuid = const Uuid();
   final KeywordService _keywordService = KeywordService();
   final AuthService _authService = AuthService();
-  final PaymentService _paymentService =
-      PaymentService(logger: Logger()); // Added PaymentService instance
+  final PaymentService _paymentService = PaymentService(logger: Logger());
 
-  static const String _subjectsKey = 'subjects'; // 과목 데이터 캐시 키
-  static const String _quizTypesKey = 'quizTypes'; // 퀴즈 유형 데이터 캐시 키
-  static const String _quizzesKey = 'quizzes'; // 퀴즈 데이터 캐시 키
-  static const Duration _cacheExpiration = Duration(hours: 1); // 캐시 만료 시간
+  static const String _subjectsKey = 'subjects';
+  static const String _quizTypesKey = 'quizTypes';
+  static const String _quizzesKey = 'quizzes';
+  static const Duration _cacheExpiration = Duration(hours: 24);
 
   final Map<String, List<Subject>> _cachedSubjects = {};
   final Map<String, Map<String, List<QuizType>>> _cachedQuizTypes = {};
@@ -39,7 +37,6 @@ class QuizService {
       _userQuizData = {};
 
   QuizService._internal();
-  // 로컬 스토리지에서 사용자 퀴즈 데이터를 로드하는 메소드
 
   String _getUserDisplayName(String userId) {
     final displayName = _authService.getCurrentUserDisplayName();
@@ -47,42 +44,47 @@ class QuizService {
   }
 
   Future<void> loadUserQuizData(String userId) async {
-    final userName = _getUserDisplayName(userId);
-    _logger.i('사용자 $userName($userId)의 퀴즈 데이터를 로드하는 중');
     try {
-      final prefs = await SharedPreferences.getInstance(); // 앱의 로컬 데이터 저장소에 접근
-      final String? jsonString = prefs
-          .getString('user_quiz_data_$userId'); // 로컬 저장소에서 퀴즈 데이터를 문자열로 가져옴
-      if (jsonString != null) {
-        // 로컬 저장소에 퀴즈 데이터가 있으면
-        final Map<String, dynamic> jsonData =
-            json.decode(jsonString); // 문자열을 Map으로 변환
-        _userQuizData[userId] = _convertToQuizUserDataMap(
-            jsonData); // Map을 QuizUserData 객체로 변환하여 저장
-        _logger.i('로컬 스토리지에서 사용자 $userName($userId)의 퀴즈 데이터를 로드했습니다');
-      } else {
-        // 로컬 저장소에 퀴즈 데이터가 없으면
-        _logger.i(
-            '로컬 스토리지에 사용자 $userName($userId)의 데이터가 없습니다. Firebase에서 로드를 시도합니다.');
-        await _loadUserQuizDataFromFirebase(userId); // Firebase에서 퀴즈 데이터를 로드
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonString = prefs.getString('user_quiz_data_$userId');
+      final String? lastUpdateTime =
+          prefs.getString('last_update_time_$userId');
+
+      bool shouldLoadFromFirebase = false;
+
+      if (jsonString != null && lastUpdateTime != null) {
+        final lastUpdate = DateTime.parse(lastUpdateTime);
+        final now = DateTime.now();
+        shouldLoadFromFirebase = now.difference(lastUpdate) > _cacheExpiration;
+
+        if (!shouldLoadFromFirebase) {
+          final Map<String, dynamic> jsonData = json.decode(jsonString);
+          _userQuizData[userId] = _convertToQuizUserDataMap(jsonData);
+          return;
+        }
+      }
+
+      if (shouldLoadFromFirebase || jsonString == null) {
+        await _loadUserQuizDataFromFirebase(userId);
+
+        final updatedData = json
+            .encode(_convertFromQuizUserDataMap(_userQuizData[userId] ?? {}));
+        await prefs.setString('user_quiz_data_$userId', updatedData);
+        await prefs.setString(
+            'last_update_time_$userId', DateTime.now().toIso8601String());
       }
     } catch (e) {
-      _logger.e('사용자 $userName($userId)의 퀴즈 데이터를 로드하는 중 오류 발생: $e');
       rethrow;
     }
   }
 
-  // Firebase에서 사용자 퀴즈 데이터를 로드하는 메소드
   Future<void> _loadUserQuizDataFromFirebase(String userId) async {
     try {
-      // 결제 상태 확인
       final hasValidSubscription =
           await _paymentService.checkSubscriptionStatus();
       if (!hasValidSubscription) {
         final canAttempt = await _paymentService.canAttemptQuiz();
         if (!canAttempt) {
-          _logger.w(
-              'User $userId has no valid subscription or free attempts remaining');
           throw Exception('Subscription required or free attempts exhausted');
         }
       }
@@ -92,54 +94,35 @@ class QuizService {
       if (docSnapshot.exists) {
         final data = docSnapshot.data() as Map<String, dynamic>;
         _userQuizData[userId] = _convertToQuizUserDataMap(data);
-        _logger.i('Firebase에서 용자 $userId의 퀴즈 데이터를 로드했습니다');
-      } else {
-        _logger.w('Firebase에 사용자 $userId의 데이터가 없습니다');
       }
     } catch (e) {
-      _logger.e('Firebase에서 사용자 $userId의 퀴즈 데이터를 로드하는 중 오류 발생: $e');
       rethrow;
     }
   }
 
-  // 로컬 스토리지에 사용자 퀴즈 데이터를 저장하는 메소드
   Future<void> saveUserQuizData(String userId) async {
-    _logger.i('사용자 $userId의 퀴즈 데이터를 저장하는 중');
     try {
       final prefs = await SharedPreferences.getInstance();
       final String jsonString =
           json.encode(_convertFromQuizUserDataMap(_userQuizData[userId]!));
       await prefs.setString('user_quiz_data_$userId', jsonString);
-      _logger.i('사용자 $userId의 퀴즈 데이터를 로컬 스토리지에 저장했습니다');
     } catch (e) {
-      _logger.e('사용자 $userId의 퀴즈 데이터를 저장하는 중 오류 발생: $e');
       rethrow;
     }
   }
 
-  // Firebase와 데이터를 동기화하는 메소드
   Future<void> syncUserData(
       String userId, Map<String, dynamic> userData) async {
-    _logger.i('사용자 $userId의 데이터를 동기화하는 중');
     try {
-      // 로컬 데이터를 Firebase로 전송
       await _sendDataToFirebase(userId, userData);
-
-      // Firebase에서 최신 데이터를 받아옴
       final firebaseData = await _getDataFromFirebase(userId);
-
-      // 로컬 데이터 업데이트
       _userQuizData[userId] = _convertToQuizUserDataMap(firebaseData);
       await saveUserQuizData(userId);
-
-      _logger.i('사용자 $userId의 데이터 동기화 완료');
     } catch (e) {
-      _logger.e('사용자 $userId의 데이터 동기화 중 오류 발생: $e');
       rethrow;
     }
   }
 
-  // Firebase로 데이터를 전송하는 메소드
   Future<void> _sendDataToFirebase(
       String userId, Map<String, dynamic> data) async {
     try {
@@ -147,28 +130,21 @@ class QuizService {
           .collection('users')
           .doc(userId)
           .set(data, SetOptions(merge: true));
-      _logger.i('사용자 $userId의 데이터를 Firebase로 전송했습니다');
     } catch (e) {
-      _logger.e('사용자 $userId의 데이터를 Firebase로 전송하는 중 오류 발생: $e');
       rethrow;
     }
   }
 
-  // Firebase에서 데이터를 받아오는 메소드
   Future<Map<String, dynamic>> _getDataFromFirebase(String userId) async {
     try {
       final docSnapshot =
           await _firestore.collection('users').doc(userId).get();
       if (docSnapshot.exists) {
-        final data = docSnapshot.data() as Map<String, dynamic>;
-        _logger.i('Firebase에서 사용자 $userId의 데이터를 받아왔습니다');
-        return data;
+        return docSnapshot.data() as Map<String, dynamic>;
       } else {
-        _logger.w('Firebase에 사용자 $userId의 데이터가 없습니다');
         return {};
       }
     } catch (e) {
-      _logger.e('Firebase에서 사용자 $userId의 데이터를 받아오는 중 오류 발생: $e');
       rethrow;
     }
   }
@@ -184,20 +160,14 @@ class QuizService {
     bool isUnderstandingImproved = false,
     bool? toggleReviewStatus,
   }) async {
-    final userName = _getUserDisplayName(userId);
-    _logger.i(
-        '사용자 $userName($userId)의 퀴즈 데이터 업데이트 중: subject=$subjectId, quizType=$quizTypeId, quiz=$quizId, correct=$isCorrect');
-
     _userQuizData[userId] ??= {};
     _userQuizData[userId]![subjectId] ??= {};
     _userQuizData[userId]![subjectId]![quizTypeId] ??= {};
-    _userQuizData[userId]![subjectId]![quizTypeId]![quizId] ??= QuizUserData(
-      lastAnswered: DateTime.now(),
-    );
+    _userQuizData[userId]![subjectId]![quizTypeId]![quizId] ??=
+        QuizUserData(lastAnswered: DateTime.now());
 
     var quizData = _userQuizData[userId]![subjectId]![quizTypeId]![quizId]!;
 
-    // toggleReviewStatus가 true이거나 이미 복습 리스트에 있는 경우에만 Anki 알고리즘 적용
     if (toggleReviewStatus == true || quizData.markedForReview) {
       int? qualityOfRecall;
       if (answerTime != null) {
@@ -221,10 +191,8 @@ class QuizService {
       quizData.easeFactor = ankiResult['easeFactor'] as double;
       quizData.consecutiveCorrect = ankiResult['consecutiveCorrect'] as int;
       quizData.mistakeCount = ankiResult['mistakeCount'] as int;
-      // targetRetention을 직접 사용
-      quizData.nextReviewDate = DateTime.now().add(
-        Duration(minutes: quizData.interval),
-      );
+      quizData.nextReviewDate =
+          DateTime.now().add(Duration(minutes: quizData.interval));
     }
 
     if (isCorrect) {
@@ -242,35 +210,24 @@ class QuizService {
     if (toggleReviewStatus != null) {
       quizData.markedForReview = toggleReviewStatus;
       if (toggleReviewStatus) {
-        // 복습 리스트에 추가될 때 nextReviewDate 설정
         quizData.nextReviewDate = DateTime.now().add(Duration(
             minutes:
                 (AnkiAlgorithm.initialInterval * quizData.easeFactor).round()));
       } else {
-        // 복습 리스트에서 제거될 때 Anki 관련 데이터 초기화
         quizData.interval = AnkiAlgorithm.initialInterval;
-        // Comment: The 'defaultEaseFactor' getter is not defined in AnkiAlgorithm.
-        // We need to define it or use a default value.
-        quizData.easeFactor = 2.5; // Using a default value of 2.5
+        quizData.easeFactor = 2.5;
         quizData.consecutiveCorrect = 0;
         quizData.mistakeCount = 0;
         quizData.nextReviewDate = null;
       }
     }
 
-    await saveUserQuizData(userId); // Ensure data is saved locally
-    _logger.d('사용자 $userName($userId)의 퀴즈 데이터 업데이트 완료');
-
-    // Added: Trigger synchronization after updating quiz data
+    await saveUserQuizData(userId);
     await syncUserData(userId, getUserQuizData(userId));
   }
 
-  // 복습리스트에 복습카드를 추가하는 메소드
   Future<void> addToReviewList(
       String userId, String subjectId, String quizTypeId, String quizId) async {
-    _logger.i(
-        'Adding quiz to review list: user=$userId, subject=$subjectId, quizType=$quizTypeId, quiz=$quizId');
-
     _userQuizData[userId] ??= {};
     _userQuizData[userId]![subjectId] ??= {};
     _userQuizData[userId]![subjectId]![quizTypeId] ??= {};
@@ -278,38 +235,25 @@ class QuizService {
       nextReviewDate: DateTime.now(),
       lastAnswered: DateTime.now(),
     );
-    // 퀴즈ID가 복습리스트에 존재하게 됨
-    var quizData = _userQuizData[userId]![subjectId]![quizTypeId]![quizId]!;
-    // 퀴즈ID가 복습리스트에 존재하게
-    quizData.markedForReview = true;
-    // targetRetention을 사용하여 초기 복습 간격 설정
-    quizData.nextReviewDate = DateTime.now().add(
-      Duration(minutes: AnkiAlgorithm.initialInterval),
-    );
 
-    _logger.d('Added quiz to review list: quizId=$quizId');
+    var quizData = _userQuizData[userId]![subjectId]![quizTypeId]![quizId]!;
+    quizData.markedForReview = true;
+    quizData.nextReviewDate =
+        DateTime.now().add(Duration(minutes: AnkiAlgorithm.initialInterval));
 
     await saveUserQuizData(userId);
   }
 
-  // 복습리스트에서 복습카드를 제거하는 메소드
   Future<void> removeFromReviewList(
       String userId, String subjectId, String quizTypeId, String quizId) async {
-    _logger.i(
-        'Removing quiz from review list: user=$userId, subject=$subjectId, quizType=$quizTypeId, quiz=$quizId');
-
     var quizData = _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId];
     if (quizData != null) {
-      // 복습 관련 데이터만 초기화
       quizData.markedForReview = false;
       quizData.interval = AnkiAlgorithm.initialInterval;
       quizData.easeFactor = 2.5;
       quizData.consecutiveCorrect = 0;
       quizData.mistakeCount = 0;
       quizData.nextReviewDate = null;
-
-      // 기존 학습 데이터는 유지 (correct, total, accuracy 등)
-      _logger.d('Reset review data for quiz: $quizId');
     }
 
     await saveUserQuizData(userId);
@@ -335,10 +279,8 @@ class QuizService {
       quizData.interval = AnkiAlgorithm.initialInterval;
     }
 
-    // targetRetention을 사용하여 다음 복습 날짜 계산
-    quizData.nextReviewDate = DateTime.now().add(
-      Duration(minutes: quizData.interval),
-    );
+    quizData.nextReviewDate =
+        DateTime.now().add(Duration(minutes: quizData.interval));
 
     return quizData.nextReviewDate;
   }
@@ -346,16 +288,11 @@ class QuizService {
   Future<List<Quiz>> getQuizzesForReview(
       String userId, String subjectId, String? quizTypeId,
       {DateTime? date}) async {
-    _logger.i(
-        'Fetching quizzes for review: user=$userId, subject=$subjectId, quizType=$quizTypeId, date=$date');
-
     List<Quiz> reviewQuizzes = [];
     final now = date ?? DateTime.now();
 
-    // Removed the 'today' variable and condition
     final subjectData = _userQuizData[userId]?[subjectId];
     if (subjectData == null) {
-      _logger.w('No data for user $userId and subject $subjectId');
       return reviewQuizzes;
     }
 
@@ -369,7 +306,6 @@ class QuizService {
         final quizData = typeData[quizId];
         if (quizData == null) continue;
 
-        // Updated condition to include all due quizzes before 'now'
         if (quizData.markedForReview &&
             quizData.nextReviewDate != null &&
             quizData.nextReviewDate!.isBefore(now)) {
@@ -381,7 +317,6 @@ class QuizService {
       }
     }
 
-    _logger.d('Found ${reviewQuizzes.length} quizzes for review');
     return reviewQuizzes;
   }
 
@@ -404,7 +339,6 @@ class QuizService {
     return count;
   }
 
-  // 퀴즈 ID로 퀴즈를 가져오는 메소드
   Future<Quiz?> getQuizById(
       String subjectId, String quizTypeId, String quizId) async {
     try {
@@ -420,16 +354,13 @@ class QuizService {
       if (docSnapshot.exists) {
         return Quiz.fromFirestore(docSnapshot);
       } else {
-        _logger.w('퀴즈를 찾을 수 없음: quizId=$quizId');
         return null;
       }
     } catch (e) {
-      _logger.e('퀴즈를 가져오는 중 오류 발생: $e');
       return null;
     }
   }
 
-  // userQuizData 가져오는 메소드
   Map<String, dynamic> getUserQuizData(String userId) {
     _logger.i('사용자 퀴즈 데이터 가져오기: $userId');
     final data = _convertFromQuizUserDataMap(_userQuizData[userId] ?? {});
@@ -931,7 +862,6 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
 
   Future<List<Quiz>> getQuizzesByIds(
       String subjectId, String quizTypeId, List<String> quizIds) async {
-    _logger.i('과목 $subjectId에 대한 퀴즈를 가져오는 중입니다: $quizTypeId');
     try {
       final quizzes = await _firestore
           .collection('subjects')
@@ -944,73 +874,98 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
 
       return quizzes.docs.map((doc) => Quiz.fromFirestore(doc)).toList();
     } catch (e) {
-      _logger.e('과목 $subjectId에 대한 퀴즈를 가져오는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
 
   Map<String, Map<String, Map<String, QuizUserData>>> _convertToQuizUserDataMap(
       Map<String, dynamic> data) {
-    return data.map((subjectId, subjectData) {
-      if (subjectData is! Map<String, dynamic>) {
-        _logger.w('Invalid subject data format for $subjectId: $subjectData');
-        return MapEntry(subjectId, {});
+    try {
+      if (data.isEmpty) {
+        return {};
       }
 
-      return MapEntry(
-        subjectId,
-        subjectData.map((quizTypeId, quizTypeData) {
-          if (quizTypeData is! Map<String, dynamic>) {
-            _logger.w(
-                'Invalid quiz type data format for $quizTypeId: $quizTypeData');
-            return MapEntry(quizTypeId, {});
-          }
+      return data.map((subjectId, subjectData) {
+        if (subjectData == null) {
+          return MapEntry(subjectId, {});
+        }
 
-          return MapEntry(
-            quizTypeId,
-            quizTypeData.map((quizId, quizData) {
-              if (quizData is! Map<String, dynamic>) {
-                _logger.w('Invalid quiz data format for $quizId: $quizData');
-                return MapEntry(
-                    quizId, QuizUserData(lastAnswered: DateTime.now()));
-              }
+        if (subjectData is! Map<String, dynamic>) {
+          return MapEntry(subjectId, {});
+        }
 
-              // Timestamp를 DateTime으로 변환
-              if (quizData['lastAnswered'] is Timestamp) {
-                quizData['lastAnswered'] =
-                    (quizData['lastAnswered'] as Timestamp)
-                        .toDate()
-                        .toIso8601String();
-              }
-              if (quizData['nextReviewDate'] is Timestamp) {
-                quizData['nextReviewDate'] =
-                    (quizData['nextReviewDate'] as Timestamp)
-                        .toDate()
-                        .toIso8601String();
-              }
+        return MapEntry(
+          subjectId,
+          (subjectData).map((quizTypeId, quizTypeData) {
+            if (quizTypeData == null) {
+              return MapEntry(quizTypeId, {});
+            }
 
-              return MapEntry(quizId, QuizUserData.fromJson(quizData));
-            }),
-          );
-        }),
-      );
-    });
+            if (quizTypeData is! Map<String, dynamic>) {
+              return MapEntry(quizTypeId, {});
+            }
+
+            return MapEntry(
+              quizTypeId,
+              (quizTypeData).map((quizId, quizData) {
+                if (quizData == null) {
+                  return MapEntry(
+                      quizId, QuizUserData(lastAnswered: DateTime.now()));
+                }
+
+                if (quizData is! Map<String, dynamic>) {
+                  return MapEntry(
+                      quizId, QuizUserData(lastAnswered: DateTime.now()));
+                }
+
+                try {
+                  if (quizData['lastAnswered'] != null) {
+                    if (quizData['lastAnswered'] is Timestamp) {
+                      quizData['lastAnswered'] =
+                          (quizData['lastAnswered'] as Timestamp)
+                              .toDate()
+                              .toIso8601String();
+                    } else if (quizData['lastAnswered'] is String) {
+                      DateTime.parse(quizData['lastAnswered'] as String);
+                    }
+                  }
+
+                  if (quizData['nextReviewDate'] != null) {
+                    if (quizData['nextReviewDate'] is Timestamp) {
+                      quizData['nextReviewDate'] =
+                          (quizData['nextReviewDate'] as Timestamp)
+                              .toDate()
+                              .toIso8601String();
+                    } else if (quizData['nextReviewDate'] is String) {
+                      DateTime.parse(quizData['nextReviewDate'] as String);
+                    }
+                  }
+
+                  return MapEntry(quizId, QuizUserData.fromJson(quizData));
+                } catch (e) {
+                  return MapEntry(
+                      quizId, QuizUserData(lastAnswered: DateTime.now()));
+                }
+              }),
+            );
+          }),
+        );
+      });
+    } catch (e) {
+      return {};
+    }
   }
 
   Future<void> resetSelectedOption(
       String userId, String subjectId, String quizTypeId, String quizId) async {
-    final userName = _getUserDisplayName(userId);
-    _logger.i('사용자 $userName($userId)의 선택한 옵션 초기화 중');
     try {
       final quizData = _userQuizData[userId]?[subjectId]?[quizTypeId]?[quizId];
       if (quizData != null) {
         quizData.selectedOptionIndex = null;
         await saveUserQuizData(userId);
         await syncUserData(userId, getUserQuizData(userId));
-        _logger.d('사용자 $userName($userId)의 선택한 옵션 초기화 완료');
       }
     } catch (e) {
-      _logger.e('사용자 $userName($userId)의 선택한 옵션 초기화 중 오류 발생: $e');
       rethrow;
     }
   }
@@ -1041,19 +996,13 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
     return quizData.correct / quizData.total;
   }
 
-  // type별 퀴즈 수 가져오기
   Future<int> getTotalQuizCount(String subjectId, String quizTypeId) async {
     try {
-      _logger.i('퀴즈 수를 가져오는 중: $subjectId, $quizTypeId');
-
-      // 1. 메모리 캐시 확인
       final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
       if (_cachedQuizzes[subjectId]?[quizTypeId]?[key] != null) {
-        _logger.d('메모리 캐시에서 퀴즈 수를 가져왔습니다');
         return _cachedQuizzes[subjectId]![quizTypeId]![key]!.length;
       }
 
-      // 2. 로컬 저장소 확인
       final prefs = await SharedPreferences.getInstance();
       final cachedData = prefs.getString(key);
       final cacheTimestamp = prefs.getInt('${key}_timestamp');
@@ -1061,7 +1010,6 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
       if (cachedData != null && cacheTimestamp != null) {
         final now = DateTime.now().millisecondsSinceEpoch;
         if (now - cacheTimestamp < _cacheExpiration.inMilliseconds) {
-          _logger.d('로컬 저장소에서 퀴즈 수를 가져왔습니다');
           final quizzes = (json.decode(cachedData) as List)
               .map((item) => Quiz.fromJson(item as Map<String, dynamic>))
               .toList();
@@ -1069,19 +1017,15 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
         }
       }
 
-      // 3. Firestore에서 가져오기
-      _logger.d('Firestore에서 퀴즈 수를 가져오는 중입니다');
       final quizzes = await getQuizzes(subjectId, quizTypeId);
       return quizzes.length;
     } catch (e) {
-      _logger.e('퀴즈 수를 가져오는 중 오류 발생: $e');
       return 0;
     }
   }
 
   Future<int> getWeightedAverageAccuracy(
       String userId, String subjectId, String quizTypeId) async {
-    _logger.i('가중 평균 정답률을 계산하는 중입니다: $userId, $subjectId, $quizTypeId');
     try {
       final quizzes = await getQuizzes(subjectId, quizTypeId);
       int totalCorrect = 0;
@@ -1102,23 +1046,19 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
 
       return ((totalCorrect / totalAttempts) * 100).round();
     } catch (e) {
-      _logger.e('가중 평균 정답률을 계산하는 중 오류 발생: $e');
       return 0;
     }
   }
 
   Future<List<Quiz>> getOXQuizzes(String subjectId, String quizTypeId) async {
-    _logger.i('과목 $subjectId의 OX 퀴즈를 가져오는 중입니다: $quizTypeId');
     try {
       final quizzes = await getQuizzes(subjectId, quizTypeId);
       return quizzes.where((quiz) => quiz.isOX).toList();
     } catch (e) {
-      _logger.e('과목 $subjectId의 OX 퀴즈를 가져오는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
 
-  // 이미지 URL 처리를 위한 헬퍼 메서드
   String _processImageUrl(String imageUrl) {
     if (imageUrl.startsWith('http')) {
       final uri = Uri.parse(imageUrl);
@@ -1129,17 +1069,14 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
     return imageUrl;
   }
 
-  // 캐시 업데이트를 위한 헬퍼 메서드
   Future<void> _updateQuizCache(
       String subjectId, String quizTypeId, Quiz quiz) async {
     final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
 
-    // 메모리 캐시 업데이트
     _cachedQuizzes[subjectId] ??= {};
     _cachedQuizzes[subjectId]![quizTypeId] ??= {};
     _cachedQuizzes[subjectId]![quizTypeId]![key] ??= [];
 
-    // 기존 퀴즈 업데이트 또는 새 퀴즈 추가
     final quizList = _cachedQuizzes[subjectId]![quizTypeId]![key]!;
     final index = quizList.indexWhere((q) => q.id == quiz.id);
     if (index != -1) {
@@ -1148,7 +1085,6 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
       quizList.add(quiz);
     }
 
-    // SharedPreferences 업데이트
     await _updateSharedPreferences(subjectId, quizTypeId);
   }
 }

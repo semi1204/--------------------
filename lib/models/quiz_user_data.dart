@@ -44,21 +44,39 @@ class QuizUserData {
         'markedForReview': markedForReview,
       };
 
-  factory QuizUserData.fromJson(Map<String, dynamic> json) => QuizUserData(
-        correct: json['correct'] ?? 0,
-        total: json['total'] ?? 0,
-        accuracy: json['accuracy'] ?? 0.0,
-        interval: json['interval'] ?? 0,
-        easeFactor: json['easeFactor'] ?? 2.5,
-        consecutiveCorrect: json['consecutiveCorrect'] ?? 0,
+  factory QuizUserData.fromJson(Map<String, dynamic> json) {
+    try {
+      DateTime parseDateTime(dynamic value) {
+        if (value == null) return DateTime.now();
+        if (value is String) {
+          try {
+            return DateTime.parse(value);
+          } catch (e) {
+            return DateTime.now();
+          }
+        }
+        return DateTime.now();
+      }
+
+      return QuizUserData(
+        correct: json['correct']?.toInt() ?? 0,
+        total: json['total']?.toInt() ?? 0,
+        accuracy: (json['accuracy'] ?? 0.0).toDouble(),
+        interval: json['interval']?.toInt() ?? 0,
+        easeFactor: (json['easeFactor'] ?? 2.5).toDouble(),
+        consecutiveCorrect: json['consecutiveCorrect']?.toInt() ?? 0,
         nextReviewDate: json['nextReviewDate'] != null
-            ? DateTime.parse(json['nextReviewDate'])
+            ? parseDateTime(json['nextReviewDate'])
             : null,
-        mistakeCount: json['mistakeCount'] ?? 0,
-        lastAnswered: DateTime.parse(
-            json['lastAnswered'] ?? DateTime.now().toIso8601String()),
-        selectedOptionIndex: json['selectedOptionIndex'],
+        mistakeCount: json['mistakeCount']?.toInt() ?? 0,
+        lastAnswered: parseDateTime(json['lastAnswered']),
+        selectedOptionIndex: json['selectedOptionIndex']?.toInt(),
         isUnderstandingImproved: json['isUnderstandingImproved'] ?? false,
         markedForReview: json['markedForReview'] ?? false,
       );
+    } catch (e) {
+      // 데이터 변환 실패시 기본값으로 초기화
+      return QuizUserData(lastAnswered: DateTime.now());
+    }
+  }
 }

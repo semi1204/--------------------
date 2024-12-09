@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/services/analytics_service.dart';
 import 'package:nursing_quiz_app_6/services/payment_service.dart';
 import '../models/quiz.dart';
 import '../services/quiz_service.dart';
@@ -12,6 +13,7 @@ class QuizProvider with ChangeNotifier {
   final UserProvider _userProvider;
   final Logger _logger;
   final PaymentService _paymentService;
+  final AnalyticsService _analytics;
 
   List<Quiz> _allQuizzes = [];
   List<Quiz> _filteredQuizzes = [];
@@ -27,7 +29,7 @@ class QuizProvider with ChangeNotifier {
   String? _selectedQuizTypeId;
 
   QuizProvider(this._quizService, this._userProvider, this._logger,
-      this._paymentService);
+      this._paymentService, this._analytics);
 
   List<Quiz> get quizzes => _filteredQuizzes;
   Map<String, int?> get selectedAnswers => _selectedAnswers;
@@ -231,5 +233,26 @@ class QuizProvider with ChangeNotifier {
       _logger.e('Error resetting quiz option: $e');
       rethrow;
     }
+  }
+
+  Future<void> submitAnswer(
+    String subjectId,
+    String quizTypeId,
+    String quizId,
+    int answerIndex,
+    int timeSpent,
+  ) async {
+    // 기존 코드...
+
+    final isCorrect = answerIndex ==
+        _allQuizzes.firstWhere((q) => q.id == quizId).correctOptionIndex;
+
+    // Analytics 이벤트 로깅
+    await _analytics.logQuizCompleted(
+      quizId: quizId,
+      subjectId: subjectId,
+      isCorrect: isCorrect,
+      timeSpent: timeSpent,
+    );
   }
 }

@@ -1,19 +1,17 @@
 // user_provider.dart
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:logger/logger.dart';
 import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'package:nursing_quiz_app_6/services/auth_service.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
-import 'package:nursing_quiz_app_6/services/payment_service.dart'; // Add this import
+import 'package:nursing_quiz_app_6/services/payment_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
 import 'dart:math' as math;
 
 class UserProvider with ChangeNotifier {
   User? _user;
-  bool _isSubscribed = false; // Add this line
-  final Logger _logger;
+  bool _isSubscribed = false;
   final AuthService _authService = AuthService();
   final QuizService _quizService = QuizService();
   final PaymentService _paymentService;
@@ -22,7 +20,6 @@ class UserProvider with ChangeNotifier {
   double get targetRetention => _targetRetention;
 
   void setTargetRetention(double value) {
-    _logger.i('Updating target retention from $_targetRetention to $value');
     _targetRetention = value;
     AnkiAlgorithm.targetRetention = value;
     notifyListeners();
@@ -53,31 +50,26 @@ class UserProvider with ChangeNotifier {
 
   bool get isAdmin {
     if (_user == null) {
-      _logger.i('유저가 없습니다, 관리자가 아닙니다');
       return false;
     }
-    bool adminStatus = _user!.email == ADMIN_EMAIL;
-    _logger.i('유저 ${_user!.email}의 관리자 상태 확인: $adminStatus');
-    return adminStatus;
+    return _user!.email == ADMIN_EMAIL;
   }
 
-  bool get isSubscribed => _isSubscribed; // Add this getter
+  bool get isSubscribed => _isSubscribed;
 
   Future<void> setUser(User? user) async {
-    _logger.i('유저 이메일: ${user?.email ?? 'No user'}');
     if (_user?.uid != user?.uid) {
       _user = user;
       if (user != null) {
         await _loadUserData();
-        await checkAndUpdateSubscriptionStatus(); // Add this line
+        await checkAndUpdateSubscriptionStatus();
       } else {
-        _isSubscribed = false; // Reset subscription status on logout
+        _isSubscribed = false;
       }
       notifyListeners();
     }
   }
 
-  // Add this method
   Future<void> checkAndUpdateSubscriptionStatus() async {
     if (_user != null) {
       _isSubscribed = await _paymentService.checkSubscriptionStatus();
@@ -90,21 +82,17 @@ class UserProvider with ChangeNotifier {
     await _quizService.loadUserQuizData(_user!.uid);
   }
 
-  // Firebase의 currentUser를 사용하여 로그인 상태 확인
   Future<bool> isUserLoggedIn() async {
     try {
       final currentUser = _authService.auth.currentUser;
       if (currentUser != null) {
         await setUser(currentUser);
-        _logger.i('유저의 로그인 상태 확인 성공: ${currentUser.email}');
         return true;
       } else {
         await setUser(null);
-        _logger.i('유저의 로그인 상태 확인 실패');
         return false;
       }
     } catch (e) {
-      _logger.e('유저의 로그인 상태 ��인 실패: $e');
       return false;
     }
   }
@@ -129,11 +117,9 @@ class UserProvider with ChangeNotifier {
   Future<void> signOut() async {
     await _authService.signOut();
     await setUser(null);
-    _logger.i('유저의 로그아웃 성공');
     notifyListeners();
   }
 
-  // Service에 업데이트된 데이터를 보내는 메소드
   Future<void> updateUserQuizData(
     String subjectId,
     String quizTypeId,
@@ -144,12 +130,8 @@ class UserProvider with ChangeNotifier {
     bool isUnderstandingImproved = false,
     bool? toggleReviewStatus,
   }) async {
-    if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 퀴즈 데이터를 업데이트할 수 없음');
-      return;
-    }
-    _logger.i(
-        '사용자 퀴즈 데이터 업데이트: subjectId=$subjectId, quizTypeId=$quizTypeId, quizId=$quizId, 정답여부=$isCorrect, 이해도 향상여부=$isUnderstandingImproved');
+    if (_user == null) return;
+
     await _quizService.updateUserQuizData(
       _user!.uid,
       subjectId,
@@ -161,83 +143,57 @@ class UserProvider with ChangeNotifier {
       isUnderstandingImproved: isUnderstandingImproved,
       toggleReviewStatus: toggleReviewStatus,
     );
-    // Removed redundant saveUserQuizData call as it's handled within updateUserQuizData
-    // await _quizService.saveUserQuizData(_user!.uid);
-    _logger.d('사용자 퀴즈 데이터 업데이트 성공');
     notifyListeners();
   }
 
-  // 복습 리스트(복습리스트엔 복습카드가 존재해야 함)에 퀴즈를 추가하는 메소드
-  // --------- 복습리스트에 존재하는 것과, 복습카드가 나오는 것을 구분해야 함.---------//
   Future<void> addToReviewList(
     String subjectId,
     String quizTypeId,
     String quizId,
   ) async {
-    if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 복습 리스트에 퀴즈를 추가할 수 없음');
-      return;
-    }
+    if (_user == null) return;
+
     await _quizService.addToReviewList(
         _user!.uid, subjectId, quizTypeId, quizId);
     notifyListeners();
-
-    // Added: Trigger synchronization after adding to review list
     await syncUserData();
   }
 
-  // 복습 리스트 Data에서 퀴즈를 제거하는 메소드
   Future<void> removeFromReviewList(
     String subjectId,
     String quizTypeId,
     String quizId,
   ) async {
-    if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 복습 리스트에서 퀴즈를 제거할 수 없음');
-      return;
-    }
+    if (_user == null) return;
 
-    // 복습 리스트에서만 제거하고 복습 관련 데이터만 초기화
     await _quizService.removeFromReviewList(
         _user!.uid, subjectId, quizTypeId, quizId);
-
     notifyListeners();
     await syncUserData();
   }
 
-  // 복습 리스트에 복습 퀴즈가 존재하는지 확인하는 메소드
   bool isInReviewList(String subjectId, String quizTypeId, String quizId) {
-    if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 복습 리스트에 퀴즈가 존재하는지 확인할 수 없음');
-      return false;
-    }
+    if (_user == null) return false;
     return _quizService.isInReviewList(
         _user!.uid, subjectId, quizTypeId, quizId);
   }
 
-  // 복습 리스트에 존재하는 퀴즈의 다음 복습 날짜를 확인하는 메소드
   DateTime? getNextReviewDate(
       String subjectId, String quizTypeId, String quizId,
       {bool isUnderstandingImproved = true}) {
-    if (_user == null) {
-      _logger.w('사용자 ID가 없습니��. 다음 복습 날짜 확인할 수 없음');
-      return null;
-    }
+    if (_user == null) return null;
     return _quizService.getNextReviewDate(
         _user!.uid, subjectId, quizTypeId, quizId,
         isUnderstandingImproved: isUnderstandingImproved);
   }
 
-  // 복습 리스트에 존재하는 퀴즈의 다음 복습 날짜를 포맷팅하는 메소드
   Map<String, String> formatNextReviewDate(
       String subjectId, String quizTypeId, String quizId) {
     final now = DateTime.now();
 
-    // 알겠음 버튼을 눌렀을 때의 다음 복습 날짜
     final nextReviewDateIfUnderstood = getNextReviewDate(
         subjectId, quizTypeId, quizId,
         isUnderstandingImproved: true);
-    // 모르겠음 버튼을 눌렀을 때의 다음 복습 날짜
     final nextReviewDateIfNotUnderstood = getNextReviewDate(
         subjectId, quizTypeId, quizId,
         isUnderstandingImproved: false);
@@ -260,37 +216,24 @@ class UserProvider with ChangeNotifier {
   }
 
   Map<String, dynamic> getUserQuizData() {
-    if (_user == null) {
-      _logger.w('Cannot get user quiz data: No user logged in');
-      return {};
-    }
+    if (_user == null) return {};
     return _quizService.getUserQuizData(_user!.uid);
   }
 
   Future<void> syncUserData() async {
-    if (_user == null) {
-      _logger.w('Cannot sync user data: No user logged in');
-      return;
-    }
+    if (_user == null) return;
     try {
       await _quizService.syncUserData(_user!.uid, getUserQuizData());
-      _logger.i('사용자 퀴즈 데이터 동기화 성공');
       notifyListeners();
     } catch (e) {
-      _logger.e('사용자 퀴즈 데이터 동기화 실패: $e');
       rethrow;
     }
   }
 
   double getQuizAccuracy(String subjectId, String quizTypeId, String quizId) {
-    if (_user == null) {
-      _logger.w('Cannot get quiz accuracy: No user logged in');
-      return 0.0;
-    }
-    double accuracy =
-        _quizService.getQuizAccuracy(_user!.uid, subjectId, quizTypeId, quizId);
-    _logger.d('Quiz accuracy for $quizId: $accuracy');
-    return accuracy;
+    if (_user == null) return 0.0;
+    return _quizService.getQuizAccuracy(
+        _user!.uid, subjectId, quizTypeId, quizId);
   }
 
   String _formatTimeDifference(Duration difference) {
@@ -306,21 +249,15 @@ class UserProvider with ChangeNotifier {
   }
 
   Future<void> syncUserQuizData() async {
-    if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 퀴즈 데이터를 동기화할 수 없음');
-      return;
-    }
+    if (_user == null) return;
     try {
       await _quizService.syncUserData(_user!.uid, getUserQuizData());
-      _logger.i('사용자 퀴즈 데이터 동기화 성공');
       notifyListeners();
     } catch (e) {
-      _logger.e('사용자 퀴즈 데이터 동기화 실패: $e');
       rethrow;
     }
   }
 
-// calculateNextReviewDate 메소드 수정
   DateTime calculateNextReviewDate(int repetitions, Duration easeFactor) {
     final now = DateTime.now();
     final intervalDays =
@@ -330,16 +267,10 @@ class UserProvider with ChangeNotifier {
 
   UserProvider({
     required PaymentService paymentService,
-    required Logger logger,
-  })  : _paymentService = paymentService,
-        _logger = logger;
+  }) : _paymentService = paymentService;
 
-  /// Counts the number of quizzes reviewed on a specific date for a given subject.
   int getReviewedQuizzesCount(String subjectId, DateTime date) {
-    if (_user == null) {
-      _logger.w('사용자 ID가 없습니다. 복습된 퀴즈 개수를 세는 중 오류 발생');
-      return 0;
-    }
+    if (_user == null) return 0;
 
     int count = 0;
     final userData = _quizService.getUserQuizData(_user!.uid);
@@ -358,8 +289,6 @@ class UserProvider with ChangeNotifier {
       });
     }
 
-    _logger.d('복습된 퀴즈 개수: $subjectId on ${date.toIso8601String()}: $count');
-
     return count;
   }
 
@@ -367,9 +296,7 @@ class UserProvider with ChangeNotifier {
     try {
       await _authService.deleteAccount(password);
       await signOut();
-      _logger.i('User account deleted and signed out');
     } catch (e) {
-      _logger.e('Error during account deletion: $e');
       rethrow;
     }
   }

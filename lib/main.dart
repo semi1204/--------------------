@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:nursing_quiz_app_6/providers/quiz_provider.dart';
 import 'package:nursing_quiz_app_6/providers/quiz_view_mode_provider.dart';
+import 'package:nursing_quiz_app_6/services/analytics_service.dart';
 import 'package:nursing_quiz_app_6/utils/auth_wrapper.dart';
 import 'package:provider/provider.dart';
 import 'package:nursing_quiz_app_6/services/quiz_service.dart';
@@ -13,6 +14,8 @@ import 'firebase_options.dart';
 import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
 import 'package:nursing_quiz_app_6/providers/subject_provider.dart';
 import 'package:nursing_quiz_app_6/providers/review_quiz_provider.dart'; // 추가
+import 'package:nursing_quiz_app_6/utils/cache_manager.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 final logger = Logger();
 
@@ -21,6 +24,12 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize CacheManager
+  await CacheManager.init();
+
+  // Enable Firebase Analytics collection
+  await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
 
   final paymentService = PaymentService(logger: logger);
   await paymentService.initialize();
@@ -36,9 +45,8 @@ void main() async {
         ChangeNotifierProvider<PaymentService>.value(
             value: paymentService), // Changed this line
         ChangeNotifierProvider(
-            create: (context) => UserProvider(
-                logger: context.read<Logger>(),
-                paymentService: context.read<PaymentService>())),
+            create: (context) =>
+                UserProvider(paymentService: context.read<PaymentService>())),
         Provider<QuizService>.value(value: quizService),
         ChangeNotifierProvider(create: (_) => SubjectProvider()),
         ChangeNotifierProvider(
@@ -47,6 +55,7 @@ void main() async {
             context.read<UserProvider>(),
             context.read<Logger>(),
             context.read<PaymentService>(),
+            context.read<AnalyticsService>(),
           ),
         ),
         ChangeNotifierProvider(

@@ -1,5 +1,3 @@
-import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
-
 class QuizUserData {
   int correct;
   int total;

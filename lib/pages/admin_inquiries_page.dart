@@ -50,10 +50,29 @@ class AdminInquiriesPage extends StatelessWidget {
         return ListView(
           children: snapshot.data!.docs.map((DocumentSnapshot document) {
             Map<String, dynamic> data = document.data() as Map<String, dynamic>;
-            return ListTile(
-              title: Text(data['body']),
-              subtitle: Text('From: ${data['userEmail'] ?? 'Anonymous'}'),
-              trailing: Text(data['status']),
+            return Dismissible(
+              key: Key(document.id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                color: Colors.red,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20.0),
+                child: const Icon(Icons.delete, color: Colors.white),
+              ),
+              onDismissed: (direction) async {
+                await FirebaseFirestore.instance
+                    .collection('inquiries')
+                    .doc(document.id)
+                    .delete();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('문의사항이 삭제되었습니다')),
+                );
+              },
+              child: ListTile(
+                title: Text(data['body']),
+                subtitle: Text('From: ${data['userEmail'] ?? 'Anonymous'}'),
+                trailing: Text(data['status']),
+              ),
             );
           }).toList(),
         );
@@ -79,11 +98,30 @@ class AdminInquiriesPage extends StatelessWidget {
         return ListView(
           children: snapshot.data!.docs.map((DocumentSnapshot document) {
             Map<String, dynamic> data = document.data() as Map<String, dynamic>;
-            return ListTile(
-              title: Text('Quiz ID: ${data['quizId']}'),
-              subtitle: Text(data['errorDescription']),
-              trailing: Text(data['status']),
-              onTap: () => _showErrorReportDetails(context, data),
+            return Dismissible(
+              key: Key(document.id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                color: Colors.red,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20.0),
+                child: const Icon(Icons.delete, color: Colors.white),
+              ),
+              onDismissed: (direction) async {
+                await FirebaseFirestore.instance
+                    .collection('error_reports')
+                    .doc(document.id)
+                    .delete();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('오류 보고가 삭제되었습니다')),
+                );
+              },
+              child: ListTile(
+                title: Text('Quiz ID: ${data['quizId']}'),
+                subtitle: Text(data['errorDescription']),
+                trailing: Text(data['status']),
+                onTap: () => _showErrorReportDetails(context, data),
+              ),
             );
           }).toList(),
         );

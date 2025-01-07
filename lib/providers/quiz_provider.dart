@@ -242,8 +242,6 @@ class QuizProvider with ChangeNotifier {
     int answerIndex,
     int timeSpent,
   ) async {
-    // 기존 코드...
-
     final isCorrect = answerIndex ==
         _allQuizzes.firstWhere((q) => q.id == quizId).correctOptionIndex;
 

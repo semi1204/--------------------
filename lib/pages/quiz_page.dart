@@ -115,18 +115,8 @@ class _QuizPageState extends State<QuizPage>
                   pinned: false,
                   actions: [
                     IconButton(
-                      icon: Icon(
-                        context.select((QuizViewModeProvider p) => p.isOneByOne)
-                            ? Icons.view_agenda
-                            : Icons.view_list,
-                      ),
-                      onPressed: () => _handleViewModeToggle(context),
-                    ),
-                    OXToggleButton(
-                      initialValue: quizProvider.showOXOnly,
-                      onChanged: (value) {
-                        quizProvider.toggleQuizType(value);
-                      },
+                      icon: const Icon(Icons.menu),
+                      onPressed: () => _showOptionsBottomSheet(context),
                     ),
                     const CustomCloseButton(),
                   ],
@@ -436,5 +426,146 @@ class _QuizPageState extends State<QuizPage>
     }
 
     return closestIndex;
+  }
+
+  void _showOptionsBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.refresh),
+              title: const Text('전체 선택 초기화'),
+              onTap: () {
+                final quizProvider = context.read<QuizProvider>();
+                for (var quiz in quizProvider.quizzes) {
+                  quizProvider.resetSelectedOption(
+                    widget.subject.id,
+                    widget.quizType.id,
+                    quiz.id,
+                  );
+                }
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                context.select((QuizViewModeProvider p) => p.isOneByOne)
+                    ? Icons.view_agenda
+                    : Icons.view_list,
+              ),
+              title: Text(
+                context.select((QuizViewModeProvider p) => p.isOneByOne)
+                    ? '스크롤 보기'
+                    : '단일 퀴즈 보기',
+              ),
+              onTap: () {
+                _handleViewModeToggle(context);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.sort),
+              title: const Text('정답률로 필터링'),
+              onTap: () {
+                Navigator.pop(context);
+                showModalBottomSheet(
+                  context: context,
+                  builder: (context) => const AccuracyFilterBottomSheet(),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class AccuracyFilterBottomSheet extends StatelessWidget {
+  const AccuracyFilterBottomSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final quizProvider = Provider.of<QuizProvider>(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 16, bottom: 16),
+            child: Text(
+              '정답률로 필터링',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.filter_list),
+            title: const Text('전체 보기'),
+            selected: quizProvider.currentSortOption == SortOption.all,
+            onTap: () {
+              quizProvider.setSortOption(SortOption.all);
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: Container(
+              width: 24,
+              height: 24,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red,
+              ),
+            ),
+            title: const Text('20% 미만'),
+            selected: quizProvider.currentSortOption == SortOption.low,
+            onTap: () {
+              quizProvider.setSortOption(SortOption.low);
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: Container(
+              width: 24,
+              height: 24,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.yellow,
+              ),
+            ),
+            title: const Text('20% ~ 60%'),
+            selected: quizProvider.currentSortOption == SortOption.medium,
+            onTap: () {
+              quizProvider.setSortOption(SortOption.medium);
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: Container(
+              width: 24,
+              height: 24,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.green,
+              ),
+            ),
+            title: const Text('60% 이상'),
+            selected: quizProvider.currentSortOption == SortOption.high,
+            onTap: () {
+              quizProvider.setSortOption(SortOption.high);
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
   }
 }

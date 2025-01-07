@@ -55,7 +55,6 @@ void main() async {
             context.read<UserProvider>(),
             context.read<Logger>(),
             context.read<PaymentService>(),
-            context.read<AnalyticsService>(),
           ),
         ),
         ChangeNotifierProvider(

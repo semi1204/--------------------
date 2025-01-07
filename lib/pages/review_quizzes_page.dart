@@ -42,7 +42,6 @@ class _ReviewQuizzesPageContent extends StatefulWidget {
   final String? initialQuizId;
 
   const _ReviewQuizzesPageContent({
-    super.key,
     this.initialSubjectId,
     this.initialQuizId,
   });

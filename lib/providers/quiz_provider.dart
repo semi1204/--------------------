@@ -13,7 +13,7 @@ class QuizProvider with ChangeNotifier {
   final UserProvider _userProvider;
   final Logger _logger;
   final PaymentService _paymentService;
-  final AnalyticsService _analytics;
+  final AnalyticsService? _analytics;
 
   List<Quiz> _allQuizzes = [];
   List<Quiz> _filteredQuizzes = [];
@@ -28,8 +28,9 @@ class QuizProvider with ChangeNotifier {
   String? _selectedSubjectId;
   String? _selectedQuizTypeId;
 
-  QuizProvider(this._quizService, this._userProvider, this._logger,
-      this._paymentService, this._analytics);
+  QuizProvider(
+      this._quizService, this._userProvider, this._logger, this._paymentService,
+      [this._analytics]);
 
   List<Quiz> get quizzes => _filteredQuizzes;
   Map<String, int?> get selectedAnswers => _selectedAnswers;
@@ -246,11 +247,13 @@ class QuizProvider with ChangeNotifier {
         _allQuizzes.firstWhere((q) => q.id == quizId).correctOptionIndex;
 
     // Analytics 이벤트 로깅
-    await _analytics.logQuizCompleted(
-      quizId: quizId,
-      subjectId: subjectId,
-      isCorrect: isCorrect,
-      timeSpent: timeSpent,
-    );
+    if (_analytics != null) {
+      await _analytics!.logQuizCompleted(
+        quizId: quizId,
+        subjectId: subjectId,
+        isCorrect: isCorrect,
+        timeSpent: timeSpent,
+      );
+    }
   }
 }

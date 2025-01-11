@@ -1,5 +1,6 @@
 import 'package:easy_date_timeline/easy_date_timeline.dart';
 import 'package:flutter/material.dart';
+import 'package:nursing_quiz_app_6/providers/theme_provider.dart';
 
 class TimelineView extends StatelessWidget {
   const TimelineView({
@@ -37,16 +38,9 @@ class TimelineView extends StatelessWidget {
         dayProps: EasyDayProps(
           dayStructure: DayStructure.dayNumDayStr,
           activeDayStyle: DayStyle(
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.all(Radius.circular(12)),
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.primary,
-                  colorScheme.secondary,
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+            decoration: const BoxDecoration(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              color: ThemeProvider.primaryColor,
             ),
             dayStrStyle: TextStyle(
               color: colorScheme.onPrimary,

@@ -231,25 +231,24 @@ class _DateReviewPageState extends State<DateReviewPage> {
       backgroundColor: themeProvider.isDarkMode
           ? ThemeProvider.darkModeSurface
           : Colors.white,
-      body: Column(
-        children: [
-          TimelineView(
-            selectedDate: _selectedDate,
-            onSelectedDateChanged: (date) {
-              setState(() => _selectedDate = date);
-              _loadQuizzes();
-            },
-          ),
-          Expanded(
-            child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      color:
-                          themeProvider.isDarkMode ? Colors.white : Colors.blue,
+      body: _isLoading
+          ? Center(
+              child: CircularProgressIndicator(
+                color: themeProvider.isDarkMode ? Colors.white : Colors.blue,
+              ),
+            )
+          : _quizzesBySubject.isEmpty
+              ? Column(
+                  children: [
+                    TimelineView(
+                      selectedDate: _selectedDate,
+                      onSelectedDateChanged: (date) {
+                        setState(() => _selectedDate = date);
+                        _loadQuizzes();
+                      },
                     ),
-                  )
-                : _quizzesBySubject.isEmpty
-                    ? Center(
+                    Expanded(
+                      child: Center(
                         child: Text(
                           '이 날짜에 틀린 문제가 없습니다',
                           style:
@@ -259,19 +258,30 @@ class _DateReviewPageState extends State<DateReviewPage> {
                                         : Colors.black87,
                                   ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: _quizzesBySubject.length,
-                        itemBuilder: (context, index) {
-                          final subject =
-                              _quizzesBySubject.keys.elementAt(index);
-                          final quizzesByType = _quizzesBySubject[subject]!;
-                          return _buildSubjectSection(subject, quizzesByType);
-                        },
                       ),
-          ),
-        ],
-      ),
+                    ),
+                  ],
+                )
+              : ListView.builder(
+                  itemCount:
+                      _quizzesBySubject.length + 1, // +1 for TimelineView
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return TimelineView(
+                        selectedDate: _selectedDate,
+                        onSelectedDateChanged: (date) {
+                          setState(() => _selectedDate = date);
+                          _loadQuizzes();
+                        },
+                      );
+                    }
+                    final subjectIndex = index - 1;
+                    final subject =
+                        _quizzesBySubject.keys.elementAt(subjectIndex);
+                    final quizzesByType = _quizzesBySubject[subject]!;
+                    return _buildSubjectSection(subject, quizzesByType);
+                  },
+                ),
     );
   }
 }

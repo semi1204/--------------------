@@ -20,8 +20,9 @@ class _DateReviewPageState extends State<DateReviewPage> {
   DateTime _selectedDate = DateTime.now();
   Map<Subject, Map<String, List<Quiz>>> _quizzesBySubject = {};
   bool _isLoading = false;
-  int _questionNumber = 1;
   final _logger = Logger();
+  final Map<String, int> _selectedAnswers = {};
+  final Map<String, int> _questionNumbers = {};
 
   @override
   void initState() {
@@ -29,16 +30,33 @@ class _DateReviewPageState extends State<DateReviewPage> {
     _loadQuizzes();
   }
 
+  void _assignQuestionNumbers() {
+    int number = 1;
+    _questionNumbers.clear();
+
+    for (var subject in _quizzesBySubject.keys) {
+      final quizzesByType = _quizzesBySubject[subject]!;
+      for (var entry in quizzesByType.entries) {
+        final quizzes = entry.value;
+        for (var quiz in quizzes) {
+          _questionNumbers[quiz.id] = number++;
+        }
+      }
+    }
+  }
+
   Future<void> _loadQuizzes() async {
     if (!mounted) return;
 
     setState(() {
       _isLoading = true;
-      _questionNumber = 1;
+      _selectedAnswers.clear();
+      _questionNumbers.clear();
     });
 
     final quizService = context.read<QuizService>();
     final userId = context.read<UserProvider>().user?.uid;
+    final userProvider = context.read<UserProvider>();
 
     if (userId == null) {
       setState(() => _isLoading = false);
@@ -46,11 +64,9 @@ class _DateReviewPageState extends State<DateReviewPage> {
     }
 
     try {
-      // Load all subjects at once
       final subjects = await quizService.getSubjects();
       Map<Subject, Map<String, List<Quiz>>> quizzesBySubject = {};
 
-      // Load all quiz types for all subjects in parallel
       final quizTypesFutures = subjects.map((subject) async {
         final quizTypes = await quizService.getQuizTypes(subject.id);
         return MapEntry(subject, quizTypes);
@@ -58,19 +74,30 @@ class _DateReviewPageState extends State<DateReviewPage> {
 
       final subjectsWithQuizTypes = await Future.wait(quizTypesFutures);
 
-      // Load quizzes for each subject and quiz type in parallel
       for (var entry in subjectsWithQuizTypes) {
         final subject = entry.key;
         final quizTypes = entry.value;
 
         final quizzesFutures = quizTypes.map((quizType) async {
-          final quizzes = await quizService.getQuizzesForReview(
+          final quizzes = await quizService.getQuizzesForDate(
             userId,
             subject.id,
             quizType.id,
-            date: _selectedDate,
+            _selectedDate,
           );
-          return MapEntry(quizType.id, quizzes);
+
+          final incorrectQuizzes = quizzes.where((quiz) {
+            final quizData = userProvider.getUserQuizData()[subject.id]
+                ?[quizType.id]?[quiz.id];
+            if (quizData == null) return false;
+
+            final selectedOptionIndex = quizData['selectedOptionIndex'] as int?;
+            if (selectedOptionIndex == null) return false;
+
+            return selectedOptionIndex != quiz.correctOptionIndex;
+          }).toList();
+
+          return MapEntry(quizType.id, incorrectQuizzes);
         });
 
         final quizzesByType = Map.fromEntries(
@@ -88,8 +115,9 @@ class _DateReviewPageState extends State<DateReviewPage> {
           _quizzesBySubject = quizzesBySubject;
           _isLoading = false;
         });
+        _assignQuestionNumbers();
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       _logger.e('Failed to load quizzes: $e');
       if (mounted) {
         setState(() => _isLoading = false);
@@ -105,6 +133,9 @@ class _DateReviewPageState extends State<DateReviewPage> {
     final userProvider = context.read<UserProvider>();
     final userId = userProvider.user?.uid;
     if (userId != null) {
+      setState(() {
+        _selectedAnswers['${quiz.id}'] = index;
+      });
       context.read<QuizService>().updateUserQuizData(
             userId,
             subjectId,
@@ -116,39 +147,80 @@ class _DateReviewPageState extends State<DateReviewPage> {
     }
   }
 
-  void _handleFeedbackGiven(String subjectId, String quizTypeId, Quiz quiz,
-      bool isUnderstandingImproved) {
+  void _handleResetQuiz(String subjectId, String quizTypeId, String quizId) {
     final userProvider = context.read<UserProvider>();
     final userId = userProvider.user?.uid;
     if (userId != null) {
-      context.read<QuizService>().updateUserQuizData(
+      setState(() {
+        _selectedAnswers.remove(quizId);
+      });
+      context.read<QuizService>().resetSelectedOption(
             userId,
             subjectId,
             quizTypeId,
-            quiz.id,
-            true,
-            isUnderstandingImproved: isUnderstandingImproved,
+            quizId,
           );
     }
   }
 
-  void _handleRemoveCard(Subject subject, String quizId) {
-    setState(() {
-      final updatedQuizzesBySubject =
-          Map<Subject, Map<String, List<Quiz>>>.from(_quizzesBySubject);
-      final subjectQuizzes = updatedQuizzesBySubject[subject];
-      if (subjectQuizzes != null) {
-        subjectQuizzes.forEach((typeId, quizzes) {
-          subjectQuizzes[typeId] =
-              quizzes.where((q) => q.id != quizId).toList();
-        });
-        subjectQuizzes.removeWhere((_, quizzes) => quizzes.isEmpty);
-      }
-      if (subjectQuizzes?.isEmpty ?? true) {
-        updatedQuizzesBySubject.remove(subject);
-      }
-      _quizzesBySubject = updatedQuizzesBySubject;
-    });
+  Widget _buildQuizCard(Quiz quiz, String subjectId, String quizTypeId) {
+    final questionNumber = _questionNumbers[quiz.id] ?? 0;
+    return QuizPageCard(
+      key: ValueKey(quiz.id),
+      quiz: quiz,
+      questionNumber: questionNumber,
+      subjectId: subjectId,
+      quizTypeId: quizTypeId,
+      nextReviewDate: '',
+      onAnswerSelected: (index) => _handleAnswerSelected(
+        subjectId,
+        quizTypeId,
+        quiz,
+        index,
+      ),
+      onResetQuiz: () => _handleResetQuiz(
+        subjectId,
+        quizTypeId,
+        quiz.id,
+      ),
+      isQuizPage: true,
+      rebuildExplanation: false,
+      selectedOptionIndex: _selectedAnswers['${quiz.id}'],
+    );
+  }
+
+  Widget _buildSubjectSection(
+      Subject subject, Map<String, List<Quiz>> quizzesByType) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          margin: const EdgeInsets.only(bottom: 8.0),
+          decoration: BoxDecoration(
+            color: context.watch<ThemeProvider>().isDarkMode
+                ? Colors.grey[850]
+                : Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '# ${subject.name}',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: context.watch<ThemeProvider>().isDarkMode
+                      ? Colors.white
+                      : Colors.black87,
+                ),
+          ),
+        ),
+        ...quizzesByType.entries.expand((entry) {
+          final quizTypeId = entry.key;
+          final quizzes = entry.value;
+          return quizzes
+              .map((quiz) => _buildQuizCard(quiz, subject.id, quizTypeId));
+        }).toList(),
+      ],
+    );
   }
 
   @override
@@ -179,7 +251,7 @@ class _DateReviewPageState extends State<DateReviewPage> {
                 : _quizzesBySubject.isEmpty
                     ? Center(
                         child: Text(
-                          '이 날짜에 복습할 퀴즈가 없습니다',
+                          '이 날짜에 틀린 문제가 없습니다',
                           style:
                               Theme.of(context).textTheme.titleMedium?.copyWith(
                                     color: themeProvider.isDarkMode
@@ -190,70 +262,11 @@ class _DateReviewPageState extends State<DateReviewPage> {
                       )
                     : ListView.builder(
                         itemCount: _quizzesBySubject.length,
-                        itemBuilder: (context, subjectIndex) {
+                        itemBuilder: (context, index) {
                           final subject =
-                              _quizzesBySubject.keys.elementAt(subjectIndex);
+                              _quizzesBySubject.keys.elementAt(index);
                           final quizzesByType = _quizzesBySubject[subject]!;
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16.0),
-                                margin: const EdgeInsets.only(bottom: 8.0),
-                                decoration: BoxDecoration(
-                                  color: themeProvider.isDarkMode
-                                      ? Colors.grey[850]
-                                      : Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '# ${subject.name}',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: themeProvider.isDarkMode
-                                            ? Colors.white
-                                            : Colors.black87,
-                                      ),
-                                ),
-                              ),
-                              ...quizzesByType.entries.expand((entry) {
-                                final quizTypeId = entry.key;
-                                final quizzes = entry.value;
-
-                                return quizzes.map((quiz) {
-                                  final questionNumber = _questionNumber++;
-                                  return ReviewPageCard(
-                                    key: ValueKey('${quiz.id}_$questionNumber'),
-                                    quiz: quiz,
-                                    questionNumber: questionNumber,
-                                    subjectId: subject.id,
-                                    quizTypeId: quizTypeId,
-                                    nextReviewDate: '',
-                                    onAnswerSelected: (index) =>
-                                        _handleAnswerSelected(
-                                      subject.id,
-                                      quizTypeId,
-                                      quiz,
-                                      index,
-                                    ),
-                                    onFeedbackGiven: (quiz, isImproved) =>
-                                        _handleFeedbackGiven(
-                                      subject.id,
-                                      quizTypeId,
-                                      quiz,
-                                      isImproved,
-                                    ),
-                                    onRemoveCard: (quizId) =>
-                                        _handleRemoveCard(subject, quizId),
-                                  );
-                                });
-                              }).toList(),
-                            ],
-                          );
+                          return _buildSubjectSection(subject, quizzesByType);
                         },
                       ),
           ),

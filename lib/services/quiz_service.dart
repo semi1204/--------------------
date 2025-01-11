@@ -362,7 +362,6 @@ class QuizService {
   }
 
   Map<String, dynamic> getUserQuizData(String userId) {
-    _logger.i('사용자 퀴즈 데이터 가져오기: $userId');
     final data = _convertFromQuizUserDataMap(_userQuizData[userId] ?? {});
 
     // FSRS 형식으로 로그 출력 - 변화가 있는 퀴즈만
@@ -478,8 +477,6 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
   // Quizpage에서 퀴즈 데이터를 가져오는 함수
   Future<List<Quiz>> getQuizzes(String subjectId, String quizTypeId,
       {bool forceRefresh = false}) async {
-    _logger.i('과목 $subjectId에 대한 퀴즈 가져오는 중입니다: $quizTypeId');
-
     // 캐시 키 생성
     final key = '${_quizzesKey}_${subjectId}_$quizTypeId';
 
@@ -489,7 +486,7 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
         _cachedQuizzes[subjectId]!.containsKey(quizTypeId) &&
         _cachedQuizzes[subjectId]![quizTypeId]!.containsKey(key)) {
       // 캐시에서 퀴즈를 가져왔음을 로그로 기록
-      _logger.d('메모리 캐시에서 퀴즈를 가져왔습니다: $subjectId, $quizTypeId');
+
       return _cachedQuizzes[subjectId]![quizTypeId]![key]!;
     }
 
@@ -523,12 +520,8 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
       _cachedQuizzes[subjectId] = {
         quizTypeId: {key: quizzes}
       };
-      _logger.i(
-          '과목 $subjectId 및 퀴즈 유형 $quizTypeId에 대한 퀴를 가져왔습니다: ${quizzes.length}');
       return quizzes;
     } catch (e) {
-      _logger
-          .e('과목 $subjectId 및 퀴즈 유형 $quizTypeId에 대한 퀴즈를 가져오는 중 오류가 발생했습니다: $e');
       rethrow;
     }
   }
@@ -540,7 +533,6 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
     required String Function(T) encodeData,
     bool forceRefresh = false,
   }) async {
-    _logger.d('캐시를 사용하여 데이터 가져오는 중: $key');
     final prefs = await SharedPreferences.getInstance();
     final cachedData = prefs.getString(key);
     final cacheTimestamp = prefs.getInt('${key}_timestamp');
@@ -548,7 +540,6 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
     if (!forceRefresh && cachedData != null && cacheTimestamp != null) {
       final now = DateTime.now().millisecondsSinceEpoch;
       if (now - cacheTimestamp < _cacheExpiration.inMilliseconds) {
-        _logger.d('캐시된 데이터 사용: $key');
         return parseData(cachedData);
       }
     }
@@ -1086,5 +1077,82 @@ FSRS 학습 데이터 [과목: $subjectId, 유형: $quizTypeId, 문제: $quizId]
     }
 
     await _updateSharedPreferences(subjectId, quizTypeId);
+  }
+
+  Future<List<Quiz>> getQuizzesForDate(
+    String userId,
+    String subjectId,
+    String quizTypeId,
+    DateTime date,
+  ) async {
+    try {
+      final startOfDay = DateTime(date.year, date.month, date.day);
+
+      // Get all quizzes for this subject and quiz type
+      final quizDocs = await _firestore
+          .collection('subjects')
+          .doc(subjectId)
+          .collection('quizTypes')
+          .doc(quizTypeId)
+          .collection('quizzes')
+          .get();
+
+      // Get user's quiz data for the specified date
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+
+      if (!userDoc.exists) {
+        return [];
+      }
+
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final subjectData = userData[subjectId] as Map<String, dynamic>?;
+      if (subjectData == null) return [];
+
+      final quizTypeData = subjectData[quizTypeId] as Map<String, dynamic>?;
+      if (quizTypeData == null) return [];
+
+      // Filter quizzes based on attempt date and correctness
+      final List<Quiz> attemptedQuizzes = [];
+
+      for (var quizDoc in quizDocs.docs) {
+        final quizData = quizTypeData[quizDoc.id];
+        if (quizData == null) continue;
+
+        DateTime? lastAnswered;
+        final lastAnsweredData = quizData['lastAnswered'];
+
+        if (lastAnsweredData is Timestamp) {
+          lastAnswered = lastAnsweredData.toDate();
+        } else if (lastAnsweredData is String) {
+          try {
+            lastAnswered = DateTime.parse(lastAnsweredData);
+          } catch (e) {
+            _logger.w('Failed to parse date string: $lastAnsweredData');
+            continue;
+          }
+        }
+
+        if (lastAnswered == null) continue;
+
+        // Check if the quiz was attempted on the specified date
+        if (lastAnswered.year == startOfDay.year &&
+            lastAnswered.month == startOfDay.month &&
+            lastAnswered.day == startOfDay.day) {
+          final selectedOptionIndex = quizData['selectedOptionIndex'] as int?;
+          if (selectedOptionIndex == null) continue;
+
+          final quiz = Quiz.fromFirestore(quizDoc);
+          // Only include incorrect answers
+          if (selectedOptionIndex != quiz.correctOptionIndex) {
+            attemptedQuizzes.add(quiz);
+          }
+        }
+      }
+
+      return attemptedQuizzes;
+    } catch (e, stackTrace) {
+      _logger.e('Error getting quizzes for date: $e\n$stackTrace');
+      rethrow;
+    }
   }
 }

@@ -19,6 +19,10 @@ class UserProvider with ChangeNotifier {
   double _targetRetention = 0.9;
   double get targetRetention => _targetRetention;
 
+  bool _isInitialized = false;
+
+  bool get isInitialized => _isInitialized;
+
   void setTargetRetention(double value) {
     _targetRetention = value;
     AnkiAlgorithm.targetRetention = value;
@@ -61,7 +65,7 @@ class UserProvider with ChangeNotifier {
     if (_user?.uid != user?.uid) {
       _user = user;
       if (user != null) {
-        await _loadUserData();
+        await loadUserData();
         await checkAndUpdateSubscriptionStatus();
       } else {
         _isSubscribed = false;
@@ -77,7 +81,7 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  Future<void> _loadUserData() async {
+  Future<void> loadUserData() async {
     if (_user == null) return;
     await _quizService.loadUserQuizData(_user!.uid);
   }
@@ -309,5 +313,16 @@ class UserProvider with ChangeNotifier {
   Future<void> incrementQuizAttempt() async {
     if (_user == null) return;
     await _paymentService.incrementQuizAttempt();
+  }
+
+  Future<void> initializeUser() async {
+    if (_isInitialized) return;
+
+    // 기존의 사용자 초기화 로직이 완료될 때까지 대기
+    // Firebase Auth 상태 변경을 기다림
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    _isInitialized = true;
+    notifyListeners();
   }
 }

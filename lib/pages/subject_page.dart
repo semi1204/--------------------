@@ -305,9 +305,20 @@ class _SubjectPageState extends State<SubjectPage> {
     super.initState();
     _scrollController.addListener(_scrollListener);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<SubjectProvider>(context, listen: false).loadSubjects();
-      _preloadSubjectProgress();
+      _initializeData();
     });
+  }
+
+  Future<void> _initializeData() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    await userProvider.initializeUser();
+
+    if (!mounted) return;
+
+    await Provider.of<SubjectProvider>(context, listen: false).loadSubjects();
+
+    await _preloadSubjectProgress();
   }
 
   Future<void> _preloadSubjectProgress() async {
@@ -472,6 +483,15 @@ class _SubjectPageState extends State<SubjectPage> {
       UserProvider userProvider,
       String subjectId,
       String quizTypeId) async {
+    if (!userProvider.isInitialized) {
+      return {
+        'progress': 0.0,
+        'answeredCount': 0,
+        'totalCount': 0,
+        'accuracy': 0
+      };
+    }
+
     final quizData = userProvider.getUserQuizData();
     final subjectData = quizData[subjectId] as Map<String, dynamic>?;
     final userId = userProvider.user?.uid;

@@ -7,6 +7,7 @@ import '../providers/theme_provider.dart';
 import 'quiz_type_page.dart';
 import 'review_quizzes_page.dart';
 import 'add_quiz_page.dart';
+import 'date_review_page.dart';
 import '../widgets/drawer/app_drawer.dart';
 import '../widgets/linked_title.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -373,6 +374,7 @@ class _SubjectPageState extends State<SubjectPage> {
             children: [
               _buildSubjectList(subjectProvider, themeProvider),
               const ReviewQuizzesPage(),
+              const DateReviewPage(),
               if (Provider.of<UserProvider>(context, listen: false).isAdmin)
                 const AddQuizPage(),
             ],
@@ -471,7 +473,10 @@ class _SubjectPageState extends State<SubjectPage> {
       items: [
         const BottomNavigationBarItem(
             icon: Icon(Icons.local_library), label: '과목별 기출'),
-        const BottomNavigationBarItem(icon: Icon(Icons.refresh), label: '복습하기'),
+        const BottomNavigationBarItem(
+            icon: Icon(Icons.refresh), label: 'AI 복습'),
+        const BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_today), label: '날짜별 복습'),
         if (Provider.of<UserProvider>(context, listen: false).isAdmin)
           const BottomNavigationBarItem(icon: Icon(Icons.add), label: '퀴즈 추가'),
       ],

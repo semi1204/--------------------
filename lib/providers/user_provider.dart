@@ -8,6 +8,7 @@ import 'package:nursing_quiz_app_6/services/payment_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nursing_quiz_app_6/utils/anki_algorithm.dart';
 import 'dart:math' as math;
+import 'package:logger/logger.dart';
 
 class UserProvider with ChangeNotifier {
   User? _user;
@@ -15,6 +16,7 @@ class UserProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
   final QuizService _quizService = QuizService();
   final PaymentService _paymentService;
+  final Logger _logger = Logger();
 
   double _targetRetention = 0.9;
   double get targetRetention => _targetRetention;
@@ -83,7 +85,22 @@ class UserProvider with ChangeNotifier {
 
   Future<void> loadUserData() async {
     if (_user == null) return;
-    await _quizService.loadUserQuizData(_user!.uid);
+
+    try {
+      // First try to load from local cache
+      await _quizService.loadUserQuizData(_user!.uid);
+
+      // If the data is empty, force load from Firebase
+      if (getUserQuizData().isEmpty) {
+        await _quizService.syncUserData(_user!.uid, {});
+        await _quizService.saveUserQuizData(_user!.uid);
+      }
+
+      notifyListeners();
+    } catch (e) {
+      _logger.e('Error loading user data: $e');
+      rethrow;
+    }
   }
 
   Future<bool> isUserLoggedIn() async {
@@ -316,13 +333,21 @@ class UserProvider with ChangeNotifier {
   }
 
   Future<void> initializeUser() async {
-    if (_isInitialized) return;
+    if (_user == null) {
+      final currentUser = _authService.auth.currentUser;
+      if (currentUser != null) {
+        _user = currentUser;
+      } else {
+        return;
+      }
+    }
 
-    // 기존의 사용자 초기화 로직이 완료될 때까지 대기
-    // Firebase Auth 상태 변경을 기다림
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    _isInitialized = true;
-    notifyListeners();
+    if (!_isInitialized) {
+      await loadUserData();
+      await checkAndUpdateSubscriptionStatus();
+      _loadTargetRetention();
+      _isInitialized = true;
+      notifyListeners();
+    }
   }
 }

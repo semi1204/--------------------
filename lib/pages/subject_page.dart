@@ -317,9 +317,15 @@ class _SubjectPageState extends State<SubjectPage> {
 
     if (!mounted) return;
 
-    await Provider.of<SubjectProvider>(context, listen: false).loadSubjects();
+    final subjectProvider =
+        Provider.of<SubjectProvider>(context, listen: false);
+    await subjectProvider.loadSubjects();
 
-    await _preloadSubjectProgress();
+    // Only preload subject progress if user data is available
+    if (userProvider.user != null &&
+        userProvider.getUserQuizData().isNotEmpty) {
+      await _preloadSubjectProgress();
+    }
   }
 
   Future<void> _preloadSubjectProgress() async {
@@ -329,9 +335,11 @@ class _SubjectPageState extends State<SubjectPage> {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
     for (var subject in subjectProvider.subjects) {
-      final progress = await _calculateQuizSubjectProgress(
-          quizService, userProvider, subject.id, 'default');
-      _subjectProgressCache[subject.id] = progress;
+      if (!_subjectProgressCache.containsKey(subject.id)) {
+        final progress = await _calculateQuizSubjectProgress(
+            quizService, userProvider, subject.id, 'default');
+        _subjectProgressCache[subject.id] = progress;
+      }
     }
     if (mounted) setState(() {});
   }

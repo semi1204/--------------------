@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
+import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 import 'package:nursing_quiz_app_6/models/subscription_constants.dart';
 import 'package:nursing_quiz_app_6/widgets/bottom_sheet/subscription_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'package:in_app_review/in_app_review.dart';
+import 'dart:io';
 
 class PaymentService extends ChangeNotifier {
   PaymentService({required Logger logger}) : _logger = logger;
@@ -350,11 +353,27 @@ class PaymentService extends ChangeNotifier {
         throw Exception('Store not available');
       }
 
+      // For StoreKit deferred payments (Ask to Buy)
+      if (Platform.isIOS && productDetails is AppStoreProductDetails) {
+        final payment = SKPaymentWrapper(
+          productIdentifier: productDetails.id,
+          quantity: 1,
+          applicationUsername: _auth.currentUser?.uid,
+          simulatesAskToBuyInSandbox: true, // Enable Ask to Buy in sandbox
+        );
+
+        final storeKit = SKPaymentQueueWrapper();
+        await storeKit.addPayment(payment);
+        return;
+      }
+
+      final purchaseParam = PurchaseParam(
+        productDetails: productDetails,
+        applicationUserName: _auth.currentUser?.uid,
+      );
+
       await _inAppPurchase.buyNonConsumable(
-        purchaseParam: PurchaseParam(
-          productDetails: productDetails,
-          applicationUserName: _auth.currentUser?.uid,
-        ),
+        purchaseParam: purchaseParam,
       );
 
       if (context.mounted) {

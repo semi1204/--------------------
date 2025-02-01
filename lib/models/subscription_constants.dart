@@ -31,4 +31,30 @@ class SubscriptionPlan {
     required this.savePercent,
     this.isPopular = false,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'price': price,
+      'period': period,
+      'originalPrice': originalPrice,
+      'savePercent': savePercent,
+      'isPopular': isPopular,
+    };
+  }
+
+  factory SubscriptionPlan.fromJson(Map<String, dynamic> json) {
+    return SubscriptionPlan(
+      id: json['id'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      price: json['price'] ?? '',
+      period: json['period'] ?? '',
+      originalPrice: json['originalPrice'] ?? '',
+      savePercent: json['savePercent'] ?? '',
+      isPopular: json['isPopular'] ?? false,
+    );
+  }
 }

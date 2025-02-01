@@ -3,6 +3,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 import 'package:nursing_quiz_app_6/models/subscription_constants.dart';
+import 'package:nursing_quiz_app_6/models/payment_history.dart';
 import 'package:nursing_quiz_app_6/widgets/bottom_sheet/subscription_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
@@ -21,13 +22,16 @@ class PaymentService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   late StreamSubscription<List<PurchaseDetails>> _purchaseUpdatedSubscription;
 
+  bool get isIOS => Platform.isIOS;
+  bool get isMacOs => Platform.isMacOS;
+
   static const String _subscriptionEndDateKey = 'subscription_end_date';
+  static const String _subscriptionCacheKey = 'subscription_status';
   static const String _freeQuizCountKey = 'free_quiz_count';
   static const int maxFreeQuizzes = 10;
 
   SharedPreferences? _prefs;
 
-  // 상품 정보를 저장할 변수 추가
   List<ProductDetails> _productDetails = [];
 
   Future<void> _initPrefs() async {
@@ -43,12 +47,15 @@ class PaymentService extends ChangeNotifier {
       return;
     }
 
-    const Set<String> kIds = {
-      'com.example.nursingQuizApp.yearly',
-      'com.example.nursingQuizApp.monthly',
+    if (Platform.isIOS || Platform.isMacOS) {
+      await _verifySubscriptionWithStoreKit();
+    }
+
+    final Set<String> kIds = {
+      SubscriptionIds.monthlyIosId,
+      SubscriptionIds.yearlyIosId,
     };
 
-    // 상품 정보 조회 및 저장
     final ProductDetailsResponse response =
         await _inAppPurchase.queryProductDetails(kIds);
     if (response.error != null) {
@@ -63,7 +70,90 @@ class PaymentService extends ChangeNotifier {
         _inAppPurchase.purchaseStream.listen(_handlePurchaseUpdate);
   }
 
-  static const String _subscriptionCacheKey = 'subscription_status';
+  Future<void> _verifySubscriptionWithStoreKit() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final InAppPurchaseStoreKitPlatformAddition storeKit = _inAppPurchase
+          .getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
+
+      final SKPaymentQueueWrapper queue = SKPaymentQueueWrapper();
+      final transactions = await queue.transactions();
+
+      bool hasActiveSubscription = false;
+
+      for (final transaction in transactions) {
+        if (transaction.payment == null ||
+            transaction.transactionIdentifier == null) continue;
+
+        if (transaction.transactionState ==
+                SKPaymentTransactionStateWrapper.purchased ||
+            transaction.transactionState ==
+                SKPaymentTransactionStateWrapper.restored) {
+          final bool isValidTransaction =
+              await _validateStoreKitTransaction(transaction);
+          if (isValidTransaction) {
+            hasActiveSubscription = true;
+            break;
+          }
+        }
+
+        await queue.finishTransaction(transaction);
+      }
+
+      await _updateSubscriptionCache(hasActiveSubscription);
+      _logger.i(
+          'StoreKit verification completed - Has active subscription: $hasActiveSubscription');
+    } catch (e) {
+      _logger.e('Error during StoreKit verification: $e');
+      await _updateSubscriptionCache(false);
+    }
+  }
+
+  Future<bool> _validateStoreKitTransaction(
+      SKPaymentTransactionWrapper transaction) async {
+    try {
+      final productId = transaction.payment.productIdentifier;
+      final isYearly = productId == SubscriptionIds.yearlyId;
+      final now = DateTime.now();
+
+      final bool isSandbox = transaction.payment.simulatesAskToBuyInSandbox;
+      final Duration subscriptionDuration = isSandbox
+          ? (isYearly ? const Duration(minutes: 5) : const Duration(minutes: 3))
+          : (isYearly ? const Duration(days: 365) : const Duration(days: 30));
+
+      await _firestore
+          .collection('subscription_validations')
+          .doc(_auth.currentUser?.uid)
+          .set({
+        'transactionId': transaction.transactionIdentifier,
+        'productId': productId,
+        'validatedAt': FieldValue.serverTimestamp(),
+        'isSandbox': isSandbox,
+        'expiresAt': Timestamp.fromDate(now.add(subscriptionDuration)),
+      });
+
+      return true;
+    } catch (e) {
+      _logger.e('Transaction validation error: $e');
+      return false;
+    }
+  }
+
+  Future<void> _updateSubscriptionCache(bool isSubscribed) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    await _prefs?.setBool('${_subscriptionCacheKey}_${user.uid}', isSubscribed);
+    await _prefs?.setInt(
+      '${_subscriptionCacheKey}_${user.uid}_timestamp',
+      DateTime.now().millisecondsSinceEpoch,
+    );
+
+    _logger.i('Updated subscription cache - Is subscribed: $isSubscribed');
+    notifyListeners();
+  }
 
   Future<bool> checkSubscriptionStatus() async {
     try {
@@ -172,6 +262,10 @@ class PaymentService extends ChangeNotifier {
     for (var purchaseDetails in purchaseDetailsList) {
       if (purchaseDetails.status == PurchaseStatus.pending) {
         _logger.i('Purchase pending: ${purchaseDetails.productID}');
+        // Ask to Buy 상태 처리
+        if (Platform.isIOS || Platform.isMacOS) {
+          _handleAskToBuyStatus(purchaseDetails);
+        }
       } else if (purchaseDetails.status == PurchaseStatus.error) {
         _logger.e('Purchase error: ${purchaseDetails.error}');
       } else if (purchaseDetails.status == PurchaseStatus.purchased ||
@@ -189,6 +283,10 @@ class PaymentService extends ChangeNotifier {
         }
       } else if (purchaseDetails.status == PurchaseStatus.canceled) {
         _logger.i('Purchase canceled: ${purchaseDetails.productID}');
+        // Ask to Buy 거절 처리
+        if (Platform.isIOS || Platform.isMacOS) {
+          _handleAskToBuyRejection(purchaseDetails);
+        }
       }
     }
     notifyListeners();
@@ -196,15 +294,82 @@ class PaymentService extends ChangeNotifier {
 
   Future<bool> _verifyPurchase(PurchaseDetails purchaseDetails) async {
     try {
+      if (Platform.isIOS || Platform.isMacOS) {
+        final SKPaymentQueueWrapper paymentQueue = SKPaymentQueueWrapper();
+        final List<SKPaymentTransactionWrapper> transactions =
+            await paymentQueue.transactions();
+
+        final matchingTransaction = transactions.firstWhere(
+          (transaction) =>
+              transaction.transactionIdentifier == purchaseDetails.purchaseID,
+          orElse: () => throw Exception('Transaction not found in StoreKit'),
+        );
+
+        if (matchingTransaction.transactionState !=
+                SKPaymentTransactionStateWrapper.purchased &&
+            matchingTransaction.transactionState !=
+                SKPaymentTransactionStateWrapper.restored) {
+          _logger.w(
+              'Invalid transaction state: ${matchingTransaction.transactionState}');
+          return false;
+        }
+
+        if (purchaseDetails.verificationData.source == 'app_store_sandbox') {
+          _logger.i('Sandbox purchase detected, applying sandbox verification');
+          final bool isValidSandbox =
+              await _verifySandboxPurchase(matchingTransaction);
+          if (!isValidSandbox) {
+            _logger.w('Sandbox verification failed');
+            return false;
+          }
+        }
+      }
+
       final verificationData = purchaseDetails.verificationData;
       final response = await _verifyWithServer(
         token: verificationData.serverVerificationData,
         productId: purchaseDetails.productID,
         source: verificationData.source,
       );
+
+      _logger.i('Purchase verification completed - Success: $response');
       return response;
     } catch (e) {
       _logger.e('Purchase verification error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _verifySandboxPurchase(
+      SKPaymentTransactionWrapper transaction) async {
+    try {
+      if (transaction.payment == null ||
+          transaction.transactionIdentifier == null ||
+          transaction.payment.productIdentifier.isEmpty) {
+        _logger.w('Invalid sandbox transaction details');
+        return false;
+      }
+
+      final queue = SKPaymentQueueWrapper();
+      final transactions = await queue.transactions();
+
+      final exists = transactions.any((t) =>
+          t.transactionIdentifier == transaction.transactionIdentifier &&
+          t.payment.productIdentifier ==
+              transaction.payment.productIdentifier &&
+          (t.transactionState == SKPaymentTransactionStateWrapper.purchased ||
+              t.transactionState == SKPaymentTransactionStateWrapper.restored));
+
+      if (!exists) {
+        _logger.w(
+            'Transaction not found in current payment queue or invalid state');
+        return false;
+      }
+
+      _logger.i('Sandbox verification completed successfully');
+      return true;
+    } catch (e) {
+      _logger.e('Sandbox verification error: $e');
       return false;
     }
   }
@@ -233,27 +398,53 @@ class PaymentService extends ChangeNotifier {
   }
 
   Future<void> _updateSubscriptionStatus(PurchaseDetails purchase) async {
-    final endDate = DateTime.now().add(
-      purchase.productID == SubscriptionIds.monthlyId
-          ? const Duration(days: 30)
-          : const Duration(days: 365),
-    );
+    final DateTime now = DateTime.now();
+    final bool isYearlySubscription =
+        purchase.productID == SubscriptionIds.yearlyId;
+    final bool isSandbox = Platform.isIOS
+        ? purchase.verificationData.source == 'app_store_sandbox'
+        : false;
 
-    // 로컬 저장
-    await _prefs?.setInt(
-      _subscriptionEndDateKey,
-      endDate.millisecondsSinceEpoch,
-    );
-
-    // 서버 저장
     final user = _auth.currentUser;
     if (user != null) {
       await _firestore.collection('subscriptions').doc(user.uid).set({
-        'endDate': Timestamp.fromDate(endDate),
+        'startDate': Timestamp.fromDate(now),
         'purchaseToken': purchase.purchaseID,
         'productId': purchase.productID,
+        'isYearlySubscription': isYearlySubscription,
         'updatedAt': FieldValue.serverTimestamp(),
+        'userEmail': user.email,
+        'isSandbox': isSandbox,
       });
+
+      await _updateSubscriptionCache(true);
+
+      final productDetails = _productDetails.firstWhere(
+        (p) => p.id == purchase.productID,
+        orElse: () => throw Exception('Product details not found'),
+      );
+
+      final paymentHistory = PaymentHistory(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: user.uid,
+        subscriptionId: purchase.productID,
+        amount: double.parse(
+            productDetails.price.replaceAll(RegExp(r'[^\d.]'), '')),
+        date: now,
+        status: PaymentStatus.success,
+        paymentMethod: Platform.isIOS ? 'App Store' : 'Google Play',
+        transactionId: purchase.purchaseID ?? '',
+        userEmail: user.email,
+        isSandbox: isSandbox,
+      );
+
+      await _firestore
+          .collection('payment_history')
+          .doc(paymentHistory.id)
+          .set(paymentHistory.toFirestore());
+
+      _logger.i(
+          'Updated subscription status - Sandbox: ${paymentHistory.isSandbox}');
     }
   }
 
@@ -348,13 +539,32 @@ class PaymentService extends ChangeNotifier {
             const Center(child: CircularProgressIndicator()),
       );
 
+      // Clear any pending transactions before initiating new purchase
+      if (Platform.isIOS || Platform.isMacOS) {
+        final SKPaymentQueueWrapper wrapper = SKPaymentQueueWrapper();
+        final List<SKPaymentTransactionWrapper> transactions =
+            await wrapper.transactions();
+
+        // Complete any pending transactions for this product
+        for (final transaction in transactions) {
+          if (transaction.payment.productIdentifier == productDetails.id) {
+            await wrapper.finishTransaction(transaction);
+            _logger.i(
+                'Completed pending transaction: ${transaction.transactionIdentifier}');
+          }
+        }
+      }
+
       final bool available = await _inAppPurchase.isAvailable();
       if (!available) {
         throw Exception('Store not available');
       }
 
       // For StoreKit deferred payments (Ask to Buy)
-      if (Platform.isIOS && productDetails is AppStoreProductDetails) {
+      if ((Platform.isIOS || Platform.isMacOS) &&
+          productDetails is AppStoreProductDetails) {
+        _logger.i('Initiating StoreKit payment with Ask to Buy support');
+
         final payment = SKPaymentWrapper(
           productIdentifier: productDetails.id,
           quantity: 1,
@@ -364,24 +574,33 @@ class PaymentService extends ChangeNotifier {
 
         final storeKit = SKPaymentQueueWrapper();
         await storeKit.addPayment(payment);
+
+        if (context.mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('결제 요청이 전송되었습니다. 승인을 기다려주세요.'),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
         return;
       }
 
-      final purchaseParam = PurchaseParam(
-        productDetails: productDetails,
-        applicationUserName: _auth.currentUser?.uid,
-      );
-
       await _inAppPurchase.buyNonConsumable(
-        purchaseParam: purchaseParam,
+        purchaseParam: PurchaseParam(
+          productDetails: productDetails,
+          applicationUserName: _auth.currentUser?.uid,
+        ),
       );
 
       if (context.mounted) {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(); // Close loading dialog
       }
     } catch (e) {
       _logger.e('Error initiating purchase: $e');
       if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
         showDialog(
           context: context,
           builder: (BuildContext ctx) => AlertDialog(
@@ -439,6 +658,16 @@ class PaymentService extends ChangeNotifier {
         );
       }
     }
+  }
+
+  void _handleAskToBuyStatus(PurchaseDetails purchaseDetails) {
+    _logger.i('Ask to Buy request pending for: ${purchaseDetails.productID}');
+    // 여기서 필요한 경우 UI 업데이트나 사용자에게 알림을 보낼 수 있습니다.
+  }
+
+  void _handleAskToBuyRejection(PurchaseDetails purchaseDetails) {
+    _logger.i('Ask to Buy request rejected for: ${purchaseDetails.productID}');
+    // 여기서 필요한 경우 UI 업데이트나 사용자에게 알림을 보낼 수 있습니다.
   }
 
   @override

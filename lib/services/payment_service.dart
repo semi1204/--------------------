@@ -4,6 +4,7 @@ import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 import 'package:nursing_quiz_app_6/models/subscription_constants.dart';
 import 'package:nursing_quiz_app_6/models/payment_history.dart';
+import 'package:nursing_quiz_app_6/utils/constants.dart';
 import 'package:nursing_quiz_app_6/widgets/bottom_sheet/subscription_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
@@ -47,7 +48,9 @@ class PaymentService extends ChangeNotifier {
       return;
     }
 
+    // 앱 시작 시 무조건 StoreKit 검증 수행
     if (Platform.isIOS || Platform.isMacOS) {
+      _logger.i('Performing initial StoreKit verification');
       await _verifySubscriptionWithStoreKit();
     }
 
@@ -70,123 +73,39 @@ class PaymentService extends ChangeNotifier {
         _inAppPurchase.purchaseStream.listen(_handlePurchaseUpdate);
   }
 
-  Future<void> _verifySubscriptionWithStoreKit() async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) return;
-
-      final InAppPurchaseStoreKitPlatformAddition storeKit = _inAppPurchase
-          .getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
-
-      final SKPaymentQueueWrapper queue = SKPaymentQueueWrapper();
-      final transactions = await queue.transactions();
-
-      bool hasActiveSubscription = false;
-
-      for (final transaction in transactions) {
-        if (transaction.payment == null ||
-            transaction.transactionIdentifier == null) continue;
-
-        if (transaction.transactionState ==
-                SKPaymentTransactionStateWrapper.purchased ||
-            transaction.transactionState ==
-                SKPaymentTransactionStateWrapper.restored) {
-          final bool isValidTransaction =
-              await _validateStoreKitTransaction(transaction);
-          if (isValidTransaction) {
-            hasActiveSubscription = true;
-            break;
-          }
-        }
-
-        await queue.finishTransaction(transaction);
-      }
-
-      await _updateSubscriptionCache(hasActiveSubscription);
-      _logger.i(
-          'StoreKit verification completed - Has active subscription: $hasActiveSubscription');
-    } catch (e) {
-      _logger.e('Error during StoreKit verification: $e');
-      await _updateSubscriptionCache(false);
-    }
-  }
-
-  Future<bool> _validateStoreKitTransaction(
-      SKPaymentTransactionWrapper transaction) async {
-    try {
-      final productId = transaction.payment.productIdentifier;
-      final isYearly = productId == SubscriptionIds.yearlyId;
-      final now = DateTime.now();
-
-      final bool isSandbox = transaction.payment.simulatesAskToBuyInSandbox;
-      final Duration subscriptionDuration = isSandbox
-          ? (isYearly ? const Duration(minutes: 5) : const Duration(minutes: 3))
-          : (isYearly ? const Duration(days: 365) : const Duration(days: 30));
-
-      await _firestore
-          .collection('subscription_validations')
-          .doc(_auth.currentUser?.uid)
-          .set({
-        'transactionId': transaction.transactionIdentifier,
-        'productId': productId,
-        'validatedAt': FieldValue.serverTimestamp(),
-        'isSandbox': isSandbox,
-        'expiresAt': Timestamp.fromDate(now.add(subscriptionDuration)),
-      });
-
-      return true;
-    } catch (e) {
-      _logger.e('Transaction validation error: $e');
-      return false;
-    }
-  }
-
-  Future<void> _updateSubscriptionCache(bool isSubscribed) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    await _prefs?.setBool('${_subscriptionCacheKey}_${user.uid}', isSubscribed);
-    await _prefs?.setInt(
-      '${_subscriptionCacheKey}_${user.uid}_timestamp',
-      DateTime.now().millisecondsSinceEpoch,
-    );
-
-    _logger.i('Updated subscription cache - Is subscribed: $isSubscribed');
-    notifyListeners();
-  }
-
   Future<bool> checkSubscriptionStatus() async {
     try {
       final user = _auth.currentUser;
       if (user == null) return false;
-      // 1. Check SharedPreferences cache first
+
+      if (user.email == ADMIN_EMAIL) return true;
+
+      // 캐시 확인
       await _initPrefs();
       final cachedStatus =
           _prefs?.getBool('${_subscriptionCacheKey}_${user.uid}');
       final cachedTimestamp =
           _prefs?.getInt('${_subscriptionCacheKey}_${user.uid}_timestamp');
 
+      // 캐시가 있고 24시간 이내라면 캐시된 값 사용
       if (cachedStatus != null && cachedTimestamp != null) {
         final cacheAge = DateTime.now()
             .difference(DateTime.fromMillisecondsSinceEpoch(cachedTimestamp));
-        if (cacheAge < const Duration(minutes: 30)) {
+        if (cacheAge < const Duration(hours: 24)) {
+          _logger.i(
+              'Using cached subscription status: $cachedStatus (cache age: ${cacheAge.inHours}h)');
           return cachedStatus;
+        } else {
+          _logger.i(
+              'Cache expired (age: ${cacheAge.inHours}h), performing StoreKit verification');
         }
+      } else {
+        _logger.i('No cache found, performing StoreKit verification');
       }
 
-      // 2. Check Firestore only if cache miss or expired
-      final doc =
-          await _firestore.collection('subscriptions').doc(user.uid).get();
-      if (doc.exists) {
-        final serverEndDate = (doc.data()?['endDate'] as Timestamp).toDate();
-        final isActive = DateTime.now().isBefore(serverEndDate);
-
-        // Cache the result in SharedPreferences
-        await _prefs?.setBool('${_subscriptionCacheKey}_${user.uid}', isActive);
-        await _prefs?.setInt('${_subscriptionCacheKey}_${user.uid}_timestamp',
-            DateTime.now().millisecondsSinceEpoch);
-
-        return isActive;
+      // 캐시가 없거나 만료된 경우 StoreKit 확인
+      if (Platform.isIOS || Platform.isMacOS) {
+        return await _verifySubscriptionWithStoreKit();
       }
 
       return false;
@@ -196,22 +115,50 @@ class PaymentService extends ChangeNotifier {
     }
   }
 
-  Future<bool> hasActiveSubscription() async {
-    await _initPrefs();
-    final endDateMillis = _prefs?.getInt(_subscriptionEndDateKey);
-    if (endDateMillis == null) return false;
+  Future<bool> _verifySubscriptionWithStoreKit() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
 
-    final endDate = DateTime.fromMillisecondsSinceEpoch(endDateMillis);
-    final isActive = DateTime.now().isBefore(endDate);
+      if (user.email == ADMIN_EMAIL) {
+        await _updateSubscriptionCache(true);
+        return true;
+      }
 
-    _logger.d(
-        'Local subscription status: ${isActive ? 'active' : 'inactive'} until $endDate');
-    return isActive;
+      _logger.i('Starting StoreKit verification');
+      final SKPaymentQueueWrapper queue = SKPaymentQueueWrapper();
+      final transactions = await queue.transactions();
+
+      bool checkSubscriptionStatus = false;
+
+      for (final transaction in transactions) {
+        if (transaction.payment == null ||
+            transaction.transactionIdentifier == null) continue;
+
+        // 구매 완료된 트랜잭션만 확인
+        if (transaction.transactionState ==
+            SKPaymentTransactionStateWrapper.purchased) {
+          _logger.i(
+              'Found purchased transaction: ${transaction.transactionIdentifier}');
+          checkSubscriptionStatus = true;
+          break;
+        }
+      }
+
+      // StoreKit 검증 결과를 24시간 캐시로 저장
+      await _updateSubscriptionCache(checkSubscriptionStatus);
+      _logger.i(
+          'StoreKit verification completed - Has active subscription: $checkSubscriptionStatus');
+      return checkSubscriptionStatus;
+    } catch (e) {
+      _logger.e('Error during StoreKit verification: $e');
+      return false;
+    }
   }
 
   Future<bool> canAttemptQuiz() async {
     try {
-      if (await hasActiveSubscription()) return true;
+      if (await checkSubscriptionStatus()) return true;
 
       final currentCount = _prefs?.getInt(_freeQuizCountKey) ?? 0;
       return currentCount < maxFreeQuizzes;
@@ -223,7 +170,7 @@ class PaymentService extends ChangeNotifier {
 
   Future<void> incrementQuizAttempt() async {
     try {
-      if (await hasActiveSubscription()) return;
+      if (await checkSubscriptionStatus()) return;
 
       final currentCount = _prefs?.getInt(_freeQuizCountKey) ?? 0;
       final newCount = currentCount + 1;
@@ -251,7 +198,7 @@ class PaymentService extends ChangeNotifier {
   }
 
   Future<int> getRemainingQuizzes() async {
-    if (await hasActiveSubscription()) return -1;
+    if (await checkSubscriptionStatus()) return -1;
 
     final currentCount = _prefs?.getInt(_freeQuizCountKey) ?? 0;
     return maxFreeQuizzes - currentCount;
@@ -314,14 +261,12 @@ class PaymentService extends ChangeNotifier {
           return false;
         }
 
-        if (purchaseDetails.verificationData.source == 'app_store_sandbox') {
-          _logger.i('Sandbox purchase detected, applying sandbox verification');
-          final bool isValidSandbox =
-              await _verifySandboxPurchase(matchingTransaction);
-          if (!isValidSandbox) {
-            _logger.w('Sandbox verification failed');
-            return false;
-          }
+        // App Store 영수증 검증
+        final String receiptData =
+            purchaseDetails.verificationData.serverVerificationData;
+        if (receiptData.isEmpty) {
+          _logger.w('Empty receipt data from App Store');
+          return false;
         }
       }
 
@@ -336,40 +281,6 @@ class PaymentService extends ChangeNotifier {
       return response;
     } catch (e) {
       _logger.e('Purchase verification error: $e');
-      return false;
-    }
-  }
-
-  Future<bool> _verifySandboxPurchase(
-      SKPaymentTransactionWrapper transaction) async {
-    try {
-      if (transaction.payment == null ||
-          transaction.transactionIdentifier == null ||
-          transaction.payment.productIdentifier.isEmpty) {
-        _logger.w('Invalid sandbox transaction details');
-        return false;
-      }
-
-      final queue = SKPaymentQueueWrapper();
-      final transactions = await queue.transactions();
-
-      final exists = transactions.any((t) =>
-          t.transactionIdentifier == transaction.transactionIdentifier &&
-          t.payment.productIdentifier ==
-              transaction.payment.productIdentifier &&
-          (t.transactionState == SKPaymentTransactionStateWrapper.purchased ||
-              t.transactionState == SKPaymentTransactionStateWrapper.restored));
-
-      if (!exists) {
-        _logger.w(
-            'Transaction not found in current payment queue or invalid state');
-        return false;
-      }
-
-      _logger.i('Sandbox verification completed successfully');
-      return true;
-    } catch (e) {
-      _logger.e('Sandbox verification error: $e');
       return false;
     }
   }
@@ -405,10 +316,27 @@ class PaymentService extends ChangeNotifier {
         ? purchase.verificationData.source == 'app_store_sandbox'
         : false;
 
+    final Duration subscriptionDuration = isSandbox
+        ? (isYearlySubscription
+            ? const Duration(minutes: 5)
+            : const Duration(minutes: 3))
+        : (isYearlySubscription
+            ? const Duration(days: 365)
+            : const Duration(days: 30));
+
+    final DateTime endDate = now.add(subscriptionDuration);
+
     final user = _auth.currentUser;
     if (user != null) {
+      // Update local cache first
+      await _prefs?.setInt(
+          _subscriptionEndDateKey, endDate.millisecondsSinceEpoch);
+      await _updateSubscriptionCache(true);
+
+      // Then update Firestore
       await _firestore.collection('subscriptions').doc(user.uid).set({
         'startDate': Timestamp.fromDate(now),
+        'endDate': Timestamp.fromDate(endDate),
         'purchaseToken': purchase.purchaseID,
         'productId': purchase.productID,
         'isYearlySubscription': isYearlySubscription,
@@ -417,13 +345,24 @@ class PaymentService extends ChangeNotifier {
         'isSandbox': isSandbox,
       });
 
-      await _updateSubscriptionCache(true);
+      // Also update subscription_validations for StoreKit verification
+      await _firestore
+          .collection('subscription_validations')
+          .doc(user.uid)
+          .set({
+        'transactionId': purchase.purchaseID,
+        'productId': purchase.productID,
+        'validatedAt': FieldValue.serverTimestamp(),
+        'isSandbox': isSandbox,
+        'expiresAt': Timestamp.fromDate(endDate),
+      });
 
       final productDetails = _productDetails.firstWhere(
         (p) => p.id == purchase.productID,
         orElse: () => throw Exception('Product details not found'),
       );
 
+      // Record payment history
       final paymentHistory = PaymentHistory(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         userId: user.uid,
@@ -444,7 +383,9 @@ class PaymentService extends ChangeNotifier {
           .set(paymentHistory.toFirestore());
 
       _logger.i(
-          'Updated subscription status - Sandbox: ${paymentHistory.isSandbox}');
+          'Updated subscription status - Sandbox: ${paymentHistory.isSandbox}, End Date: $endDate');
+
+      notifyListeners();
     }
   }
 
@@ -668,6 +609,20 @@ class PaymentService extends ChangeNotifier {
   void _handleAskToBuyRejection(PurchaseDetails purchaseDetails) {
     _logger.i('Ask to Buy request rejected for: ${purchaseDetails.productID}');
     // 여기서 필요한 경우 UI 업데이트나 사용자에게 알림을 보낼 수 있습니다.
+  }
+
+  Future<void> _updateSubscriptionCache(bool isSubscribed) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    await _prefs?.setBool('${_subscriptionCacheKey}_${user.uid}', isSubscribed);
+    await _prefs?.setInt(
+      '${_subscriptionCacheKey}_${user.uid}_timestamp',
+      DateTime.now().millisecondsSinceEpoch,
+    );
+
+    _logger.i('Updated subscription cache - Is subscribed: $isSubscribed');
+    notifyListeners();
   }
 
   @override
